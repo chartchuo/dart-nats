@@ -1,0 +1,11 @@
+name: dart_nats
+description: NATS Client library for Dart
+version: 0.0.1
+
+environment:
+  sdk: ">=2.1.0 <3.0.0"
+
+# dependencies:
+
+dev_dependencies:
+  test: ^1.9.4

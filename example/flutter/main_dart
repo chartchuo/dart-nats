@@ -1,0 +1,107 @@
+// Please rename from main_dart to main.dart and replace in flutter lib/ folder
+
+import 'package:flutter/material.dart';
+import 'package:hello_world/nats_client.dart' as nats;
+
+
+
+void main() => runApp(MyApp());
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: MyHomePage(),
+    );
+  }
+}
+
+class MyHomePage extends StatefulWidget {
+  _MyHomePageState createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  TextEditingController _controller = TextEditingController();
+  nats.Client natsClient;
+  nats.Subscription fooSub, barSub;
+
+  @override
+  void initState() {
+    super.initState();
+    connect();
+  }
+
+  void connect() {
+    natsClient = nats.Client();
+    natsClient.connect('demo.nats.io');
+    fooSub = natsClient.sub('foo');
+    barSub = natsClient.sub('bar');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Form(
+              child: TextFormField(
+                controller: _controller,
+                decoration: InputDecoration(labelText: 'publish'),
+              ),
+            ),
+            Text('foo message:'),
+            StreamBuilder(
+              stream: fooSub.stream,
+              builder: (context, AsyncSnapshot<nats.Message> snapshot) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24.0),
+                  child: Text(snapshot.hasData ? '${snapshot.data}' : ''),
+                );
+              },
+            ),
+            Text('bar message:'),
+            StreamBuilder(
+              stream: barSub.stream,
+              builder: (context, AsyncSnapshot<nats.Message> snapshot) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24.0),
+                  child: Text(snapshot.hasData ? '${snapshot.data}' : ''),
+                );
+              },
+            ),
+            Row(
+              children: <Widget>[
+                RaisedButton(
+                  child: Text('pub to foo'),
+                  onPressed: () => _sendMessage('foo'),
+                ),
+                RaisedButton(
+                  child: Text('pub to bar'),
+                  onPressed: () => _sendMessage('bar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _sendMessage(String subject) {
+    if (_controller.text.isNotEmpty) {
+      natsClient.pub(subject, _controller.text);
+    }
+  }
+
+  @override
+  void dispose() {
+    // natsClient.unSub(fooSub);
+    // natsClient.unSub(barSub);
+    // natsClient.close();
+    super.dispose();
+  }
+}
