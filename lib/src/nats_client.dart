@@ -47,10 +47,10 @@ class Client {
 
     if (connectOption != null) _connectOption = connectOption;
 
-    for (int i = 0; i == 0 || retry; i++) {
-      if (i == 0)
+    for (var i = 0; i == 0 || retry; i++) {
+      if (i == 0) {
         status = Status.connecting;
-      else {
+      } else {
         status = Status.reconnecting;
         await Future.delayed(Duration(seconds: retryInterval));
       }
@@ -63,7 +63,7 @@ class Client {
         _addConnectOption(_connectOption);
         _backendSubscriptAll();
 
-        String buffer = '';
+        var buffer = '';
         await for (var d in _socket) {
           buffer += utf8.decode(d);
           var split = buffer.split('\r\n');
@@ -73,7 +73,7 @@ class Client {
           });
         }
         status = Status.disconnected;
-        _socket.close();
+        await _socket.close();
       } catch (err) {
         close();
       }
@@ -144,10 +144,10 @@ class Client {
     var s = line1.split(' ');
     if (s.length == 4) s.insert(3, '');
     var subject = s[1];
-    int sid = int.parse(s[2]);
-    String replyTo = s[3];
+    var sid = int.parse(s[2]);
+    var replyTo = s[3];
     // int bytes = s[4];
-    String payload = line2;
+    var payload = line2;
 
     if (_subs[sid] != null) {
       _subs[sid].add(Message(subject, sid, replyTo, payload));
@@ -158,17 +158,18 @@ class Client {
     _add('ping');
   }
 
-  _addConnectOption(ConnectOption c) {
+  void _addConnectOption(ConnectOption c) {
     _add('connect ' + jsonEncode(c.toJson()));
   }
 
   bool pub(String subject, String msg, {String replyTo}) {
     if (status != Status.connected) return false;
 
-    if (replyTo == null)
+    if (replyTo == null) {
       _add('pub $subject ${msg.length}');
-    else
+    } else {
       _add('pub $subject $replyTo ${msg.length}');
+    }
     _add(msg);
 
     return true;
@@ -176,7 +177,7 @@ class Client {
 
   Subscription sub(String subject, {String queueGroup}) {
     _ssid++;
-    Subscription s = Subscription(_ssid, subject, queueGroup: queueGroup);
+    var s = Subscription(_ssid, subject, queueGroup: queueGroup);
     _subs[_ssid] = s;
     if (status == Status.connected) {
       _sub(subject, _ssid, queueGroup: queueGroup);
@@ -186,10 +187,11 @@ class Client {
   }
 
   void _sub(String subject, int sid, {String queueGroup}) {
-    if (queueGroup == null)
+    if (queueGroup == null) {
       _add('sub $subject $sid');
-    else
+    } else {
       _add('sub $subject $queueGroup $sid');
+    }
   }
 
   bool unSub(Subscription s) {
@@ -211,10 +213,11 @@ class Client {
   //todo unsub with max msgs
 
   void _unSub(int sid, {String maxMsgs}) {
-    if (maxMsgs == null)
+    if (maxMsgs == null) {
       _add('unsub $sid');
-    else
+    } else {
       _add('unsub $sid $maxMsgs');
+    }
   }
 
   bool _add(String str) {
@@ -238,7 +241,7 @@ class Subscription {
   Subscription(this.sid, this.subject, {this.queueGroup});
   Stream<Message> get stream => _controller.stream;
 
-  add(Message msg) {
+  void add(Message msg) {
     _controller.sink.add(msg);
   }
 

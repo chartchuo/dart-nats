@@ -49,15 +49,15 @@ class Info {
 
   Map<String, dynamic> toJson() {
     final data = Map<String, dynamic>();
-    data['server_id'] = this.serverId;
-    data['server_name'] = this.serverName;
-    data['version'] = this.version;
-    data['proto'] = this.proto;
-    data['go'] = this.go;
-    data['host'] = this.host;
-    data['port'] = this.port;
-    data['max_payload'] = this.maxPayload;
-    data['client_id'] = this.clientId;
+    data['server_id'] = serverId;
+    data['server_name'] = serverName;
+    data['version'] = version;
+    data['proto'] = proto;
+    data['go'] = go;
+    data['host'] = host;
+    data['port'] = port;
+    data['max_payload'] = maxPayload;
+    data['client_id'] = clientId;
 
     return _removeNull(data);
   }
@@ -93,13 +93,13 @@ class ConnectOption {
 
   Map<String, dynamic> toJson() {
     final data = Map<String, dynamic>();
-    data['verbose'] = this.verbose;
-    data['pedantic'] = this.pedantic;
-    data['tls_required'] = this.tlsRequired;
-    data['name'] = this.name;
-    data['lang'] = this.lang;
-    data['version'] = this.version;
-    data['protocol'] = this.protocol;
+    data['verbose'] = verbose;
+    data['pedantic'] = pedantic;
+    data['tls_required'] = tlsRequired;
+    data['name'] = name;
+    data['lang'] = lang;
+    data['version'] = version;
+    data['protocol'] = protocol;
 
     return _removeNull(data);
   }
