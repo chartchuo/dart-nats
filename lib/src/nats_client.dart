@@ -229,6 +229,7 @@ class Client {
   void close() {
     _backendSubs.forEach((_, s) => s = false);
     _socket?.close();
+    status = Status.closed;
   }
 }
 

@@ -28,102 +28,43 @@ void main() async {
 
 ## Flutter Examples:
 
-Run the `example/flutter/main.dart`:
-
-```
-dart example/flutter/main.dart
-```
-
+Step 1 declare object
 ```dart
-import 'package:flutter/material.dart';
-import 'package:hello_world/nats_client.dart' as nats;
-
-class MyHomePage extends StatefulWidget {
-  _MyHomePageState createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  TextEditingController _controller = TextEditingController();
   nats.Client natsClient;
   nats.Subscription fooSub, barSub;
+```
 
-  @override
-  void initState() {
-    super.initState();
-    connect();
-  }
-
+Step 2 simply connect to server and subscribe to subject
+```dart
   void connect() {
     natsClient = nats.Client();
     natsClient.connect('demo.nats.io');
     fooSub = natsClient.sub('foo');
     barSub = natsClient.sub('bar');
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Form(
-              child: TextFormField(
-                controller: _controller,
-                decoration: InputDecoration(labelText: 'publish'),
-              ),
-            ),
-            Text('foo message:'),
-            StreamBuilder(
-              stream: fooSub.stream,
-              builder: (context, AsyncSnapshot<nats.Message> snapshot) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24.0),
-                  child: Text(snapshot.hasData ? '${snapshot.data}' : ''),
-                );
-              },
-            ),
-            Text('bar message:'),
-            StreamBuilder(
-              stream: barSub.stream,
-              builder: (context, AsyncSnapshot<nats.Message> snapshot) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24.0),
-                  child: Text(snapshot.hasData ? '${snapshot.data}' : ''),
-                );
-              },
-            ),
-            Row(
-              children: <Widget>[
-                RaisedButton(
-                  child: Text('pub to foo'),
-                  onPressed: () => _sendMessage('foo'),
-                ),
-                RaisedButton(
-                  child: Text('pub to bar'),
-                  onPressed: () => _sendMessage('bar'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _sendMessage(String subject) {
-    if (_controller.text.isNotEmpty) {
-      natsClient.pub(subject, _controller.text);
-    }
-  }
-
-  @override
+```
+Step 3 Use as Stream in StreamBuilder
+```dart
+          StreamBuilder(
+            stream: fooSub.stream,
+            builder: (context, AsyncSnapshot<nats.Message> snapshot) {
+              return Text(snapshot.hasData ? '${snapshot.data}' : '');
+            },
+          ),
+```
+Step 4 dispose 
+```dart
   void dispose() {
+    natsClient.close();
     super.dispose();
   }
-}
+```
+
+
+Full Flutter sample code `example/flutter/main.dart`:
+
+```
+dart example/flutter/main.dart
 ```
 
 ## Done
@@ -135,3 +76,4 @@ class _MyHomePageState extends State<MyHomePage> {
 ## Todo
 * Reply to 
 * Connect to cluster 
+* authentication
