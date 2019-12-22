@@ -28,13 +28,15 @@ void main() async {
 
 ## Flutter Examples:
 
-Step 1 declare object
+Import and Declare object
 ```dart
+import 'package:dart_nats/dart_nats.dart' as nats;
+
   nats.Client natsClient;
   nats.Subscription fooSub, barSub;
 ```
 
-Step 2 simply connect to server and subscribe to subject
+Simply connect to server and subscribe to subject
 ```dart
   void connect() {
     natsClient = nats.Client();
@@ -43,7 +45,7 @@ Step 2 simply connect to server and subscribe to subject
     barSub = natsClient.sub('bar');
   }
 ```
-Step 3 Use as Stream in StreamBuilder
+Use as Stream in StreamBuilder
 ```dart
           StreamBuilder(
             stream: fooSub.stream,
@@ -52,14 +54,19 @@ Step 3 Use as Stream in StreamBuilder
             },
           ),
 ```
-Step 4 dispose 
+
+Publish Message
+```dart
+      natsClient.pub(subject, _controller.text);
+```
+
+Dispose 
 ```dart
   void dispose() {
     natsClient.close();
     super.dispose();
   }
 ```
-
 
 Full Flutter sample code `example/flutter/main.dart`:
 
