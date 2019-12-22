@@ -65,10 +65,10 @@ class _MyHomePageState extends State<MyHomePage> {
             children: <Widget>[
               RaisedButton(
                   child: Text('pub to foo'),
-                  onPressed: () => _sendMessage('foo')),
+                  onPressed: () => _publishMessage('foo')),
               RaisedButton(
                   child: Text('pub to bar'),
-                  onPressed: () => _sendMessage('bar')),
+                  onPressed: () => _publishMessage('bar')),
             ],
           ),
         ],
@@ -76,7 +76,7 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  void _sendMessage(String subject) {
+  void _publishMessage(String subject) {
     if (_controller.text.isNotEmpty) {
       natsClient.pub(subject, _controller.text);
     }
