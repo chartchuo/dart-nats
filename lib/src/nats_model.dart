@@ -1,5 +1,5 @@
 Map<String, dynamic> _removeNull(Map<String, dynamic> data) {
-  var data2 = Map<String, dynamic>();
+  var data2 = <String, dynamic>{};
 
   data.forEach((s, d) {
     if (d != null) data2[s] = d;
@@ -48,7 +48,7 @@ class Info {
   }
 
   Map<String, dynamic> toJson() {
-    final data = Map<String, dynamic>();
+    final data = <String, dynamic>{};
     data['server_id'] = serverId;
     data['server_name'] = serverName;
     data['version'] = version;
@@ -92,7 +92,7 @@ class ConnectOption {
   }
 
   Map<String, dynamic> toJson() {
-    final data = Map<String, dynamic>();
+    final data = <String, dynamic>{};
     data['verbose'] = verbose;
     data['pedantic'] = pedantic;
     data['tls_required'] = tlsRequired;

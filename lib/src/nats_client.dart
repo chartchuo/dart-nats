@@ -30,8 +30,8 @@ class Client {
 
   Info get natsInfo => _natsInfo;
 
-  final _subs = Map<int, Subscription>();
-  final _backendSubs = Map<int, bool>();
+  final _subs = <int, Subscription>{};
+  final _backendSubs = <int, bool>{};
   int _ssid = 0;
 
   void connect(String host,
