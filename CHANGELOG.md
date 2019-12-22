@@ -1,3 +1,6 @@
+## 0.1.0+3
+* Update sample code
+
 ## 0.1.0+2
 * Update readme
 

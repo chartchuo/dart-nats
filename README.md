@@ -68,11 +68,7 @@ Dispose
   }
 ```
 
-Full Flutter sample code `example/flutter/main.dart`:
-
-```
-dart example/flutter/main.dart
-```
+Full Flutter sample code [example/flutter/main.dart](https://github.com/chartchuo/dart-nats/blob/master/example/flutter/main_dart)
 
 ## Done
 * Connect to NATS Server
