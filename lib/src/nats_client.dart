@@ -26,15 +26,15 @@ class Client {
   Socket _socket;
   Info _natsInfo;
   var status = Status.disconnected;
-  ConnectOption _connectOption = ConnectOption(verbose: false);
+  var _connectOption = ConnectOption(verbose: false);
 
   Info get natsInfo => _natsInfo;
 
-  Map<int, Subscription> _subs = Map<int, Subscription>();
-  Map<int, bool> _backendSubs = Map<int, bool>();
+  final _subs = Map<int, Subscription>();
+  final _backendSubs = Map<int, bool>();
   int _ssid = 0;
 
-  connect(String host,
+  void connect(String host,
       {int port = 4222,
       ConnectOption connectOption,
       int timeout = 5,
@@ -92,8 +92,6 @@ class Client {
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
   void _processLine(String line) {
-    print('Receive: $line');
-
     switch (_receiveState) {
       case _ReceiveState.idle:
         //decode operation
@@ -138,7 +136,7 @@ class Client {
   }
 
   void _processErr(String data) {
-    print('NATS Client Error: $data');
+    // print('NATS Client Error: $data');
     close();
   }
 
@@ -195,7 +193,7 @@ class Client {
   }
 
   bool unSub(Subscription s) {
-    int sid = s.sid;
+    var sid = s.sid;
 
     if (_subs[sid] == null) return false;
     _unSub(sid);
@@ -221,7 +219,6 @@ class Client {
 
   bool _add(String str) {
     if (_socket == null) return false; //todo throw error
-    print('Send: $str');
     _socket.add(utf8.encode(str + '\r\n'));
     return true;
   }

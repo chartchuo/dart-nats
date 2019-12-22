@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:dart_nats/dart-nats.dart';
+import 'package:dart_nats/dart_nats.dart';
 
 //please start nats-server on localhost before testing
 
