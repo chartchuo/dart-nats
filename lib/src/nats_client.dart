@@ -20,6 +20,14 @@ enum Status {
   // draining_pubs,
 }
 
+class _Pub {
+  final String subject;
+  final String msg;
+  final String replyTo;
+
+  _Pub(this.subject, this.msg, this.replyTo);
+}
+
 class Client {
   String _host;
   int _port;
@@ -32,6 +40,8 @@ class Client {
 
   final _subs = <int, Subscription>{};
   final _backendSubs = <int, bool>{};
+  final List<_Pub> _pubBuffer = List();
+
   int _ssid = 0;
 
   void connect(String host,
@@ -62,6 +72,7 @@ class Client {
 
         _addConnectOption(_connectOption);
         _backendSubscriptAll();
+        _drainPubBuffer();
 
         var buffer = '';
         await for (var d in _socket) {
@@ -86,6 +97,12 @@ class Client {
       _sub(s.subject, sid, queueGroup: s.queueGroup);
       // s.backendSubscription = true;
       _backendSubs[sid] = true;
+    });
+  }
+
+  void _drainPubBuffer() {
+    _pubBuffer.forEach((p) {
+      _pub(p);
     });
   }
 
@@ -162,8 +179,14 @@ class Client {
     _add('connect ' + jsonEncode(c.toJson()));
   }
 
-  bool pub(String subject, String msg, {String replyTo}) {
-    if (status != Status.connected) return false;
+  bool pub(String subject, String msg, {String replyTo, bool buffer = true}) {
+    if (status != Status.connected) {
+      if (buffer) {
+        _pubBuffer.add(_Pub(subject, msg, replyTo));
+      } else {
+        return false;
+      }
+    }
 
     if (replyTo == null) {
       _add('pub $subject ${msg.length}');
@@ -171,6 +194,17 @@ class Client {
       _add('pub $subject $replyTo ${msg.length}');
     }
     _add(msg);
+
+    return true;
+  }
+
+  bool _pub(_Pub p) {
+    if (p.replyTo == null) {
+      _add('pub ${p.subject} ${p.msg.length}');
+    } else {
+      _add('pub ${p.subject} ${p.replyTo} ${p.msg.length}');
+    }
+    _add(p.msg);
 
     return true;
   }

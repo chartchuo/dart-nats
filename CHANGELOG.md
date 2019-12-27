@@ -1,3 +1,6 @@
+## 0.1.1
+* publish can be buffered.
+
 ## 0.1.0+4
 * Update sample code
 
