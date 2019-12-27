@@ -28,6 +28,11 @@ class _Pub {
   _Pub(this.subject, this.msg, this.replyTo);
 }
 
+/// Nat Client
+/// This is main client class to connect to NATS server
+/// example:
+/// client.connect('localhost');
+///
 class Client {
   String _host;
   int _port;
@@ -44,6 +49,7 @@ class Client {
 
   int _ssid = 0;
 
+  /// Connect to NATS server
   void connect(String host,
       {int port = 4222,
       ConnectOption connectOption,
