@@ -40,7 +40,7 @@ class Client {
 
   final _subs = <int, Subscription>{};
   final _backendSubs = <int, bool>{};
-  final List<_Pub> _pubBuffer = List();
+  final _pubBuffer = <_Pub>[];
 
   int _ssid = 0;
 
