@@ -29,11 +29,6 @@ class _Pub {
   _Pub(this.subject, this.msg, this.replyTo);
 }
 
-/// Nat Client
-/// This is main client class to connect to NATS server
-/// example:
-/// client.connect('localhost');
-///
 class Client {
   String _host;
   int _port;
@@ -81,25 +76,20 @@ class Client {
         _backendSubscriptAll();
         _drainPubBuffer();
 
-        var buffer = Uint8List(0);
+        _buffer = Uint8List(0);
         await for (var d in _socket) {
-          buffer.addAll(d);
+          //work around error list<int> not subset of uint8list
+          var tmp = _buffer + d;
+          _buffer = Uint8List.fromList(tmp);
 
           switch (_receiveState) {
             case _ReceiveState.idle:
+              _processOp();
               break;
             case _ReceiveState.msg:
-              _processMsg(_receiveLine1, line.codeUnits);
-              _receiveLine1 = '';
-              _receiveState = _ReceiveState.idle;
+              _processMsg();
               break;
           }
-          // buffer += utf8.decode(d);
-          var split = buffer.split('\r\n');
-          buffer = split.removeLast();
-          split.forEach((line) {
-            _processLine(line);
-          });
         }
         status = Status.disconnected;
         await _socket.close();
@@ -124,48 +114,53 @@ class Client {
     });
   }
 
+  var _buffer = Uint8List(0);
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
-  void _processLine(String line) {
-    switch (_receiveState) {
-      case _ReceiveState.idle:
-        //decode operation
-        var i = line.indexOf(' ');
-        String op, data;
-        if (i != -1) {
-          op = line.substring(0, i).trim().toLowerCase();
-          data = line.substring(i).trim();
-        } else {
-          op = line.trim().toLowerCase();
-          data = '';
-        }
+  void _processOp() {
+    //find endline
+    var nextLineIndex = _buffer.indexWhere((c) {
+      if (c == 13) {
+        return true;
+      }
+      return false;
+    });
+    if (nextLineIndex == -1) return;
+    var line =
+        String.fromCharCodes(_buffer.sublist(0, nextLineIndex)); // retest
+    _buffer = _buffer.sublist(nextLineIndex + 2);
+    var tmp = String.fromCharCodes(_buffer);
+    print(tmp);
+    //decode operation
+    var i = line.indexOf(' ');
+    String op, data;
+    if (i != -1) {
+      op = line.substring(0, i).trim().toLowerCase();
+      data = line.substring(i).trim();
+    } else {
+      op = line.trim().toLowerCase();
+      data = '';
+    }
 
-        //process operation
-        switch (op) {
-          case 'msg':
-            _receiveState = _ReceiveState.msg;
-            _receiveLine1 = line;
-            break;
-          case 'info':
-            _natsInfo = Info.fromJson(jsonDecode(data));
-            break;
-          case 'ping':
-            _add('pong');
-            break;
-          case '-err':
-            _processErr(data);
-            break;
-          case 'pong':
-          case '+ok':
-            //do nothing
-            break;
-        }
-
+    //process operation
+    switch (op) {
+      case 'msg':
+        // _receiveState = _ReceiveState.msg;
+        _receiveLine1 = line;
+        _processMsg();
         break;
-      case _ReceiveState.msg:
-        _processMsg(_receiveLine1, line.codeUnits);
-        _receiveLine1 = '';
-        _receiveState = _ReceiveState.idle;
+      case 'info':
+        _natsInfo = Info.fromJson(jsonDecode(data));
+        break;
+      case 'ping':
+        _add('pong');
+        break;
+      case '-err':
+        _processErr(data);
+        break;
+      case 'pong':
+      case '+ok':
+        //do nothing
         break;
     }
   }
@@ -175,18 +170,28 @@ class Client {
     close();
   }
 
-  void _processMsg(String line1, List<int> line2) {
-    var s = line1.split(' ');
-    if (s.length == 4) s.insert(3, '');
+  void _processMsg() {
+    var s = _receiveLine1.split(' ');
+    // if (s.length == 4) s.insert(3, '');
     var subject = s[1];
     var sid = int.parse(s[2]);
-    var replyTo = s[3];
-    // int bytes = s[4];
-    var payload = line2;
+    String replyTo;
+    int length;
+    if (s.length == 4) {
+      length = int.parse(s[3]);
+    } else {
+      replyTo = s[3];
+      length = int.parse(s[4]);
+    }
+    if (_buffer.length < length) return;
+    var payload = _buffer.sublist(0, length);
+    _buffer = _buffer.sublist(length + 2);
 
     if (_subs[sid] != null) {
       _subs[sid].add(Message(subject, sid, replyTo, payload));
     }
+    _receiveLine1 = '';
+    _receiveState = _ReceiveState.idle;
   }
 
   void ping() {
@@ -197,7 +202,7 @@ class Client {
     _add('connect ' + jsonEncode(c.toJson()));
   }
 
-  bool pub(String subject, List<int> msg,
+  bool pub(String subject, Uint8List msg,
       {String replyTo, bool buffer = true}) {
     if (status != Status.connected) {
       if (buffer) {
@@ -215,6 +220,11 @@ class Client {
     _addByte(msg);
 
     return true;
+  }
+
+  bool pubString(String subject, String msg,
+      {String replyTo, bool buffer = true}) {
+    return pub(subject, utf8.encode(msg), replyTo: replyTo, buffer: buffer);
   }
 
   bool _pub(_Pub p) {
@@ -315,9 +325,8 @@ class Subscription {
 class Message {
   final int sid;
   final String subject, replyTo;
-  final List<int> payload;
+  final Uint8List payload;
   Message(this.subject, this.sid, this.replyTo, this.payload);
-  String toString() {
-    return utf8.decode(payload);
-  }
+
+  get payloadString => utf8.decode(payload);
 }

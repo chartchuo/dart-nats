@@ -16,10 +16,10 @@ void main() async {
   var client = Client();
   client.connect('localhost');
   var sub = client.sub('subject1');
-  client.pub('subject1', 'message1');
+  client.pubString('subject1', 'message1');
   var msg = await sub.stream.first;
 
-  print(msg);
+  print(msg.payloadString);
   client.unSub(sub);
   client.close();
 }
@@ -49,14 +49,14 @@ Use as Stream in StreamBuilder
           StreamBuilder(
             stream: fooSub.stream,
             builder: (context, AsyncSnapshot<nats.Message> snapshot) {
-              return Text(snapshot.hasData ? '${snapshot.data}' : '');
+              return Text(snapshot.hasData ? '${snapshot.data.payloadString}' : '');
             },
           ),
 ```
 
 Publish Message
 ```dart
-      natsClient.pub(subject, _controller.text);
+      natsClient.pubString(subject, _controller.text);
 ```
 
 Dispose 

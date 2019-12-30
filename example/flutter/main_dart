@@ -30,7 +30,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void connect() {
     natsClient = nats.Client();
-    natsClient.connect('demo.nats.io');
+    natsClient.connect('10.0.2.2');
     fooSub = natsClient.sub('foo');
     barSub = natsClient.sub('bar');
   }
@@ -51,14 +51,14 @@ class _MyHomePageState extends State<MyHomePage> {
           StreamBuilder(
             stream: fooSub.stream,
             builder: (context, AsyncSnapshot<nats.Message> snapshot) {
-              return Text(snapshot.hasData ? '${snapshot.data}' : '');
+              return Text(snapshot.hasData ? '${snapshot.data.payloadString}' : '');
             },
           ),
           Text('bar message:'),
           StreamBuilder(
             stream: barSub.stream,
             builder: (context, AsyncSnapshot<nats.Message> snapshot) {
-              return Text(snapshot.hasData ? '${snapshot.data}' : '');
+              return Text(snapshot.hasData ? '${snapshot.data.payloadString}' : '');
             },
           ),
           Row(
@@ -78,7 +78,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _publishMessage(String subject) {
     if (_controller.text.isNotEmpty) {
-      natsClient.pub(subject, _controller.text);
+      natsClient.pubString(subject, _controller.text);
     }
   }
 

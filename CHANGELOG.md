@@ -1,3 +1,9 @@
+## 0.1.3
+* add string api client.pubString and message.payloadString
+* fix defect: pub sub non ascii
+* fix defect: message include \r or \n
+* revamp message decoding
+
 ## 0.1.2
 * change api from string to byte array
 
