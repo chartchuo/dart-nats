@@ -328,5 +328,5 @@ class Message {
   final Uint8List payload;
   Message(this.subject, this.sid, this.replyTo, this.payload);
 
-  get payloadString => utf8.decode(payload);
+  String get payloadString => utf8.decode(payload);
 }

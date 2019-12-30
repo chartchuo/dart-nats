@@ -1,4 +1,4 @@
-## 0.1.3
+## 0.1.3+1
 * add string api client.pubString and message.payloadString
 * fix defect: pub sub non ascii
 * fix defect: message include \r or \n
