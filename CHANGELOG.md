@@ -1,3 +1,6 @@
+## 0.1.2
+* change api from string to byte array
+
 ## 0.1.1
 * publish can be buffered.
 

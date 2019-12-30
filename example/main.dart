@@ -5,7 +5,7 @@ void main() async {
   client.connect('localhost');
   var sub = client.sub('subject1');
   await Future.delayed(Duration(seconds: 1));
-  client.pub('subject1', 'message1');
+  client.pub('subject1', 'message1'.codeUnits);
   var msg = await sub.stream.first;
 
   print(msg);

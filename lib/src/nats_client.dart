@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'nats_model.dart';
 
@@ -22,7 +23,7 @@ enum Status {
 
 class _Pub {
   final String subject;
-  final String msg;
+  final List<int> msg;
   final String replyTo;
 
   _Pub(this.subject, this.msg, this.replyTo);
@@ -80,9 +81,20 @@ class Client {
         _backendSubscriptAll();
         _drainPubBuffer();
 
-        var buffer = '';
+        var buffer = Uint8List(0);
         await for (var d in _socket) {
-          buffer += utf8.decode(d);
+          buffer.addAll(d);
+
+          switch (_receiveState) {
+            case _ReceiveState.idle:
+              break;
+            case _ReceiveState.msg:
+              _processMsg(_receiveLine1, line.codeUnits);
+              _receiveLine1 = '';
+              _receiveState = _ReceiveState.idle;
+              break;
+          }
+          // buffer += utf8.decode(d);
           var split = buffer.split('\r\n');
           buffer = split.removeLast();
           split.forEach((line) {
@@ -151,7 +163,7 @@ class Client {
 
         break;
       case _ReceiveState.msg:
-        _processMsg(_receiveLine1, line);
+        _processMsg(_receiveLine1, line.codeUnits);
         _receiveLine1 = '';
         _receiveState = _ReceiveState.idle;
         break;
@@ -163,7 +175,7 @@ class Client {
     close();
   }
 
-  void _processMsg(String line1, String line2) {
+  void _processMsg(String line1, List<int> line2) {
     var s = line1.split(' ');
     if (s.length == 4) s.insert(3, '');
     var subject = s[1];
@@ -185,7 +197,8 @@ class Client {
     _add('connect ' + jsonEncode(c.toJson()));
   }
 
-  bool pub(String subject, String msg, {String replyTo, bool buffer = true}) {
+  bool pub(String subject, List<int> msg,
+      {String replyTo, bool buffer = true}) {
     if (status != Status.connected) {
       if (buffer) {
         _pubBuffer.add(_Pub(subject, msg, replyTo));
@@ -199,7 +212,7 @@ class Client {
     } else {
       _add('pub $subject $replyTo ${msg.length}');
     }
-    _add(msg);
+    _addByte(msg);
 
     return true;
   }
@@ -210,7 +223,7 @@ class Client {
     } else {
       _add('pub ${p.subject} ${p.replyTo} ${p.msg.length}');
     }
-    _add(p.msg);
+    _addByte(p.msg);
 
     return true;
   }
@@ -266,6 +279,14 @@ class Client {
     return true;
   }
 
+  bool _addByte(List<int> msg) {
+    if (_socket == null) return false; //todo throw error
+
+    _socket.add(msg);
+    _socket.add(utf8.encode('\r\n'));
+    return true;
+  }
+
   void close() {
     _backendSubs.forEach((_, s) => s = false);
     _socket?.close();
@@ -293,10 +314,10 @@ class Subscription {
 
 class Message {
   final int sid;
-  final String subject, replyTo, payload;
+  final String subject, replyTo;
+  final List<int> payload;
   Message(this.subject, this.sid, this.replyTo, this.payload);
-  @override
   String toString() {
-    return payload;
+    return utf8.decode(payload);
   }
 }
