@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'message.dart';
 
+/// subscription class
 class Subscription {
   ///subscriber id (audo generate)
   final int sid;

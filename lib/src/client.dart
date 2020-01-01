@@ -16,11 +16,21 @@ enum _ReceiveState {
 
 ///status of the nats client
 enum Status {
+  /// discontected or not connected
   disconnected,
+
+  ///connected to server
   connected,
+
+  ///alread close by close or server
   closed,
+
+  ///automatic reconnection to server
   reconnecting,
+
+  ///connecting by connect() method
   connecting,
+
   // draining_subs,
   // draining_pubs,
 }
@@ -39,9 +49,12 @@ class Client {
   int _port;
   Socket _socket;
   Info _natsInfo;
+
+  ///status of the client
   var status = Status.disconnected;
   var _connectOption = ConnectOption(verbose: false);
 
+  ///server info
   Info get natsInfo => _natsInfo;
 
   final _subs = <int, Subscription>{};

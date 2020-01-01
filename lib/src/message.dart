@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+/// Message class
 class Message {
   ///subscriber id auto generate by client
   final int sid;

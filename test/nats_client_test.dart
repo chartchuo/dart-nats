@@ -8,7 +8,7 @@ import 'package:dart_nats/dart_nats.dart';
 
 void main() {
   group('all', () {
-    test("simple", () async {
+    test('simple', () async {
       var client = Client();
       client.connect('localhost');
       var sub = client.sub('subject1');
@@ -17,7 +17,7 @@ void main() {
       client.close();
       expect(String.fromCharCodes(msg.payload), equals('message1'));
     });
-    test("pub with Uint8List", () async {
+    test('pub with Uint8List', () async {
       var client = Client();
       client.connect('localhost');
       var sub = client.sub('subject1');
@@ -28,7 +28,7 @@ void main() {
       print(msg.payload);
       expect(msg.payload, equals(msgByte));
     });
-    test("pub with Uint8List include return and  new line", () async {
+    test('pub with Uint8List include return and  new line', () async {
       var client = Client();
       client.connect('localhost');
       var sub = client.sub('subject1');
@@ -40,7 +40,7 @@ void main() {
       print(msg.payload);
       expect(msg.payload, equals(msgByte));
     });
-    test("byte huge data", () async {
+    test('byte huge data', () async {
       var client = Client();
       client.connect('localhost');
       var sub = client.sub('subject1');
@@ -52,7 +52,7 @@ void main() {
       print(msg.payload);
       expect(msg.payload, equals(msgByte));
     });
-    test("Thai UTF8", () async {
+    test('Thai UTF8', () async {
       var client = Client();
       client.connect('localhost');
       var sub = client.sub('subject1');
@@ -63,7 +63,7 @@ void main() {
       print(msg.payload);
       expect(msg.payload, equals(thaiString));
     });
-    test("pubString ascii", () async {
+    test('pubString ascii', () async {
       var client = Client();
       client.connect('localhost');
       var sub = client.sub('subject1');
@@ -73,7 +73,7 @@ void main() {
       print(msg.payload);
       expect(msg.payloadString, equals('testtesttest'));
     });
-    test("pubString Thai", () async {
+    test('pubString Thai', () async {
       var client = Client();
       client.connect('localhost');
       var sub = client.sub('subject1');
@@ -83,7 +83,7 @@ void main() {
       print(msg.payload);
       expect(msg.payloadString, equals('ทดสอบ'));
     });
-    test("delay connect", () async {
+    test('delay connect', () async {
       var client = Client();
       var sub = client.sub('subject1');
       client.pubString('subject1', 'message1');
@@ -92,7 +92,7 @@ void main() {
       client.close();
       expect(msg.payloadString, equals('message1'));
     });
-    test("pub with no buffer ", () async {
+    test('pub with no buffer ', () async {
       var client = Client();
       client.connect('localhost');
       var sub = client.sub('subject1');
@@ -102,7 +102,7 @@ void main() {
       client.close();
       expect(msg.payloadString, equals('message1'));
     });
-    test("multiple sub ", () async {
+    test('multiple sub ', () async {
       var client = Client();
       client.connect('localhost');
       var sub1 = client.sub('subject1');
@@ -116,7 +116,7 @@ void main() {
       expect(msg1.payloadString, equals('message1'));
       expect(msg2.payloadString, equals('message2'));
     });
-    test("Wildcard sub * ", () async {
+    test('Wildcard sub * ', () async {
       var client = Client();
       client.connect('localhost');
       var sub = client.sub('subject1.*');
@@ -129,7 +129,7 @@ void main() {
       expect(msg1.payloadString, equals('message1'));
       expect(msg2.payloadString, equals('message2'));
     });
-    test("Wildcard sub > ", () async {
+    test('Wildcard sub > ', () async {
       var client = Client();
       client.connect('localhost');
       var sub = client.sub('subject1.>');

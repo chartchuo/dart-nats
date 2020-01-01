@@ -9,14 +9,31 @@ Map<String, dynamic> _removeNull(Map<String, dynamic> data) {
 
 ///NATS Server Info
 class Info {
+  /// sever id
   String serverId;
+
+  /// server name
   String serverName;
+
+  /// server version
   String version;
+
+  /// protocol
   int proto;
+
+  /// server go version
   String go;
+
+  /// host
   String host;
+
+  /// port number
   int port;
+
+  /// max payload
   int maxPayload;
+
+  ///client id assigned by server
   int clientId;
 
   //todo
@@ -25,6 +42,7 @@ class Info {
   //tls_verify
   //connect_url
 
+  ///constructure
   Info(
       {this.serverId,
       this.serverName,
@@ -68,12 +86,25 @@ class Info {
 
 ///connection option to send to server
 class ConnectOption {
+  ///NATS server send +OK or not (default nats server is turn on)  this client will auto tuen off as after connect
   bool verbose;
+
+  ///
   bool pedantic;
+
+  /// TLS require or not //not implement yet
   bool tlsRequired;
+
+  ///server name
   String name;
+
+  /// lang??
   String lang;
+
+  /// sever version
   String version;
+
+  ///protocol
   int protocol;
 
   ///construcure
