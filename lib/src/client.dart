@@ -3,8 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'info.dart';
-
+import 'common.dart';
 import 'message.dart';
 import 'subscription.dart';
 

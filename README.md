@@ -76,6 +76,8 @@ Full Flutter sample code [example/flutter/main.dart](https://github.com/chartchu
 
 
 ## Todo
+* inbex
 * Reply to 
+* sub with max message
 * Connect to cluster 
 * authentication

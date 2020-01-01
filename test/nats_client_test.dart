@@ -17,6 +17,12 @@ void main() {
       client.close();
       expect(String.fromCharCodes(msg.payload), equals('message1'));
     });
+    test('new', () async {
+      print(Inbox.next());
+      print(Inbox.next());
+      print(Inbox.next());
+      expect(true, true);
+    });
     test('pub with Uint8List', () async {
       var client = Client();
       client.connect('localhost');
