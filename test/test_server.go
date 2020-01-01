@@ -13,6 +13,10 @@ func main() {
 	}
 	defer nc.Close()
 
+	log.Println(nats.NewInbox())
+	log.Println(nats.NewInbox())
+	log.Println(nats.NewInbox())
+	log.Println(nats.NewInbox())
 	// Create a unique subject name for replies.
 	uniqueReplyTo := nats.NewInbox()
 

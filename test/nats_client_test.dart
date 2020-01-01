@@ -17,10 +17,16 @@ void main() {
       client.close();
       expect(String.fromCharCodes(msg.payload), equals('message1'));
     });
-    test('new', () async {
-      print(Inbox.next());
-      print(Inbox.next());
-      print(Inbox.next());
+    test('newInbox', () async {
+      var nuid = Nuid();
+      print("'" + nuid.next() + "'");
+      print("'" + nuid.next() + "'");
+      print("'" + nuid.next() + "'");
+      print("'" + nuid.next() + "'");
+      print("'" + newInbox() + "'");
+      print("'" + newInbox() + "'");
+      print("'" + newInbox() + "'");
+      print("'" + newInbox() + "'");
       expect(true, true);
     });
     test('pub with Uint8List', () async {

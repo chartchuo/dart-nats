@@ -1,3 +1,7 @@
+## 0.1.4
+* add inbox to generate unique inbox subject
+* add nuid to generate unique id 
+
 ## 0.1.3+4
 * refactor code
 * add commend
