@@ -1,3 +1,7 @@
+## 0.1.3+2
+* refactor code
+* add commend
+
 ## 0.1.3+1
 * add string api client.pubString and message.payloadString
 * fix defect: pub sub non ascii
