@@ -14,7 +14,7 @@ enum _ReceiveState {
 
 }
 
-//status of the nats client
+///status of the nats client
 enum Status {
   disconnected,
   connected,
@@ -33,7 +33,7 @@ class _Pub {
   _Pub(this.subject, this.msg, this.replyTo);
 }
 
-//NATS client
+///NATS client
 class Client {
   String _host;
   int _port;
@@ -123,7 +123,7 @@ class Client {
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
   void _processOp() {
-    //find endline
+    ///find endline
     var nextLineIndex = _buffer.indexWhere((c) {
       if (c == 13) {
         return true;
@@ -136,7 +136,8 @@ class Client {
     _buffer = _buffer.sublist(nextLineIndex + 2);
     var tmp = String.fromCharCodes(_buffer);
     print(tmp);
-    //decode operation
+
+    ///decode operation
     var i = line.indexOf(' ');
     String op, data;
     if (i != -1) {
@@ -147,7 +148,7 @@ class Client {
       data = '';
     }
 
-    //process operation
+    ///process operation
     switch (op) {
       case 'msg':
         // _receiveState = _ReceiveState.msg;
@@ -171,7 +172,7 @@ class Client {
   }
 
   void _processErr(String data) {
-    // print('NATS Client Error: $data');
+    /// print('NATS Client Error: $data');
     close();
   }
 
@@ -199,7 +200,7 @@ class Client {
     _receiveState = _ReceiveState.idle;
   }
 
-//ping server
+  ///ping server current not implement pong verification
   void ping() {
     _add('ping');
   }
@@ -208,7 +209,7 @@ class Client {
     _add('connect ' + jsonEncode(c.toJson()));
   }
 
-//publish by byte (Uint8List)
+  ///publish by byte (Uint8List)
   bool pub(String subject, Uint8List msg,
       {String replyTo, bool buffer = true}) {
     if (status != Status.connected) {
@@ -229,7 +230,7 @@ class Client {
     return true;
   }
 
-//publish by string
+  ///publish by string
   bool pubString(String subject, String msg,
       {String replyTo, bool buffer = true}) {
     return pub(subject, utf8.encode(msg), replyTo: replyTo, buffer: buffer);
@@ -246,7 +247,7 @@ class Client {
     return true;
   }
 
-//subscribe to subject option with queuegroup
+  ///subscribe to subject option with queuegroup
   Subscription sub(String subject, {String queueGroup}) {
     _ssid++;
     var s = Subscription(_ssid, subject, queueGroup: queueGroup);
@@ -266,7 +267,7 @@ class Client {
     }
   }
 
-//unsubscribe
+  ///unsubscribe
   bool unSub(Subscription s) {
     var sid = s.sid;
 
@@ -278,7 +279,7 @@ class Client {
     return true;
   }
 
-  //unsubscribe by id
+  ///unsubscribe by id
   bool unSubById(int sid) {
     if (_subs[sid] == null) return false;
     return unSub(_subs[sid]);
@@ -308,7 +309,7 @@ class Client {
     return true;
   }
 
-  //close connection to NATS server unsub to server but still keep subscription list at client
+  ///close connection to NATS server unsub to server but still keep subscription list at client
   void close() {
     _backendSubs.forEach((_, s) => s = false);
     _socket?.close();

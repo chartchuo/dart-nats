@@ -1,18 +1,20 @@
-//message model sending from NATS server
+///message model sending from NATS server
 import 'dart:convert';
 import 'dart:typed_data';
 
 class Message {
-  //subscriber id auto generate by client
+  ///subscriber id auto generate by client
   final int sid;
-  // subject  and replyto
+
+  /// subject  and replyto
   final String subject, replyTo;
-  //payload of data in byte
+
+  ///payload of data in byte
   final Uint8List payload;
 
-  //constructure
+  ///constructure
   Message(this.subject, this.sid, this.replyTo, this.payload);
 
-  //payload in string
+  ///payload in string
   String get payloadString => utf8.decode(payload);
 }

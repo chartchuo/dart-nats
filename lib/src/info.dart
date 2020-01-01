@@ -7,7 +7,7 @@ Map<String, dynamic> _removeNull(Map<String, dynamic> data) {
   return data2;
 }
 
-//NATS Server Info
+///NATS Server Info
 class Info {
   String serverId;
   String serverName;
@@ -35,7 +35,8 @@ class Info {
       this.port,
       this.maxPayload,
       this.clientId});
-//constructure from json
+
+  ///constructure from json
   Info.fromJson(Map<String, dynamic> json) {
     serverId = json['server_id'];
     serverName = json['server_name'];
@@ -48,7 +49,7 @@ class Info {
     clientId = json['client_id'];
   }
 
-//convert to json
+  ///convert to json
   Map<String, dynamic> toJson() {
     final data = <String, dynamic>{};
     data['server_id'] = serverId;
@@ -65,7 +66,7 @@ class Info {
   }
 }
 
-//connection option to send to server
+///connection option to send to server
 class ConnectOption {
   bool verbose;
   bool pedantic;
@@ -75,7 +76,7 @@ class ConnectOption {
   String version;
   int protocol;
 
-  //construcure
+  ///construcure
   ConnectOption(
       {this.verbose,
       this.pedantic,
@@ -85,7 +86,7 @@ class ConnectOption {
       this.version,
       this.protocol});
 
-  //constructure from json
+  ///constructure from json
   ConnectOption.fromJson(Map<String, dynamic> json) {
     verbose = json['verbose'];
     pedantic = json['pedantic'];
@@ -96,7 +97,7 @@ class ConnectOption {
     protocol = json['protocol'];
   }
 
-//export to json
+  ///export to json
   Map<String, dynamic> toJson() {
     final data = <String, dynamic>{};
     data['verbose'] = verbose;
