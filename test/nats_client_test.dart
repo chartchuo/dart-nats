@@ -17,17 +17,15 @@ void main() {
       client.close();
       expect(String.fromCharCodes(msg.payload), equals('message1'));
     });
-    test('newInbox', () async {
+    test('newInbox', () {
+      //just loop generate with out error
       var nuid = Nuid();
-      print("'" + nuid.next() + "'");
-      print("'" + nuid.next() + "'");
-      print("'" + nuid.next() + "'");
-      print("'" + nuid.next() + "'");
-      print("'" + newInbox() + "'");
-      print("'" + newInbox() + "'");
-      print("'" + newInbox() + "'");
-      print("'" + newInbox() + "'");
-      expect(true, true);
+      var i = 0;
+      for (i = 0; i < 10000000; i++) {
+        nuid.next();
+        newInbox();
+      }
+      expect(i, 10000000);
     });
     test('pub with Uint8List', () async {
       var client = Client();
