@@ -56,7 +56,7 @@ Use as Stream in StreamBuilder
 
 Publish Message
 ```dart
-      natsClient.pubString(subject, _controller.text);
+      natsClient.pubString('subject','message string');
 ```
 
 Dispose 
