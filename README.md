@@ -69,17 +69,16 @@ Dispose
 
 Full Flutter sample code [example/flutter/main.dart](https://github.com/chartchuo/dart-nats/blob/master/example/flutter/main_dart)
 
-## Done
-* inbox
-* nuid
-* Connect to NATS Server
-* Basic sub and pub 
-* Reconnect to single server when connection lost and resume subscription
 
+## Features
+The following is a list of features currently supported and planned by this client:
 
-## Todo
-* sub sync
-* sub with max message
-* Connect to cluster 
-* authentication
-* TLS support
+* [X] - Publish
+* [X] - Subscribe
+* [X] - NUID, Inbox
+* [X] - Reconnect to single server when connection lost and resume subscription
+* [ ] - All authentication models, including NATS 2.0 JWT and seed keys
+* [ ] - Adherance to protocol v1, accepts new server information whenever it's sent from NATS
+* [ ] - Automatic reconnect upon connection failure
+* [ ] - TLS support
+* [ ] - NATS Streaming (STAN)
