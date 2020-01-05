@@ -47,14 +47,14 @@ class Client {
   String _host;
   int _port;
   Socket _socket;
-  Info _natsInfo;
+  Info _info;
 
   ///status of the client
   var status = Status.disconnected;
   var _connectOption = ConnectOption(verbose: false);
 
   ///server info
-  Info get natsInfo => _natsInfo;
+  Info get info => _info;
 
   final _subs = <int, Subscription>{};
   final _backendSubs = <int, bool>{};
@@ -63,7 +63,7 @@ class Client {
   int _ssid = 0;
 
   /// Connect to NATS server
-  void connect(String host,
+  void connectOld(String host,
       {int port = 4222,
       ConnectOption connectOption,
       int timeout = 5,
@@ -114,6 +114,70 @@ class Client {
         close();
       }
     }
+  }
+
+  /// Connect to NATS server
+  Future connect(String host,
+      {int port = 4222,
+      ConnectOption connectOption,
+      int timeout = 5,
+      bool retry = true,
+      int retryInterval = 10}) async {
+    if (status != Status.disconnected && status != Status.closed) return;
+
+    _host = host;
+    _port = port;
+
+    if (connectOption != null) _connectOption = connectOption;
+
+    void loop() async {
+      for (var i = 0; i == 0 || retry; i++) {
+        if (i == 0) {
+          status = Status.connecting;
+        } else {
+          status = Status.reconnecting;
+          await Future.delayed(Duration(seconds: retryInterval));
+        }
+
+        try {
+          _socket = await Socket.connect(_host, _port,
+              timeout: Duration(seconds: timeout));
+          status = Status.connected;
+
+          _addConnectOption(_connectOption);
+          _backendSubscriptAll();
+          _drainPubBuffer();
+
+          _buffer = Uint8List(0);
+          _socket.listen((d) {
+            var tmp = _buffer + d;
+            _buffer = Uint8List.fromList(tmp);
+
+            switch (_receiveState) {
+              case _ReceiveState.idle:
+                _processOp();
+                break;
+              case _ReceiveState.msg:
+                _processMsg();
+                break;
+            }
+          }, onDone: () {
+            status = Status.disconnected;
+            _socket.close();
+          }, onError: (err) {
+            print(err);
+            status = Status.disconnected;
+            _socket.close();
+          });
+          return;
+        } catch (err) {
+          print(err);
+          close();
+        }
+      }
+    }
+
+    return Future.microtask(loop);
   }
 
   void _backendSubscriptAll() {
@@ -168,7 +232,7 @@ class Client {
         _processMsg();
         break;
       case 'info':
-        _natsInfo = Info.fromJson(jsonDecode(data));
+        _info = Info.fromJson(jsonDecode(data));
         break;
       case 'ping':
         _add('pong');
@@ -212,6 +276,9 @@ class Client {
     _receiveState = _ReceiveState.idle;
   }
 
+  /// get server max payload
+  int maxPayload() => _info?.maxPayload;
+
   ///ping server current not implement pong verification
   void ping() {
     _add('ping');
@@ -221,7 +288,8 @@ class Client {
     _add('connect ' + jsonEncode(c.toJson()));
   }
 
-  ///publish by byte (Uint8List)
+  ///publish by byte (Uint8List) return true if sucess to send or buffer
+  ///return false if not connect
   bool pub(String subject, Uint8List msg,
       {String replyTo, bool buffer = true}) {
     if (status != Status.connected) {
@@ -262,7 +330,7 @@ class Client {
   ///subscribe to subject option with queuegroup
   Subscription sub(String subject, {String queueGroup}) {
     _ssid++;
-    var s = Subscription(_ssid, subject, queueGroup: queueGroup);
+    var s = Subscription(_ssid, subject, this, queueGroup: queueGroup);
     _subs[_ssid] = s;
     if (status == Status.connected) {
       _sub(subject, _ssid, queueGroup: queueGroup);
@@ -319,6 +387,14 @@ class Client {
     _socket.add(msg);
     _socket.add(utf8.encode('\r\n'));
     return true;
+  }
+
+  /// Request will send a request payload and deliver the response message,
+  /// or an error, including a timeout if no message was received properly.
+  Future<Message> request(String subj, Uint8List msg, [Duration timeout]) {
+    var c = Completer<Message>();
+
+    return c.future;
   }
 
   ///close connection to NATS server unsub to server but still keep subscription list at client

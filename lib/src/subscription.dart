@@ -2,6 +2,7 @@
 import 'dart:async';
 
 import 'message.dart';
+import 'client.dart';
 
 /// subscription class
 class Subscription {
@@ -11,10 +12,17 @@ class Subscription {
   ///subject and queuegroup of this subscription
   final String subject, queueGroup;
 
+  final Client _client;
+
   final _controller = StreamController<Message>();
 
   ///constructure
-  Subscription(this.sid, this.subject, {this.queueGroup});
+  Subscription(this.sid, this.subject, this._client, {this.queueGroup});
+
+  ///
+  void unSub() {
+    _client.unSub(this);
+  }
 
   ///Stream output when server publish message
   Stream<Message> get stream => _controller.stream;

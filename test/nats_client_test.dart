@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:dart_nats/dart_nats.dart';
 
+import 'connect_test.dart';
+
 //please start nats-server on localhost before testing
 
 void main() {
@@ -151,6 +153,45 @@ void main() {
       client.close();
       expect(msg1.payloadString, equals('message1'));
       expect(msg2.payloadString, equals('message2'));
+    });
+    test('unsub after connect', () async {
+      var client = Client();
+      client.connect('localhost');
+      var sub = client.sub('subject1');
+      client.pubString('subject1', 'message1');
+      var msg = await sub.stream.first;
+      client.unSub(sub);
+      expect(msg.payloadString, equals('message1'));
+
+      sub = client.sub('subject1');
+      client.pubString('subject1', 'message1');
+      msg = await sub.stream.first;
+      sub.unSub();
+      expect(msg.payloadString, equals('message1'));
+
+      client.close();
+    });
+    test('unsub before connect', () async {
+      var client = Client();
+      client.connect('localhost');
+      var sub = client.sub('subject1');
+      client.unSub(sub);
+
+      sub = client.sub('subject1');
+      sub.unSub();
+      client.close();
+      expect(1, 1);
+    });
+    test('get may payload', () async {
+      var client = Client();
+      client.connect('localhost');
+
+      //todo wait for connected
+      await Future.delayed(Duration(seconds: 2));
+      var max = client.maxPayload();
+      client.close();
+
+      expect(max, isNotNull);
     });
   });
 }
