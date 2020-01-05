@@ -167,13 +167,13 @@ class Client {
             status = Status.disconnected;
             _socket.close();
           }, onError: (err) {
-            print(err);
+            // print(err);
             status = Status.disconnected;
             _socket.close();
           });
           return;
         } catch (err) {
-          print(err);
+          // print(err);
           close();
         }
       }
@@ -212,8 +212,8 @@ class Client {
     var line =
         String.fromCharCodes(_buffer.sublist(0, nextLineIndex)); // retest
     _buffer = _buffer.sublist(nextLineIndex + 2);
-    var tmp = String.fromCharCodes(_buffer);
-    print(tmp);
+    // var tmp = String.fromCharCodes(_buffer);
+    // print(tmp);
 
     ///decode operation
     var i = line.indexOf(' ');

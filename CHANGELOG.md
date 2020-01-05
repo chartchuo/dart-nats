@@ -1,3 +1,6 @@
+## 0.1.5+1
+* fix defect
+
 ## 0.1.5
 * request/respond function
 * change some wording from payload to data
