@@ -38,10 +38,10 @@ enum Status {
 
 class _Pub {
   final String subject;
-  final List<int> msg;
+  final List<int> data;
   final String replyTo;
 
-  _Pub(this.subject, this.msg, this.replyTo);
+  _Pub(this.subject, this.data, this.replyTo);
 }
 
 ///NATS client
@@ -292,39 +292,39 @@ class Client {
 
   ///publish by byte (Uint8List) return true if sucess sending or buffering
   ///return false if not connect
-  bool pub(String subject, Uint8List msg,
+  bool pub(String subject, Uint8List data,
       {String replyTo, bool buffer = true}) {
     if (status != Status.connected) {
       if (buffer) {
-        _pubBuffer.add(_Pub(subject, msg, replyTo));
+        _pubBuffer.add(_Pub(subject, data, replyTo));
       } else {
         return false;
       }
     }
 
     if (replyTo == null) {
-      _add('pub $subject ${msg.length}');
+      _add('pub $subject ${data.length}');
     } else {
-      _add('pub $subject $replyTo ${msg.length}');
+      _add('pub $subject $replyTo ${data.length}');
     }
-    _addByte(msg);
+    _addByte(data);
 
     return true;
   }
 
   ///publish by string
-  bool pubString(String subject, String msg,
+  bool pubString(String subject, String str,
       {String replyTo, bool buffer = true}) {
-    return pub(subject, utf8.encode(msg), replyTo: replyTo, buffer: buffer);
+    return pub(subject, utf8.encode(str), replyTo: replyTo, buffer: buffer);
   }
 
   bool _pub(_Pub p) {
     if (p.replyTo == null) {
-      _add('pub ${p.subject} ${p.msg.length}');
+      _add('pub ${p.subject} ${p.data.length}');
     } else {
-      _add('pub ${p.subject} ${p.replyTo} ${p.msg.length}');
+      _add('pub ${p.subject} ${p.replyTo} ${p.data.length}');
     }
-    _addByte(p.msg);
+    _addByte(p.data);
 
     return true;
   }
@@ -395,7 +395,7 @@ class Client {
 
   /// Request will send a request payload and deliver the response message,
   /// or an error, including a timeout if no message was received properly.
-  Future<Message> request(String subj, Uint8List msg,
+  Future<Message> request(String subj, Uint8List data,
       {String queueGroup, Duration timeout}) {
     timeout ??= Duration(seconds: 2);
 
@@ -404,7 +404,7 @@ class Client {
       _inboxs[subj] = sub(inbox, queueGroup: queueGroup);
     }
 
-    pub(subj, msg, replyTo: _inboxs[subj].subject);
+    pub(subj, data, replyTo: _inboxs[subj].subject);
     var respond = _inboxs[subj].stream.asBroadcastStream().first;
 
     // todo timeout
