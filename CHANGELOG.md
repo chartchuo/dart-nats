@@ -1,3 +1,7 @@
+## 0.1.5
+* request/respond function
+* change some wording from payload to data
+
 ## 0.1.4+1
 * add inbox to generate unique inbox subject
 * add nuid to generate unique id 
@@ -7,7 +11,7 @@
 * add commend
 
 ## 0.1.3+1
-* add string api client.pubString and message.payloadString
+* add string api client.pubString and message.string
 * fix defect: pub sub non ascii
 * fix defect: message include \r or \n
 * revamp message decoding

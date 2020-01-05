@@ -1,18 +1,6 @@
 import 'dart:typed_data';
 import 'dart:math';
 
-/// inbox port from go nats
-class Inbox {
-  static const _inboxPrefix = '_INBOX.';
-
-  static final _nuid = Nuid();
-
-  ///generate inbox
-  static String newInbox() {
-    return _inboxPrefix + _nuid.next();
-  }
-}
-
 const _inboxPrefix = '_INBOX.';
 const _digits =
     '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
@@ -27,7 +15,11 @@ const _totalLen = _preLen + _seqLen;
 final _nuid = Nuid();
 
 ///generate inbox
-String newInbox() {
+String newInbox({bool secure = true}) {
+  if (secure) {
+    _nuid.randomizePrefix();
+    _nuid.resetSequential();
+  }
   return _inboxPrefix + _nuid.next();
 }
 
@@ -42,16 +34,16 @@ class Nuid {
   Nuid() {
     _pre = Uint8List(_preLen);
     _rng = Random.secure();
-    _randomizePrefix();
-    _resetSequential();
+    randomizePrefix();
+    resetSequential();
   }
 
   ///generate next nuid
   String next() {
     _seq += _inc;
     if (_seq >= _maxSeq) {
-      _randomizePrefix();
-      _resetSequential();
+      randomizePrefix();
+      resetSequential();
     }
     var s = _seq;
     var b = _pre + Uint8List(_seqLen);
@@ -62,7 +54,8 @@ class Nuid {
     return String.fromCharCodes(b);
   }
 
-  void _resetSequential() {
+  ///reset sequential
+  void resetSequential() {
     Random();
     _seq = _rng.nextInt(1 << 31) << 32 | _rng.nextInt(1 << 32);
     if (_seq > _maxSeq) {
@@ -71,7 +64,8 @@ class Nuid {
     _inc = _minInc + _rng.nextInt(_maxInc - _minInc);
   }
 
-  void _randomizePrefix() {
+  ///random new prefix
+  void randomizePrefix() {
     for (var i = 0; i < _preLen; i++) {
       var n = _rng.nextInt(255) % _base;
       _pre[i] = _digits.codeUnits[n];

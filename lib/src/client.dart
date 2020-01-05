@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:dart_nats/dart_nats.dart';
+
 import 'common.dart';
 import 'message.dart';
 import 'subscription.dart';
@@ -91,7 +93,7 @@ class Client {
 
         _addConnectOption(_connectOption);
         _backendSubscriptAll();
-        _drainPubBuffer();
+        _flushPubBuffer();
 
         _buffer = Uint8List(0);
         await for (var d in _socket) {
@@ -146,7 +148,7 @@ class Client {
 
           _addConnectOption(_connectOption);
           _backendSubscriptAll();
-          _drainPubBuffer();
+          _flushPubBuffer();
 
           _buffer = Uint8List(0);
           _socket.listen((d) {
@@ -189,7 +191,7 @@ class Client {
     });
   }
 
-  void _drainPubBuffer() {
+  void _flushPubBuffer() {
     _pubBuffer.forEach((p) {
       _pub(p);
     });
@@ -270,7 +272,7 @@ class Client {
     _buffer = _buffer.sublist(length + 2);
 
     if (_subs[sid] != null) {
-      _subs[sid].add(Message(subject, sid, replyTo, payload));
+      _subs[sid].add(Message(subject, sid, payload, this, replyTo: replyTo));
     }
     _receiveLine1 = '';
     _receiveState = _ReceiveState.idle;
@@ -288,7 +290,7 @@ class Client {
     _add('connect ' + jsonEncode(c.toJson()));
   }
 
-  ///publish by byte (Uint8List) return true if sucess to send or buffer
+  ///publish by byte (Uint8List) return true if sucess sending or buffering
   ///return false if not connect
   bool pub(String subject, Uint8List msg,
       {String replyTo, bool buffer = true}) {
@@ -389,17 +391,31 @@ class Client {
     return true;
   }
 
+  final _inboxs = <String, Subscription>{};
+
   /// Request will send a request payload and deliver the response message,
   /// or an error, including a timeout if no message was received properly.
-  Future<Message> request(String subj, Uint8List msg, [Duration timeout]) {
-    var c = Completer<Message>();
+  Future<Message> request(String subj, Uint8List msg,
+      {String queueGroup, Duration timeout}) {
+    timeout ??= Duration(seconds: 2);
 
-    return c.future;
+    if (_inboxs[subj] == null) {
+      var inbox = newInbox();
+      _inboxs[subj] = sub(inbox, queueGroup: queueGroup);
+    }
+
+    pub(subj, msg, replyTo: _inboxs[subj].subject);
+    var respond = _inboxs[subj].stream.asBroadcastStream().first;
+
+    // todo timeout
+
+    return respond;
   }
 
   ///close connection to NATS server unsub to server but still keep subscription list at client
   void close() {
     _backendSubs.forEach((_, s) => s = false);
+    _inboxs.clear();
     _socket?.close();
     status = Status.closed;
   }

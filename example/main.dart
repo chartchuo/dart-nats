@@ -7,7 +7,7 @@ void main() async {
   client.pubString('subject1', 'message1');
   var msg = await sub.stream.first;
 
-  print(msg.payloadString);
+  print(msg.string);
   client.unSub(sub);
   client.close();
 }

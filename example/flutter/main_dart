@@ -51,14 +51,14 @@ class _MyHomePageState extends State<MyHomePage> {
           StreamBuilder(
             stream: fooSub.stream,
             builder: (context, AsyncSnapshot<nats.Message> snapshot) {
-              return Text(snapshot.hasData ? '${snapshot.data.payloadString}' : '');
+              return Text(snapshot.hasData ? '${snapshot.data.string}' : '');
             },
           ),
           Text('bar message:'),
           StreamBuilder(
             stream: barSub.stream,
             builder: (context, AsyncSnapshot<nats.Message> snapshot) {
-              return Text(snapshot.hasData ? '${snapshot.data.payloadString}' : '');
+              return Text(snapshot.hasData ? '${snapshot.data.string}' : '');
             },
           ),
           Row(

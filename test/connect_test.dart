@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:pedantic/pedantic.dart';
@@ -9,12 +8,12 @@ void main() {
   group('all', () {
     test('simple', () async {
       var client = Client();
-      client.connect('localhost', retryInterval: 1);
+      unawaited(client.connect('localhost', retryInterval: 1));
       var sub = client.sub('subject1');
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
       var msg = await sub.stream.first;
       client.close();
-      expect(String.fromCharCodes(msg.payload), equals('message1'));
+      expect(String.fromCharCodes(msg.data), equals('message1'));
     });
     test('await', () async {
       var client = Client();
@@ -27,7 +26,7 @@ void main() {
 
       var msg = await sub.stream.first;
       client.close();
-      expect(String.fromCharCodes(msg.payload), equals('message1'));
+      expect(String.fromCharCodes(msg.data), equals('message1'));
     });
   });
 }
