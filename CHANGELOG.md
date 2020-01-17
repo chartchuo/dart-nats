@@ -1,3 +1,6 @@
+## 0.1.6
+* async connect
+
 ## 0.1.5+1
 * fix defect
 
