@@ -1,5 +1,5 @@
 # Dart-NATS 
-A Dart client for the [NATS](https://nats.io) messaging system. It's simple. Design to use with flutter easy to write no need to deal with complex asynchronous.
+A Dart client for the [NATS](https://nats.io) messaging system.
 
 ## Dart Examples:
 
@@ -73,14 +73,14 @@ Full Flutter sample code [example/flutter/main.dart](https://github.com/chartchu
 ## Features
 The following is a list of features currently supported and planned by this client:
 
-* [X] - Publish
-* [X] - Subscribe, unsubscribe
-* [X] - NUID, Inbox
-* [X] - Reconnect to single server when connection lost and resume subscription
+* [x] - Publish
+* [x] - Subscribe, unsubscribe
+* [x] - NUID, Inbox
+* [x] - Reconnect to single server when connection lost and resume subscription
 * [x] - Unsubscribe after N message
 * [x] - Request, Respond
 * [x] - Queue subscribe
-* [x] - caches, flush, drain
+* [ ] - caches, flush, drain
 * [ ] - Request timeout
 * [ ] - structured data
 * [ ] - Connection option (cluster, timeout,ping interval, max ping, echo,... )

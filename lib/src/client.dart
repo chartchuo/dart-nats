@@ -290,10 +290,13 @@ class Client {
     _add('connect ' + jsonEncode(c.toJson()));
   }
 
+  ///default buffer action for pub
+  var defaultPubBuffer = true;
+
   ///publish by byte (Uint8List) return true if sucess sending or buffering
   ///return false if not connect
-  bool pub(String subject, Uint8List data,
-      {String replyTo, bool buffer = true}) {
+  bool pub(String subject, Uint8List data, {String replyTo, bool buffer}) {
+    buffer ??= defaultPubBuffer;
     if (status != Status.connected) {
       if (buffer) {
         _pubBuffer.add(_Pub(subject, data, replyTo));
