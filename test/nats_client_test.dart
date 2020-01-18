@@ -191,5 +191,23 @@ void main() {
 
       expect(max, isNotNull);
     });
+    test('sub continue msg', () async {
+      var client = Client();
+      await client.connect('localhost');
+      var sub = client.sub('sub');
+      var r = 0;
+      var iteration = 10;
+      sub.stream.listen((msg) {
+        print(msg.string);
+        r++;
+      });
+      for (var i = 0; i < iteration; i++) {
+        client.pubString('sub', i.toString());
+        await Future.delayed(Duration(milliseconds: 10));
+      }
+      await Future.delayed(Duration(seconds: 5));
+      client.close();
+      expect(r, equals(iteration));
+    });
   });
 }
