@@ -65,58 +65,58 @@ class Client {
   int _ssid = 0;
 
   /// Connect to NATS server
-  void connectOld(String host,
-      {int port = 4222,
-      ConnectOption connectOption,
-      int timeout = 5,
-      bool retry = true,
-      int retryInterval = 10}) async {
-    if (status != Status.disconnected && status != Status.closed) return;
+  // void connectOld(String host,
+  //     {int port = 4222,
+  //     ConnectOption connectOption,
+  //     int timeout = 5,
+  //     bool retry = true,
+  //     int retryInterval = 10}) async {
+  //   if (status != Status.disconnected && status != Status.closed) return;
 
-    _host = host;
-    _port = port;
+  //   _host = host;
+  //   _port = port;
 
-    if (connectOption != null) _connectOption = connectOption;
+  //   if (connectOption != null) _connectOption = connectOption;
 
-    for (var i = 0; i == 0 || retry; i++) {
-      if (i == 0) {
-        status = Status.connecting;
-      } else {
-        status = Status.reconnecting;
-        await Future.delayed(Duration(seconds: retryInterval));
-      }
+  //   for (var i = 0; i == 0 || retry; i++) {
+  //     if (i == 0) {
+  //       status = Status.connecting;
+  //     } else {
+  //       status = Status.reconnecting;
+  //       await Future.delayed(Duration(seconds: retryInterval));
+  //     }
 
-      try {
-        _socket = await Socket.connect(_host, _port,
-            timeout: Duration(seconds: timeout));
-        status = Status.connected;
+  //     try {
+  //       _socket = await Socket.connect(_host, _port,
+  //           timeout: Duration(seconds: timeout));
+  //       status = Status.connected;
 
-        _addConnectOption(_connectOption);
-        _backendSubscriptAll();
-        _flushPubBuffer();
+  //       _addConnectOption(_connectOption);
+  //       _backendSubscriptAll();
+  //       _flushPubBuffer();
 
-        _buffer = Uint8List(0);
-        await for (var d in _socket) {
-          //work around error list<int> not subset of uint8list
-          var tmp = _buffer + d;
-          _buffer = Uint8List.fromList(tmp);
+  //       _buffer = Uint8List(0);
+  //       await for (var d in _socket) {
+  //         //work around error list<int> not subset of uint8list
+  //         var tmp = _buffer + d;
+  //         _buffer = Uint8List.fromList(tmp);
 
-          switch (_receiveState) {
-            case _ReceiveState.idle:
-              _processOp();
-              break;
-            case _ReceiveState.msg:
-              _processMsg();
-              break;
-          }
-        }
-        status = Status.disconnected;
-        await _socket.close();
-      } catch (err) {
-        close();
-      }
-    }
-  }
+  //         switch (_receiveState) {
+  //           case _ReceiveState.idle:
+  //             _processOp();
+  //             break;
+  //           case _ReceiveState.msg:
+  //             _processMsg();
+  //             break;
+  //         }
+  //       }
+  //       status = Status.disconnected;
+  //       await _socket.close();
+  //     } catch (err) {
+  //       close();
+  //     }
+  //   }
+  // }
 
   /// Connect to NATS server
   Future connect(String host,
@@ -154,7 +154,7 @@ class Client {
           _socket.listen((d) {
             var tmp = _buffer + d;
             _buffer = Uint8List.fromList(tmp);
-
+            while(_buffer.contains(10)){
             switch (_receiveState) {
               case _ReceiveState.idle:
                 _processOp();
@@ -162,6 +162,7 @@ class Client {
               case _ReceiveState.msg:
                 _processMsg();
                 break;
+            }
             }
           }, onDone: () {
             status = Status.disconnected;

@@ -1,5 +1,6 @@
 ## 0.1.6
 * async connect
+* fix defect message delay when sub receive continuous message
 
 ## 0.1.5+1
 * fix defect

@@ -180,7 +180,7 @@ void main() {
       client.close();
       expect(1, 1);
     });
-    test('get may payload', () async {
+    test('get max payload', () async {
       var client = Client();
       await client.connect('localhost');
 
@@ -191,21 +191,21 @@ void main() {
 
       expect(max, isNotNull);
     });
-    test('sub continue msg', () async {
+    test('sub continuous msg', () async {
       var client = Client();
       await client.connect('localhost');
       var sub = client.sub('sub');
       var r = 0;
-      var iteration = 10;
+      var iteration = 100;
       sub.stream.listen((msg) {
         print(msg.string);
         r++;
       });
       for (var i = 0; i < iteration; i++) {
         client.pubString('sub', i.toString());
-        await Future.delayed(Duration(milliseconds: 10));
+        // await Future.delayed(Duration(milliseconds: 10));
       }
-      await Future.delayed(Duration(seconds: 5));
+      await Future.delayed(Duration(seconds: 1));
       client.close();
       expect(r, equals(iteration));
     });
