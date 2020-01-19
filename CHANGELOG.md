@@ -1,3 +1,6 @@
+## 0.1.6+1
+* Improve receive buffer handling
+
 ## 0.1.6
 * async connect
 * fix defect message delay when sub receive continuous message

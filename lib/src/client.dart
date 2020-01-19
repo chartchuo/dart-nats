@@ -10,7 +10,7 @@ import 'message.dart';
 import 'subscription.dart';
 
 enum _ReceiveState {
-  idle, //op=msg ->
+  idle, //op=msg -> msg
   msg, //newline -> idle
 
 }
@@ -154,15 +154,17 @@ class Client {
           _socket.listen((d) {
             var tmp = _buffer + d;
             _buffer = Uint8List.fromList(tmp);
-            while(_buffer.contains(10)){
-            switch (_receiveState) {
-              case _ReceiveState.idle:
-                _processOp();
-                break;
-              case _ReceiveState.msg:
-                _processMsg();
-                break;
-            }
+            while (
+                _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
+              _processOp();
+              // switch (_receiveState) {
+              //   case _ReceiveState.idle:
+              // _processOp();
+              //     break;
+              //   case _ReceiveState.msg:
+              //     _processMsg();
+              //     break;
+              // }
             }
           }, onDone: () {
             status = Status.disconnected;
@@ -230,7 +232,7 @@ class Client {
     ///process operation
     switch (op) {
       case 'msg':
-        // _receiveState = _ReceiveState.msg;
+        _receiveState = _ReceiveState.msg;
         _receiveLine1 = line;
         _processMsg();
         break;

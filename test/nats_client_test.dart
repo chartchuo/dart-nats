@@ -209,5 +209,23 @@ void main() {
       client.close();
       expect(r, equals(iteration));
     });
+    test('sub defect 13 binary', () async {
+      var client = Client();
+      await client.connect('localhost');
+      var sub = client.sub('sub');
+      var r = 0;
+      var iteration = 100;
+      sub.stream.listen((msg) {
+        print(msg.string);
+        r++;
+      });
+      for (var i = 0; i < iteration; i++) {
+        client.pub('sub', Uint8List.fromList([10, 13, 10]));
+        // await Future.delayed(Duration(milliseconds: 10));
+      }
+      await Future.delayed(Duration(seconds: 1));
+      client.close();
+      expect(r, equals(iteration));
+    });
   });
 }
