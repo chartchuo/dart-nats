@@ -125,8 +125,9 @@ class Client {
       int timeout = 5,
       bool retry = true,
       int retryInterval = 10}) async {
-    if (status != Status.disconnected && status != Status.closed) return;
-
+    if (status != Status.disconnected && status != Status.closed) {
+      return Future.error('Error: status not disconnected and not closed');
+    }
     _host = host;
     _port = port;
 
