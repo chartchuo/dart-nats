@@ -8,7 +8,7 @@ import 'package:dart_nats/dart_nats.dart';
 void run(SendPort sendPort) async {
   var client = Client();
   await client.connect('localhost');
-  for (var i = 0; i < 10000; i++) {
+  for (var i = 0; i < 100000; i++) {
     client.pubString('sub', i.toString());
   }
   await client.ping();
@@ -23,7 +23,7 @@ void main() {
       await client.connect('localhost');
       var sub = client.sub('sub');
       var r = 0;
-      var iteration = 10000;
+      var iteration = 100000;
 
       sub.stream.listen((msg) {
         print(msg.string);
@@ -32,11 +32,12 @@ void main() {
       var receivePort = ReceivePort();
       var iso = await Isolate.spawn(run, receivePort.sendPort);
 
-      // await Future.delayed(Duration(seconds: 10));
       var out = await receivePort.first;
       print(out);
       iso.kill();
 
+      await Future.delayed(Duration(
+          seconds: 1)); //wait for last message send round trip to server
       client.close();
       expect(r, equals(iteration));
     });
