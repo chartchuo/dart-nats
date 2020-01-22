@@ -183,11 +183,7 @@ class Client {
         _info = Info.fromJson(jsonDecode(data));
         break;
       case 'ping':
-        await Future.microtask(() {
-          _add('pong');
-          _socket.flush();
-        });
-
+        _add('pong');
         break;
       case '-err':
         _processErr(data);
