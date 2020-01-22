@@ -50,6 +50,7 @@ class Client {
   int _port;
   Socket _socket;
   Info _info;
+  Completer _pingCompleter;
 
   ///status of the client
   var status = Status.disconnected;
@@ -247,6 +248,8 @@ class Client {
         _processErr(data);
         break;
       case 'pong':
+        _pingCompleter.complete();
+        break;
       case '+ok':
         //do nothing
         break;
@@ -286,8 +289,10 @@ class Client {
   int maxPayload() => _info?.maxPayload;
 
   ///ping server current not implement pong verification
-  void ping() {
+  Future ping() {
+    _pingCompleter = Completer();
     _add('ping');
+    return _pingCompleter.future;
   }
 
   void _addConnectOption(ConnectOption c) {
