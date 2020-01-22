@@ -51,6 +51,7 @@ class Client {
   Socket _socket;
   Info _info;
   Completer _pingCompleter;
+  Completer _connectCompleter;
 
   ///status of the client
   var status = Status.disconnected;
@@ -66,66 +67,13 @@ class Client {
   int _ssid = 0;
 
   /// Connect to NATS server
-  // void connectOld(String host,
-  //     {int port = 4222,
-  //     ConnectOption connectOption,
-  //     int timeout = 5,
-  //     bool retry = true,
-  //     int retryInterval = 10}) async {
-  //   if (status != Status.disconnected && status != Status.closed) return;
-
-  //   _host = host;
-  //   _port = port;
-
-  //   if (connectOption != null) _connectOption = connectOption;
-
-  //   for (var i = 0; i == 0 || retry; i++) {
-  //     if (i == 0) {
-  //       status = Status.connecting;
-  //     } else {
-  //       status = Status.reconnecting;
-  //       await Future.delayed(Duration(seconds: retryInterval));
-  //     }
-
-  //     try {
-  //       _socket = await Socket.connect(_host, _port,
-  //           timeout: Duration(seconds: timeout));
-  //       status = Status.connected;
-
-  //       _addConnectOption(_connectOption);
-  //       _backendSubscriptAll();
-  //       _flushPubBuffer();
-
-  //       _buffer = Uint8List(0);
-  //       await for (var d in _socket) {
-  //         //work around error list<int> not subset of uint8list
-  //         var tmp = _buffer + d;
-  //         _buffer = Uint8List.fromList(tmp);
-
-  //         switch (_receiveState) {
-  //           case _ReceiveState.idle:
-  //             _processOp();
-  //             break;
-  //           case _ReceiveState.msg:
-  //             _processMsg();
-  //             break;
-  //         }
-  //       }
-  //       status = Status.disconnected;
-  //       await _socket.close();
-  //     } catch (err) {
-  //       close();
-  //     }
-  //   }
-  // }
-
-  /// Connect to NATS server
   Future connect(String host,
       {int port = 4222,
       ConnectOption connectOption,
       int timeout = 5,
       bool retry = true,
       int retryInterval = 10}) async {
+    _connectCompleter = Completer();
     if (status != Status.disconnected && status != Status.closed) {
       return Future.error('Error: status not disconnected and not closed');
     }
@@ -147,44 +95,35 @@ class Client {
           _socket = await Socket.connect(_host, _port,
               timeout: Duration(seconds: timeout));
           status = Status.connected;
+          _connectCompleter.complete();
 
           _addConnectOption(_connectOption);
           _backendSubscriptAll();
           _flushPubBuffer();
 
-          _buffer = Uint8List(0);
+          _buffer = [];
           _socket.listen((d) {
-            var tmp = _buffer + d;
-            _buffer = Uint8List.fromList(tmp);
+            _buffer.addAll(d);
             while (
                 _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
               _processOp();
-              // switch (_receiveState) {
-              //   case _ReceiveState.idle:
-              // _processOp();
-              //     break;
-              //   case _ReceiveState.msg:
-              //     _processMsg();
-              //     break;
-              // }
             }
           }, onDone: () {
             status = Status.disconnected;
             _socket.close();
           }, onError: (err) {
-            // print(err);
             status = Status.disconnected;
             _socket.close();
           });
           return;
         } catch (err) {
-          // print(err);
           close();
         }
       }
     }
 
-    return Future.microtask(loop);
+    loop();
+    return _connectCompleter.future;
   }
 
   void _backendSubscriptAll() {
@@ -202,10 +141,10 @@ class Client {
     });
   }
 
-  var _buffer = Uint8List(0);
+  List<int> _buffer = [];
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
-  void _processOp() {
+  void _processOp() async {
     ///find endline
     var nextLineIndex = _buffer.indexWhere((c) {
       if (c == 13) {
@@ -216,9 +155,11 @@ class Client {
     if (nextLineIndex == -1) return;
     var line =
         String.fromCharCodes(_buffer.sublist(0, nextLineIndex)); // retest
-    _buffer = _buffer.sublist(nextLineIndex + 2);
-    // var tmp = String.fromCharCodes(_buffer);
-    // print(tmp);
+    if (_buffer.length > nextLineIndex + 2) {
+      _buffer.removeRange(0, nextLineIndex + 2);
+    } else {
+      _buffer = [];
+    }
 
     ///decode operation
     var i = line.indexOf(' ');
@@ -242,7 +183,11 @@ class Client {
         _info = Info.fromJson(jsonDecode(data));
         break;
       case 'ping':
-        _add('pong');
+        await Future.microtask(() {
+          _add('pong');
+          _socket.flush();
+        });
+
         break;
       case '-err':
         _processErr(data);
@@ -257,13 +202,11 @@ class Client {
   }
 
   void _processErr(String data) {
-    /// print('NATS Client Error: $data');
     close();
   }
 
   void _processMsg() {
     var s = _receiveLine1.split(' ');
-    // if (s.length == 4) s.insert(3, '');
     var subject = s[1];
     var sid = int.parse(s[2]);
     String replyTo;
@@ -275,8 +218,13 @@ class Client {
       length = int.parse(s[4]);
     }
     if (_buffer.length < length) return;
-    var payload = _buffer.sublist(0, length);
-    _buffer = _buffer.sublist(length + 2);
+    var payload = Uint8List.fromList(_buffer.sublist(0, length));
+    // _buffer = _buffer.sublist(length + 2);
+    if (_buffer.length > length + 2) {
+      _buffer.removeRange(0, length + 2);
+    } else {
+      _buffer = [];
+    }
 
     if (_subs[sid] != null) {
       _subs[sid].add(Message(subject, sid, payload, this, replyTo: replyTo));
