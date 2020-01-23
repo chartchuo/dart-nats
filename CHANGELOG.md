@@ -1,5 +1,6 @@
 ## 0.1.7
 * add async support for ping()
+* add message.respondString
 
 ## 0.1.6+1
 * Improve receive buffer handling

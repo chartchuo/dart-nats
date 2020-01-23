@@ -28,4 +28,9 @@ class Message {
     _client.pub(replyTo, data);
     return true;
   }
+
+  ///Repond to string message
+  bool respondString(String str) {
+    return respond(utf8.encode(str));
+  }
 }
