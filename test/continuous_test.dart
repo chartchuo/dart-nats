@@ -11,7 +11,8 @@ void run(SendPort sendPort) async {
   await client.connect('localhost');
   for (var i = 0; i < iteration; i++) {
     client.pubString('iso', i.toString());
-    // await Future.delayed(Duration(milliseconds: 1));
+    //commend out for reproduce issue#4
+    await Future.delayed(Duration(milliseconds: 1));
   }
   await client.ping();
   client.close();
