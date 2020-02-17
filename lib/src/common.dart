@@ -95,6 +95,15 @@ class ConnectOption {
   /// TLS require or not //not implement yet
   bool tlsRequired;
 
+  /// Auehtnticatio Token
+  String auth_token;
+
+  /// username
+  String user;
+
+  /// password
+  String pass;
+
   ///server name
   String name;
 
@@ -111,6 +120,9 @@ class ConnectOption {
   ConnectOption(
       {this.verbose,
       this.pedantic,
+      this.auth_token,
+      this.user,
+      this.pass,
       this.tlsRequired,
       this.name,
       this.lang,
@@ -122,6 +134,9 @@ class ConnectOption {
     verbose = json['verbose'];
     pedantic = json['pedantic'];
     tlsRequired = json['tls_required'];
+    auth_token = json['auth_token'];
+    user = json['user'];
+    pass = json['pass'];
     name = json['name'];
     lang = json['lang'];
     version = json['version'];
@@ -134,6 +149,9 @@ class ConnectOption {
     data['verbose'] = verbose;
     data['pedantic'] = pedantic;
     data['tls_required'] = tlsRequired;
+    data['auth_token'] = auth_token;
+    data['user'] = user;
+    data['pass'] = pass;
     data['name'] = name;
     data['lang'] = lang;
     data['version'] = version;
