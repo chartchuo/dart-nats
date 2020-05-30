@@ -16,8 +16,12 @@ class Subscription {
 
   final _controller = StreamController<Message>();
 
+  Stream<Message> _stream;
+
   ///constructure
-  Subscription(this.sid, this.subject, this._client, {this.queueGroup});
+  Subscription(this.sid, this.subject, this._client, {this.queueGroup}) {
+    _stream = _controller.stream.asBroadcastStream();
+  }
 
   ///
   void unSub() {
@@ -25,7 +29,7 @@ class Subscription {
   }
 
   ///Stream output when server publish message
-  Stream<Message> get stream => _controller.stream;
+  Stream<Message> get stream => _stream;
 
   ///sink messat to listener
   void add(Message msg) {

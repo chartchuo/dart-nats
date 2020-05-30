@@ -360,8 +360,11 @@ class Client {
       _inboxs[subj] = sub(inbox, queueGroup: queueGroup);
     }
 
+    // var respond = _inboxs[subj].stream.asBroadcastStream().first;
+    var stream = _inboxs[subj].stream;
+    // stream.listen((event) { });
+    var respond = stream.take(1).single;
     pub(subj, data, replyTo: _inboxs[subj].subject);
-    var respond = _inboxs[subj].stream.asBroadcastStream().first;
 
     // todo timeout
 
