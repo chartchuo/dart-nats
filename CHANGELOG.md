@@ -1,3 +1,6 @@
+## 0.1.8
+* fix request error on second request
+
 ## 0.1.7
 * add async support for ping()
 * add message.respondString
