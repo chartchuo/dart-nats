@@ -66,10 +66,10 @@ void main() {
           'service', Uint8List.fromList('request'.codeUnits));
       receive = await client.request(
           'service', Uint8List.fromList('request'.codeUnits));
-      // receive = await client.request(
-      //     'service', Uint8List.fromList('request'.codeUnits));
-      // receive = await client.request(
-      //     'service', Uint8List.fromList('request'.codeUnits));
+      receive = await client.request(
+          'service', Uint8List.fromList('request'.codeUnits));
+      receive = await client.request(
+          'service', Uint8List.fromList('request'.codeUnits));
 
       client.close();
       service.close();

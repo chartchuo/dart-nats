@@ -354,21 +354,28 @@ class Client {
   Future<Message> request(String subj, Uint8List data,
       {String queueGroup, Duration timeout}) {
     timeout ??= Duration(seconds: 2);
+    data ??= Uint8List(0);
 
     if (_inboxs[subj] == null) {
       var inbox = newInbox();
       _inboxs[subj] = sub(inbox, queueGroup: queueGroup);
     }
 
-    // var respond = _inboxs[subj].stream.asBroadcastStream().first;
     var stream = _inboxs[subj].stream;
-    // stream.listen((event) { });
     var respond = stream.take(1).single;
     pub(subj, data, replyTo: _inboxs[subj].subject);
 
     // todo timeout
 
     return respond;
+  }
+
+  /// requestString() helper to request()
+  Future<Message> requestString(String subj, String data,
+      {String queueGroup, Duration timeout}) {
+    data ??= '';
+    return request(subj, Uint8List.fromList(data.codeUnits),
+        queueGroup: queueGroup, timeout: timeout);
   }
 
   ///close connection to NATS server unsub to server but still keep subscription list at client
