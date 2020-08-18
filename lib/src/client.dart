@@ -8,6 +8,7 @@ import 'package:dart_nats/dart_nats.dart';
 import 'common.dart';
 import 'message.dart';
 import 'subscription.dart';
+import 'healthcheck.dart';
 
 enum _ReceiveState {
   idle, //op=msg -> msg
@@ -54,11 +55,14 @@ class Client {
   Completer _connectCompleter;
 
   ///status of the client
-  var status = Status.disconnected;
+  static var status = Status.disconnected;
+  Healthcheck _healthcheck = Healthcheck(status);
   var _connectOption = ConnectOption(verbose: false);
 
   ///server info
   Info get info => _info;
+  ///connection status
+  Healthcheck get healthcheck => _healthcheck;
 
   final _subs = <int, Subscription>{};
   final _backendSubs = <int, bool>{};
@@ -86,8 +90,10 @@ class Client {
       for (var i = 0; i == 0 || retry; i++) {
         if (i == 0) {
           status = Status.connecting;
+          _healthcheck.add(status);
         } else {
           status = Status.reconnecting;
+          _healthcheck.add(status);
           await Future.delayed(Duration(seconds: retryInterval));
         }
 
@@ -95,6 +101,7 @@ class Client {
           _socket = await Socket.connect(_host, _port,
               timeout: Duration(seconds: timeout));
           status = Status.connected;
+          _healthcheck.add(status);
           _connectCompleter.complete();
 
           _addConnectOption(_connectOption);
@@ -110,9 +117,11 @@ class Client {
             }
           }, onDone: () {
             status = Status.disconnected;
+            _healthcheck.add(status);
             _socket.close();
           }, onError: (err) {
             status = Status.disconnected;
+            _healthcheck.add(status);
             _socket.close();
           });
           return;
@@ -384,5 +393,6 @@ class Client {
     _inboxs.clear();
     _socket?.close();
     status = Status.closed;
+    _healthcheck.add(status);
   }
 }
