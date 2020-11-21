@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:test/test.dart';
-import 'package:dart_nats/dart_nats.dart';
+import 'package:dart_nats_client/dart_nats_client.dart';
 
 //please start nats-server on localhost before testing
 
