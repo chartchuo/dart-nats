@@ -4,3 +4,7 @@ pubspec.lock
 test/go.sum
 build/
 doc/api/
+
+
+# VSCode
+.vscode/

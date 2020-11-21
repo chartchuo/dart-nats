@@ -164,6 +164,8 @@ class Client {
           _healthcheck.add(status);
           _socket.close();
         });
+        // Exit from loop on success
+        break;
       } catch (err) {
         // Close connection
         close();
