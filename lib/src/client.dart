@@ -38,23 +38,39 @@ enum Status {
 }
 
 class _Pub {
+  /// Subject of publication
   final String subject;
+
+  /// Data array
   final List<int> data;
+
+  /// Name of user if it is reply
   final String replyTo;
 
   _Pub(this.subject, this.data, this.replyTo);
 }
 
-///NATS client
+/// NATS client
 class Client {
+  /// Host name
   String _host;
+
+  /// NATS port
   int _port;
+
+  /// Socket connection object
   Socket _socket;
+
+  /// Connection info
   Info _info;
+
+  /// Ping controller
   Completer _pingCompleter;
+
+  /// Connection controller
   Completer _connectCompleter;
 
-  ///status of the client
+  /// Status of the client
   static var status = Status.disconnected;
   Healthcheck _healthcheck = Healthcheck(status);
   var _connectOption = ConnectOption(verbose: false);
@@ -65,10 +81,16 @@ class Client {
   ///connection status
   Healthcheck get healthcheck => _healthcheck;
 
+  /// Subscriptions map
   final _subs = <int, Subscription>{};
+
+  /// Subscription backend
   final _backendSubs = <int, bool>{};
+
+  /// Publication buffer
   final _pubBuffer = <_Pub>[];
 
+  /// Instance ID
   int _ssid = 0;
 
   /// Connect to NATS server
@@ -78,63 +100,78 @@ class Client {
       int timeout = 5,
       bool retry = true,
       int retryInterval = 10}) async {
+    // Init connection controller
     _connectCompleter = Completer();
+    // Check  connection status. If connected, don't allow connect again
     if (status != Status.disconnected && status != Status.closed) {
+      // Return Future error for await catch
       return Future.error('Error: status not disconnected and not closed');
     }
+    // Save hostname
     _host = host;
+    // Save port name
     _port = port;
-
+    // Check connection options validity and save
     if (connectOption != null) _connectOption = connectOption;
 
-    void loop() async {
-      for (var i = 0; i == 0 || retry; i++) {
-        if (i == 0) {
-          status = Status.connecting;
-          _healthcheck.add(status);
-        } else {
-          status = Status.reconnecting;
-          _healthcheck.add(status);
-          await Future.delayed(Duration(seconds: retryInterval));
-        }
+    // Start for loop for cennection with retries
+    for (var i = 0; i == 0 || retry; i++) {
+      if (i == 0) {
+        // If first attempt, status - connecting
+        status = Status.connecting;
+        // Add status to health check controller
+        _healthcheck.add(status);
+      } else {
+        // If not first attempt, set status reconnecting
+        status = Status.reconnecting;
+        // Add status to health check controller
+        _healthcheck.add(status);
+        // Add delay on retryInterval for next attempt
+        await Future.delayed(Duration(seconds: retryInterval));
+      }
 
-        try {
-          _socket = await Socket.connect(_host, _port,
-              timeout: Duration(seconds: timeout));
-          status = Status.connected;
+      // Try-Catch socket exceptions
+      try {
+        // Init socket connection.
+        // On this stage exception can be caught.
+        _socket = await Socket.connect(_host, _port,
+            timeout: Duration(seconds: timeout));
+        // Set status connected after socket was inited
+        status = Status.connected;
+        // Add status to health check controller
+        _healthcheck.add(status);
+        // Set complete status to connect controller
+        _connectCompleter.complete();
+        // Add connecton options
+        _addConnectOption(_connectOption);
+        // Clear backend subscriptions
+        _backendSubscriptAll();
+        // Clear publications buffer
+        _flushPubBuffer();
+
+        _buffer = [];
+        _socket.listen((d) {
+          _buffer.addAll(d);
+          while (_receiveState == _ReceiveState.idle && _buffer.contains(13)) {
+            _processOp();
+          }
+        }, onDone: () {
+          status = Status.disconnected;
           _healthcheck.add(status);
-          _connectCompleter.complete();
-
-          _addConnectOption(_connectOption);
-          _backendSubscriptAll();
-          _flushPubBuffer();
-
-          _buffer = [];
-          _socket.listen((d) {
-            _buffer.addAll(d);
-            while (
-                _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
-              _processOp();
-            }
-          }, onDone: () {
-            status = Status.disconnected;
-            _healthcheck.add(status);
-            _socket.close();
-          }, onError: (err) {
-            status = Status.disconnected;
-            _healthcheck.add(status);
-            _socket.close();
-          });
-          return;
-        } catch (err) {
-          close();
-          // Set error into Completer
-          _connectCompleter.completeError(err);
-        }
+          _socket.close();
+        }, onError: (err) {
+          status = Status.disconnected;
+          _healthcheck.add(status);
+          _socket.close();
+        });
+      } catch (err) {
+        // Close connection
+        close();
+        // Set error into Completer
+        _connectCompleter.completeError(err);
       }
     }
 
-    loop();
     return _connectCompleter.future;
   }
 
