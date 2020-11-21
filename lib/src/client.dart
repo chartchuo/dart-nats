@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:dart_nats_client/dart_nats.dart';
+import 'package:dart_nats_client/dart_nats_client.dart';
 
 import 'common.dart';
 import 'message.dart';

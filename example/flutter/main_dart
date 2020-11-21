@@ -1,7 +1,7 @@
 // Please rename from main_dart to main.dart and replace in flutter lib/ folder
 
 import 'package:flutter/material.dart';
-import 'package:dart_nats_client/dart_nats.dart' as nats;
+import 'package:dart_nats_client/dart_nats_client.dart' as nats;
 
 void main() => runApp(MyApp());
 
