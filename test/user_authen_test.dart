@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
-import 'package:dart_nats/dart_nats.dart';
+import 'package:dart_nats_client/dart_nats.dart';
 
 // start nats server using
 // nats-server -DV -m 8222 -user foo -pass bar

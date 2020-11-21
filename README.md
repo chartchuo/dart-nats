@@ -10,7 +10,7 @@ dart example/main.dart
 ```
 
 ```dart
-import 'package:dart_nats/dart_nats.dart';
+import 'package:dart_nats_client/dart_nats.dart';
 
 void main() async {
   var client = Client();
@@ -29,7 +29,7 @@ void main() async {
 
 Import and Declare object
 ```dart
-import 'package:dart_nats/dart_nats.dart' as nats;
+import 'package:dart_nats_client/dart_nats.dart' as nats;
 
   nats.Client natsClient;
   nats.Subscription fooSub, barSub;
@@ -69,6 +69,11 @@ Dispose
 
 Full Flutter sample code [example/flutter/main.dart](https://github.com/chartchuo/dart-nats/blob/master/example/flutter/main_dart)
 
+## Testing
+
+For running unit-tests use `pub run test test/` in project root folder.
+
+NOTE. For testing you need run NATS in docker. [Instruction](https://docs.nats.io/nats-server/nats_docker)
 
 ## Features
 The following is a list of features currently supported and planned by this client:

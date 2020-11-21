@@ -1,6 +1,6 @@
 @Timeout(Duration(seconds: 300))
 import 'package:test/test.dart';
-import 'package:dart_nats/dart_nats.dart';
+import 'package:dart_nats_client/dart_nats.dart';
 import 'dart:isolate';
 
 //please start nats-server on localhost before testing
