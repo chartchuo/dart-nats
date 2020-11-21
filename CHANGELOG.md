@@ -1,3 +1,7 @@
+## 0.1.9
+* fix await connection for flutter bug
+* improve docs
+
 ## 0.1.8
 * fix request error on second request
 
