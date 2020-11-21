@@ -1,4 +1,4 @@
-import 'package:dart_nats_client/dart_nats_client.dart';
+import 'package:dart_nats_client/dart_nats.dart';
 
 void main() async {
   var client = Client();

@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
-import 'package:dart_nats_client/dart_nats_client.dart';
+import 'package:dart_nats_client/dart_nats.dart';
 
 void main() {
   group('all', () {
