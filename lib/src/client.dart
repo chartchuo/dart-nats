@@ -71,8 +71,12 @@ class Client {
   Completer _connectCompleter;
 
   /// Status of the client
-  static var status = Status.disconnected;
-  Healthcheck _healthcheck = Healthcheck(status);
+  Status status;
+
+  /// Healthcheck status
+  Healthcheck _healthcheck;
+
+  /// Connection options
   var _connectOption = ConnectOption(verbose: false);
 
   ///server info
@@ -92,6 +96,14 @@ class Client {
 
   /// Instance ID
   int _ssid = 0;
+
+  /// Default constructor
+  Client() {
+    // Set status default disconnected
+    status = Status.disconnected;
+    // Init healthcheck
+    _healthcheck = Healthcheck(status);
+  }
 
   /// Connect to NATS server
   Future connect(String host,

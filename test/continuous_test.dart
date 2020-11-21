@@ -1,11 +1,11 @@
-@Timeout(Duration(seconds: 300))
+@Timeout(Duration(seconds: 30))
 import 'package:test/test.dart';
 import 'package:dart_nats_client/dart_nats_client.dart';
 import 'dart:isolate';
 
 //please start nats-server on localhost before testing
 
-const iteration = 100000;
+const iteration = 10000;
 void run(SendPort sendPort) async {
   var client = Client();
   await client.connect('localhost');
@@ -40,7 +40,7 @@ void main() {
       print(out);
       iso.kill();
       //wait for last message send round trip to server
-      await Future.delayed(Duration(seconds: 3));
+      await Future.delayed(Duration(seconds: 1));
 
       sub.close();
       client.close();

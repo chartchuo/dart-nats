@@ -31,8 +31,10 @@ void main() {
 
       var receive = await inboxSub.stream.first;
 
+      server.close();
       requester.close();
       service.close();
+      inboxSub.close();
       expect(receive.string, equals('respond'));
     });
     test('resquest', () async {
