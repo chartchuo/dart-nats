@@ -61,6 +61,7 @@ class Client {
 
   ///server info
   Info get info => _info;
+
   ///connection status
   Healthcheck get healthcheck => _healthcheck;
 
@@ -127,6 +128,8 @@ class Client {
           return;
         } catch (err) {
           close();
+          // Set error into Completer
+          _connectCompleter.completeError(err);
         }
       }
     }
