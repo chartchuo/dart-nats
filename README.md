@@ -10,7 +10,7 @@ dart example/main.dart
 ```
 
 ```dart
-import 'package:dart_nats_client/dart_nats.dart';
+import 'package:dart_nats_client/dart_nats_client.dart';
 
 void main() async {
   var client = Client();
@@ -29,7 +29,7 @@ void main() async {
 
 Import and Declare object
 ```dart
-import 'package:dart_nats_client/dart_nats.dart' as nats;
+import 'package:dart_nats_client/dart_nats_client.dart' as nats;
 
   nats.Client natsClient;
   nats.Subscription fooSub, barSub;
