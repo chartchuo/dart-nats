@@ -5,7 +5,7 @@ import 'dart:isolate';
 
 //please start nats-server on localhost before testing
 
-const iteration = 100000;
+const iteration = 10000;
 void run(SendPort sendPort) async {
   var client = Client();
   await client.connect('localhost');

@@ -118,6 +118,7 @@ class Client {
           return;
         } catch (err) {
           close();
+          _connectCompleter.completeError(err);
         }
       }
     }
