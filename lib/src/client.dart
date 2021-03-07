@@ -179,6 +179,8 @@ class Client {
         _receiveState = _ReceiveState.msg;
         _receiveLine1 = line;
         _processMsg();
+        _receiveLine1 = '';
+        _receiveState = _ReceiveState.idle;
         break;
       case 'info':
         _info = Info.fromJson(jsonDecode(data));
@@ -226,8 +228,6 @@ class Client {
     if (_subs[sid] != null) {
       _subs[sid].add(Message(subject, sid, payload, this, replyTo: replyTo));
     }
-    _receiveLine1 = '';
-    _receiveState = _ReceiveState.idle;
   }
 
   /// get server max payload

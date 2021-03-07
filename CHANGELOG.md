@@ -1,3 +1,8 @@
+## 
+* Add user passwor authentication
+* Add token authentication
+
+
 ## 0.1.8
 * fix request error on second request
 
