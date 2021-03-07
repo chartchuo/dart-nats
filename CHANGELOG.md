@@ -1,6 +1,8 @@
-## 
+## 0.2.0
 * Add user passwor authentication
 * Add token authentication
+* Convert to Null safety
+* Dart SDK version 2.12.0 - 3.0.0
 
 
 ## 0.1.8
