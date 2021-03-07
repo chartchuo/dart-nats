@@ -16,7 +16,7 @@ void main() {
       unawaited(client.connect('localhost', retryInterval: 1));
       var sub = client.sub('subject1');
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
-      var msg = await sub.stream.first;
+      var msg = await sub.stream!.first;
       client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });
@@ -29,7 +29,7 @@ void main() {
           buffer: false);
       expect(result, true);
 
-      var msg = await sub.stream.first;
+      var msg = await sub.stream!.first;
       client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });

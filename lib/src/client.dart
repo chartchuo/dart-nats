@@ -37,28 +37,28 @@ enum Status {
 }
 
 class _Pub {
-  final String subject;
+  final String? subject;
   final List<int> data;
-  final String replyTo;
+  final String? replyTo;
 
   _Pub(this.subject, this.data, this.replyTo);
 }
 
 ///NATS client
 class Client {
-  String _host;
-  int _port;
-  Socket _socket;
-  Info _info;
-  Completer _pingCompleter;
-  Completer _connectCompleter;
+  String? _host;
+  late int _port;
+  Socket? _socket;
+  Info? _info;
+  late Completer _pingCompleter;
+  late Completer _connectCompleter;
 
   ///status of the client
   var status = Status.disconnected;
   var _connectOption = ConnectOption(verbose: false);
 
   ///server info
-  Info get info => _info;
+  Info? get info => _info;
 
   final _subs = <int, Subscription>{};
   final _backendSubs = <int, bool>{};
@@ -69,7 +69,7 @@ class Client {
   /// Connect to NATS server
   Future connect(String host,
       {int port = 4222,
-      ConnectOption connectOption,
+      ConnectOption? connectOption,
       int timeout = 5,
       bool retry = true,
       int retryInterval = 10}) async {
@@ -102,7 +102,7 @@ class Client {
           _flushPubBuffer();
 
           _buffer = [];
-          _socket.listen((d) {
+          _socket!.listen((d) {
             _buffer.addAll(d);
             while (
                 _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
@@ -110,10 +110,10 @@ class Client {
             }
           }, onDone: () {
             status = Status.disconnected;
-            _socket.close();
+            _socket!.close();
           }, onError: (err) {
             status = Status.disconnected;
-            _socket.close();
+            _socket!.close();
           });
           return;
         } catch (err) {
@@ -208,7 +208,7 @@ class Client {
     var s = _receiveLine1.split(' ');
     var subject = s[1];
     var sid = int.parse(s[2]);
-    String replyTo;
+    String? replyTo;
     int length;
     if (s.length == 4) {
       length = int.parse(s[3]);
@@ -226,12 +226,12 @@ class Client {
     }
 
     if (_subs[sid] != null) {
-      _subs[sid].add(Message(subject, sid, payload, this, replyTo: replyTo));
+      _subs[sid]!.add(Message(subject, sid, payload, this, replyTo: replyTo));
     }
   }
 
   /// get server max payload
-  int maxPayload() => _info?.maxPayload;
+  int? maxPayload() => _info?.maxPayload;
 
   ///ping server current not implement pong verification
   Future ping() {
@@ -249,7 +249,7 @@ class Client {
 
   ///publish by byte (Uint8List) return true if sucess sending or buffering
   ///return false if not connect
-  bool pub(String subject, Uint8List data, {String replyTo, bool buffer}) {
+  bool pub(String? subject, Uint8List data, {String? replyTo, bool? buffer}) {
     buffer ??= defaultPubBuffer;
     if (status != Status.connected) {
       if (buffer) {
@@ -271,8 +271,9 @@ class Client {
 
   ///publish by string
   bool pubString(String subject, String str,
-      {String replyTo, bool buffer = true}) {
-    return pub(subject, utf8.encode(str), replyTo: replyTo, buffer: buffer);
+      {String? replyTo, bool buffer = true}) {
+    return pub(subject, utf8.encode(str) as Uint8List,
+        replyTo: replyTo, buffer: buffer);
   }
 
   bool _pub(_Pub p) {
@@ -287,7 +288,7 @@ class Client {
   }
 
   ///subscribe to subject option with queuegroup
-  Subscription sub(String subject, {String queueGroup}) {
+  Subscription sub(String subject, {String? queueGroup}) {
     _ssid++;
     var s = Subscription(_ssid, subject, this, queueGroup: queueGroup);
     _subs[_ssid] = s;
@@ -298,7 +299,7 @@ class Client {
     return s;
   }
 
-  void _sub(String subject, int sid, {String queueGroup}) {
+  void _sub(String? subject, int sid, {String? queueGroup}) {
     if (queueGroup == null) {
       _add('sub $subject $sid');
     } else {
@@ -321,12 +322,12 @@ class Client {
   ///unsubscribe by id
   bool unSubById(int sid) {
     if (_subs[sid] == null) return false;
-    return unSub(_subs[sid]);
+    return unSub(_subs[sid]!);
   }
 
   //todo unsub with max msgs
 
-  void _unSub(int sid, {String maxMsgs}) {
+  void _unSub(int sid, {String? maxMsgs}) {
     if (maxMsgs == null) {
       _add('unsub $sid');
     } else {
@@ -336,15 +337,15 @@ class Client {
 
   bool _add(String str) {
     if (_socket == null) return false; //todo throw error
-    _socket.add(utf8.encode(str + '\r\n'));
+    _socket!.add(utf8.encode(str + '\r\n'));
     return true;
   }
 
   bool _addByte(List<int> msg) {
     if (_socket == null) return false; //todo throw error
 
-    _socket.add(msg);
-    _socket.add(utf8.encode('\r\n'));
+    _socket!.add(msg);
+    _socket!.add(utf8.encode('\r\n'));
     return true;
   }
 
@@ -353,18 +354,18 @@ class Client {
   /// Request will send a request payload and deliver the response message,
   /// or an error, including a timeout if no message was received properly.
   Future<Message> request(String subj, Uint8List data,
-      {String queueGroup, Duration timeout}) {
+      {String? queueGroup, Duration? timeout}) {
     timeout ??= Duration(seconds: 2);
-    data ??= Uint8List(0);
+    // data ??= Uint8List(0);
 
     if (_inboxs[subj] == null) {
       var inbox = newInbox();
       _inboxs[subj] = sub(inbox, queueGroup: queueGroup);
     }
 
-    var stream = _inboxs[subj].stream;
+    var stream = _inboxs[subj]!.stream!;
     var respond = stream.take(1).single;
-    pub(subj, data, replyTo: _inboxs[subj].subject);
+    pub(subj, data, replyTo: _inboxs[subj]!.subject);
 
     // todo timeout
 
@@ -373,8 +374,8 @@ class Client {
 
   /// requestString() helper to request()
   Future<Message> requestString(String subj, String data,
-      {String queueGroup, Duration timeout}) {
-    data ??= '';
+      {String? queueGroup, Duration? timeout}) {
+    // data ??= '';
     return request(subj, Uint8List.fromList(data.codeUnits),
         queueGroup: queueGroup, timeout: timeout);
   }

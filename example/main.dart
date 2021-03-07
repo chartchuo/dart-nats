@@ -5,7 +5,7 @@ void main() async {
   await client.connect('localhost');
   var sub = client.sub('subject1');
   client.pubString('subject1', 'message1');
-  var data = await sub.stream.first;
+  var data = await sub.stream!.first;
 
   print(data.string);
   client.unSub(sub);

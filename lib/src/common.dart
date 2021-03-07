@@ -10,31 +10,31 @@ Map<String, dynamic> _removeNull(Map<String, dynamic> data) {
 ///NATS Server Info
 class Info {
   /// sever id
-  String serverId;
+  String? serverId;
 
   /// server name
-  String serverName;
+  String? serverName;
 
   /// server version
-  String version;
+  String? version;
 
   /// protocol
-  int proto;
+  int? proto;
 
   /// server go version
-  String go;
+  String? go;
 
   /// host
-  String host;
+  String? host;
 
   /// port number
-  int port;
+  int? port;
 
   /// max payload
-  int maxPayload;
+  int? maxPayload;
 
   ///client id assigned by server
-  int clientId;
+  int? clientId;
 
   //todo
   //authen required
@@ -87,34 +87,34 @@ class Info {
 ///connection option to send to server
 class ConnectOption {
   ///NATS server send +OK or not (default nats server is turn on)  this client will auto tuen off as after connect
-  bool verbose;
+  bool? verbose;
 
   ///
-  bool pedantic;
+  bool? pedantic;
 
   /// TLS require or not //not implement yet
-  bool tlsRequired;
+  bool? tlsRequired;
 
   /// Auehtnticatio Token
-  String auth_token;
+  String? auth_token;
 
   /// username
-  String user;
+  String? user;
 
   /// password
-  String pass;
+  String? pass;
 
   ///server name
-  String name;
+  String? name;
 
   /// lang??
-  String lang;
+  String? lang;
 
   /// sever version
-  String version;
+  String? version;
 
   ///protocol
-  int protocol;
+  int? protocol;
 
   ///construcure
   ConnectOption(

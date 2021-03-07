@@ -10,7 +10,7 @@ class Message {
   final int sid;
 
   /// subject  and replyto
-  final String subject, replyTo;
+  final String? subject, replyTo;
   final Client _client;
 
   ///payload of data in byte
@@ -31,6 +31,6 @@ class Message {
 
   ///Repond to string message
   bool respondString(String str) {
-    return respond(utf8.encode(str));
+    return respond(utf8.encode(str) as Uint8List);
   }
 }

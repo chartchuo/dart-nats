@@ -10,13 +10,13 @@ class Subscription {
   final int sid;
 
   ///subject and queuegroup of this subscription
-  final String subject, queueGroup;
+  final String? subject, queueGroup;
 
   final Client _client;
 
   final _controller = StreamController<Message>();
 
-  Stream<Message> _stream;
+  Stream<Message>? _stream;
 
   ///constructure
   Subscription(this.sid, this.subject, this._client, {this.queueGroup}) {
@@ -29,7 +29,7 @@ class Subscription {
   }
 
   ///Stream output when server publish message
-  Stream<Message> get stream => _stream;
+  Stream<Message>? get stream => _stream;
 
   ///sink messat to listener
   void add(Message msg) {
