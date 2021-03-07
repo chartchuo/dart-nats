@@ -23,7 +23,7 @@ void main() {
       for (i = 0; i < 10000; i++) {
         print(newInbox());
       }
-      expect(i, 100000);
+      expect(i, 10000);
     });
     test('nuid not dup', () {
       var dup = false;
