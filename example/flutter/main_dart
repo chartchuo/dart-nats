@@ -30,7 +30,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void connect() {
     natsClient = nats.Client();
-    natsClient.connect('10.0.2.2');
+    //change to ws://localhost:80 or wss://localhost:443 if you connect using futter web to localhost
+    natsClient.connect(Uri.parse('ws://10.0.2.2:80'); 
     fooSub = natsClient.sub('foo');
     barSub = natsClient.sub('bar');
   }
