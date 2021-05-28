@@ -1,6 +1,10 @@
 # Dart-NATS 
 A Dart client for the [NATS](https://nats.io) messaging system. Design to use with Dart and flutter.
 
+
+## API Change
+To support Flutter Web. We change transport from socket to WebSocket and also change API call 
+
 ## Dart Examples:
 
 Run the `example/main.dart`:
@@ -14,7 +18,7 @@ import 'package:dart_nats/dart_nats.dart';
 
 void main() async {
   var client = Client();
-  client.connect('localhost');
+  client.connect(Uri.parse('ws://localhost:80'));
   var sub = client.sub('subject1');
   client.pubString('subject1', 'message1');
   var msg = await sub.stream.first;
@@ -39,7 +43,7 @@ Simply connect to server and subscribe to subject
 ```dart
   void connect() {
     natsClient = nats.Client();
-    natsClient.connect('demo.nats.io');
+    natsClient.connect(Uri.parse('wss://demo.nats.io:443');
     fooSub = natsClient.sub('foo');
     barSub = natsClient.sub('bar');
   }

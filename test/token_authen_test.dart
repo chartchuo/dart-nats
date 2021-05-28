@@ -11,7 +11,7 @@ void main() {
   group('all', () {
     test('simple', () async {
       var client = Client();
-      unawaited(client.connect('localhost',
+      unawaited(client.connect(Uri.parse('ws://localhost:80'),
           retryInterval: 1,
           connectOption: ConnectOption(auth_token: 'mytoken')));
       var sub = client.sub('subject1');
@@ -22,7 +22,7 @@ void main() {
     });
     test('await', () async {
       var client = Client();
-      await client.connect('localhost',
+      await client.connect(Uri.parse('ws://localhost:80'),
           connectOption: ConnectOption(auth_token: 'mytoken'));
       var sub = client.sub('subject1');
       var result = client.pub(

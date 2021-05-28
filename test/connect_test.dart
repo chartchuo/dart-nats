@@ -8,7 +8,8 @@ void main() {
   group('all', () {
     test('simple', () async {
       var client = Client();
-      unawaited(client.connect('localhost', retryInterval: 1));
+      unawaited(
+          client.connect(Uri.parse('ws://localhost:80'), retryInterval: 1));
       var sub = client.sub('subject1');
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
       var msg = await sub.stream!.first;
@@ -17,7 +18,7 @@ void main() {
     });
     test('await', () async {
       var client = Client();
-      await client.connect('localhost');
+      await client.connect(Uri.parse('ws://localhost:80'));
       var sub = client.sub('subject1');
       var result = client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),

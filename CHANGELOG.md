@@ -1,3 +1,8 @@
+## 0.3.0
+* Change transport from socket to WebSock 
+* Support Flutter Web
+
+
 ## 0.2.0
 * Add user passwor authentication
 * Add token authentication

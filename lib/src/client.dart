@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:dart_nats/dart_nats.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'common.dart';
+import 'inbox.dart';
 import 'message.dart';
 import 'subscription.dart';
 
@@ -46,9 +46,7 @@ class _Pub {
 
 ///NATS client
 class Client {
-  String? _host;
-  late int _port;
-  Socket? _socket;
+  WebSocketChannel? _channel;
   Info? _info;
   late Completer _pingCompleter;
   late Completer _connectCompleter;
@@ -67,9 +65,8 @@ class Client {
   int _ssid = 0;
 
   /// Connect to NATS server
-  Future connect(String host,
-      {int port = 4222,
-      ConnectOption? connectOption,
+  Future connect(Uri uri,
+      {ConnectOption? connectOption,
       int timeout = 5,
       bool retry = true,
       int retryInterval = 10}) async {
@@ -77,8 +74,6 @@ class Client {
     if (status != Status.disconnected && status != Status.closed) {
       return Future.error('Error: status not disconnected and not closed');
     }
-    _host = host;
-    _port = port;
 
     if (connectOption != null) _connectOption = connectOption;
 
@@ -92,8 +87,7 @@ class Client {
         }
 
         try {
-          _socket = await Socket.connect(_host, _port,
-              timeout: Duration(seconds: timeout));
+          _channel = WebSocketChannel.connect(uri);
           status = Status.connected;
           _connectCompleter.complete();
 
@@ -102,7 +96,8 @@ class Client {
           _flushPubBuffer();
 
           _buffer = [];
-          _socket!.listen((d) {
+          _channel!.stream.listen((d) {
+            // _socket!.listen((d) {
             _buffer.addAll(d);
             while (
                 _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
@@ -110,10 +105,12 @@ class Client {
             }
           }, onDone: () {
             status = Status.disconnected;
-            _socket!.close();
+            _channel!.sink.close();
+            // _socket!.close();
           }, onError: (err) {
             status = Status.disconnected;
-            _socket!.close();
+            _channel!.sink.close();
+            // _socket!.close();
           });
           return;
         } catch (err) {
@@ -336,16 +333,18 @@ class Client {
   }
 
   bool _add(String str) {
-    if (_socket == null) return false; //todo throw error
-    _socket!.add(utf8.encode(str + '\r\n'));
+    if (_channel == null) return false; //todo throw error
+    _channel!.sink.add(utf8.encode(str + '\r\n'));
+    // _socket!.add(utf8.encode(str + '\r\n'));
     return true;
   }
 
   bool _addByte(List<int> msg) {
-    if (_socket == null) return false; //todo throw error
-
-    _socket!.add(msg);
-    _socket!.add(utf8.encode('\r\n'));
+    if (_channel == null) return false; //todo throw error
+    _channel!.sink.add(msg);
+    _channel!.sink.add(utf8.encode('\r\n'));
+    // _socket!.add(msg);
+    // _socket!.add(utf8.encode('\r\n'));
     return true;
   }
 
@@ -384,7 +383,8 @@ class Client {
   void close() {
     _backendSubs.forEach((_, s) => s = false);
     _inboxs.clear();
-    _socket?.close();
+    _channel?.sink.close();
+    // _socket?.close();
     status = Status.closed;
   }
 }

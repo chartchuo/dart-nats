@@ -12,3 +12,5 @@ environment:
 dev_dependencies:
   test: ^1.9.4
   pedantic: ^1.9.0
+dependencies: 
+  web_socket_channel: ^2.1.0

@@ -7,7 +7,7 @@ void main() {
   group('all', () {
     test('simple', () async {
       var client = Client();
-      await client.connect('localhost', retryInterval: 1);
+      await client.connect(Uri.parse('ws://localhost:80'), retryInterval: 1);
       var sub = client.sub('subject1');
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
       var msg = await sub.stream!.first;
@@ -16,14 +16,14 @@ void main() {
     });
     test('respond', () async {
       var server = Client();
-      await server.connect('localhost');
+      await server.connect(Uri.parse('ws://localhost:80'));
       var service = server.sub('service');
       service.stream!.listen((m) {
         m.respondString('respond');
       });
 
       var requester = Client();
-      await requester.connect('localhost');
+      await requester.connect(Uri.parse('ws://localhost:80'));
       var inbox = newInbox();
       var inboxSub = requester.sub(inbox);
 
@@ -37,14 +37,14 @@ void main() {
     });
     test('resquest', () async {
       var server = Client();
-      await server.connect('localhost');
+      await server.connect(Uri.parse('ws://localhost:80'));
       var service = server.sub('service');
       unawaited(service.stream!.first.then((m) {
         m.respond(Uint8List.fromList('respond'.codeUnits));
       }));
 
       var client = Client();
-      await client.connect('localhost');
+      await client.connect(Uri.parse('ws://localhost:80'));
       var receive = await client.request(
           'service', Uint8List.fromList('request'.codeUnits));
 
@@ -54,14 +54,14 @@ void main() {
     });
     test('repeat resquest', () async {
       var server = Client();
-      await server.connect('localhost');
+      await server.connect(Uri.parse('ws://localhost:80'));
       var service = server.sub('service');
       service.stream!.listen((m) {
         m.respond(Uint8List.fromList('respond'.codeUnits));
       });
 
       var client = Client();
-      await client.connect('localhost');
+      await client.connect(Uri.parse('ws://localhost:80'));
       var receive = await client.request(
           'service', Uint8List.fromList('request'.codeUnits));
       receive = await client.request(

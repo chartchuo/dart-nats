@@ -8,7 +8,7 @@ import 'dart:isolate';
 const iteration = 10000;
 void run(SendPort sendPort) async {
   var client = Client();
-  await client.connect('localhost');
+  await client.connect(Uri.parse('ws://localhost:80'));
   for (var i = 0; i < iteration; i++) {
     client.pubString('iso', i.toString());
     //commend out for reproduce issue#4
@@ -23,7 +23,7 @@ void main() {
   group('all', () {
     test('continuous', () async {
       var client = Client();
-      await client.connect('localhost');
+      await client.connect(Uri.parse('ws://localhost:80'));
       var sub = client.sub('iso');
       var r = 0;
 
