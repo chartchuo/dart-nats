@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:dart_nats/dart_nats.dart';
 
-//please start nats-server on localhost before testing
+//please start nats-server -c nats.conf on localhost before testing
 
 void main() {
   group('all', () {
