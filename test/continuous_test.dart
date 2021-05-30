@@ -3,8 +3,6 @@ import 'package:test/test.dart';
 import 'package:dart_nats/dart_nats.dart';
 import 'dart:isolate';
 
-//please start nats-server on localhost before testing
-
 const iteration = 1000;
 void run(SendPort sendPort) async {
   var client = Client();

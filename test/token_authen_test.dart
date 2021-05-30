@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 import 'package:dart_nats/dart_nats.dart';
 
 // start nats server using
-//nats-server -c nats.conf --auth mytoken
+// nats-server -c test/nats.conf --auth mytoken
 
 void main() {
   group('all', () {

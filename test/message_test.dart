@@ -61,9 +61,7 @@ void main() {
       client.pub('subject1', Uint8List.fromList(txt.codeUnits));
       client.pub('subject1', Uint8List.fromList(txt.codeUnits));
       var msg = await sub.stream!.first;
-      print(msg.data);
       msg = await sub.stream!.first;
-      print(msg.data);
       await client.close();
       expect(String.fromCharCodes(msg.data), equals(txt));
     });

@@ -4,6 +4,9 @@ import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
 import 'package:dart_nats/dart_nats.dart';
 
+// please start nats-server on localhost before testing
+// nats-server -c test/nats.conf
+
 void main() {
   group('all', () {
     test('simple', () async {
