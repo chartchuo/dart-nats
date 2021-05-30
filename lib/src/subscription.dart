@@ -14,12 +14,13 @@ class Subscription {
 
   final Client _client;
 
-  final _controller = StreamController<Message>();
+  late StreamController<Message> _controller;
 
-  Stream<Message>? _stream;
+  late Stream<Message> _stream;
 
   ///constructure
   Subscription(this.sid, this.subject, this._client, {this.queueGroup}) {
+    _controller = StreamController<Message>();
     _stream = _controller.stream.asBroadcastStream();
   }
 
@@ -33,6 +34,7 @@ class Subscription {
 
   ///sink messat to listener
   void add(Message msg) {
+    if (_controller.isClosed) return;
     _controller.sink.add(msg);
   }
 

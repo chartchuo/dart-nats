@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
@@ -11,7 +13,7 @@ void main() {
       var sub = client.sub('subject1');
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
       var msg = await sub.stream!.first;
-      client.close();
+      await client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });
     test('respond', () async {
@@ -31,8 +33,8 @@ void main() {
 
       var receive = await inboxSub.stream!.first;
 
-      requester.close();
-      service.close();
+      await requester.close();
+      await server.close();
       expect(receive.string, equals('respond'));
     });
     test('resquest', () async {
@@ -48,9 +50,51 @@ void main() {
       var receive = await client.request(
           'service', Uint8List.fromList('request'.codeUnits));
 
-      client.close();
-      service.close();
+      await client.close();
+      await server.close();
       expect(receive.string, equals('respond'));
+    });
+    test('resquest with timeout', () async {
+      var server = Client();
+      await server.connect(Uri.parse('ws://localhost:80'));
+      var service = server.sub('service');
+      unawaited(service.stream!.first.then((m) {
+        sleep(Duration(seconds: 1));
+        m.respond(Uint8List.fromList('respond'.codeUnits));
+      }));
+
+      var client = Client();
+      await client.connect(Uri.parse('ws://localhost:80'));
+      var receive = await client.request(
+          'service', Uint8List.fromList('request'.codeUnits),
+          timeout: Duration(seconds: 3));
+
+      await client.close();
+      await server.close();
+      expect(receive.string, equals('respond'));
+    });
+    test('resquest with timeout exception', () async {
+      var server = Client();
+      await server.connect(Uri.parse('ws://localhost:80'));
+      var service = server.sub('service');
+      unawaited(service.stream!.first.then((m) {
+        sleep(Duration(seconds: 5));
+        m.respond(Uint8List.fromList('respond'.codeUnits));
+      }));
+
+      var client = Client();
+      var timeout = false;
+      await client.connect(Uri.parse('ws://localhost:80'));
+      try {
+        await client.request('service', Uint8List.fromList('request'.codeUnits),
+            timeout: Duration(seconds: 2));
+      } on TimeoutException {
+        timeout = true;
+      }
+      await client.close();
+      service.close();
+      await server.close();
+      expect(timeout, equals(true));
     });
     test('repeat resquest', () async {
       var server = Client();
@@ -71,8 +115,8 @@ void main() {
       receive = await client.request(
           'service', Uint8List.fromList('request'.codeUnits));
 
-      client.close();
-      service.close();
+      await client.close();
+      await server.close();
       expect(receive.string, equals('respond'));
     });
   });

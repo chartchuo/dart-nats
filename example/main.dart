@@ -9,5 +9,5 @@ void main() async {
 
   print(data.string);
   client.unSub(sub);
-  client.close();
+  await client.close();
 }

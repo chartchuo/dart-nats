@@ -14,14 +14,14 @@ void main() {
       var sub = client.sub('subject1');
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
       var msg = await sub.stream!.first;
-      client.close();
+      await client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });
     test('newInbox', () {
       //just loop generate with out error
       var i = 0;
       for (i = 0; i < 10000; i++) {
-        print(newInbox());
+        newInbox();
       }
       expect(i, 10000);
     });
@@ -33,7 +33,6 @@ void main() {
         var n1 = nuid1.next();
         var n2 = nuid2.next();
         if (n1 == n2) dup = true;
-        print('$n1 $n2');
       }
       for (var i = 0; i < 10000; i++) {
         var nuid1 = Nuid();
@@ -41,7 +40,6 @@ void main() {
         var n1 = nuid1.next();
         var n2 = nuid2.next();
         if (n1 == n2) dup = true;
-        print('$n1 $n2');
       }
       expect(dup, false);
     });
@@ -52,8 +50,7 @@ void main() {
       var msgByte = Uint8List.fromList([1, 2, 3, 129, 130]);
       client.pub('subject1', msgByte);
       var msg = await sub.stream!.first;
-      client.close();
-      print(msg.data);
+      await client.close();
       expect(msg.data, equals(msgByte));
     });
     test('pub with Uint8List include return and  new line', () async {
@@ -64,8 +61,7 @@ void main() {
           [1, 10, 3, 13, 10, 13, 130, 1, 10, 3, 13, 10, 13, 130]);
       client.pub('subject1', msgByte);
       var msg = await sub.stream!.first;
-      client.close();
-      print(msg.data);
+      await client.close();
       expect(msg.data, equals(msgByte));
     });
     test('byte huge data', () async {
@@ -76,8 +72,7 @@ void main() {
           List<int>.generate(1024 + 1024 * 4, (i) => i % 256));
       client.pub('subject1', msgByte);
       var msg = await sub.stream!.first;
-      client.close();
-      print(msg.data);
+      await client.close();
       expect(msg.data, equals(msgByte));
     });
     test('UTF8', () async {
@@ -87,8 +82,7 @@ void main() {
       var thaiString = utf8.encode('ทดสอบ');
       client.pub('subject1', thaiString as Uint8List);
       var msg = await sub.stream!.first;
-      client.close();
-      print(msg.data);
+      await client.close();
       expect(msg.data, equals(thaiString));
     });
     test('pubString ascii', () async {
@@ -97,8 +91,7 @@ void main() {
       var sub = client.sub('subject1');
       client.pubString('subject1', 'testtesttest');
       var msg = await sub.stream!.first;
-      client.close();
-      print(msg.data);
+      await client.close();
       expect(msg.string, equals('testtesttest'));
     });
     test('pubString Thai', () async {
@@ -107,8 +100,7 @@ void main() {
       var sub = client.sub('subject1');
       client.pubString('subject1', 'ทดสอบ');
       var msg = await sub.stream!.first;
-      client.close();
-      print(msg.data);
+      await client.close();
       expect(msg.string, equals('ทดสอบ'));
     });
     test('delay connect', () async {
@@ -117,7 +109,7 @@ void main() {
       client.pubString('subject1', 'message1');
       await client.connect(Uri.parse('ws://localhost:80'));
       var msg = await sub.stream!.first;
-      client.close();
+      await client.close();
       expect(msg.string, equals('message1'));
     });
     test('pub with no buffer ', () async {
@@ -127,7 +119,7 @@ void main() {
       await Future.delayed(Duration(seconds: 1));
       client.pubString('subject1', 'message1', buffer: false);
       var msg = await sub.stream!.first;
-      client.close();
+      await client.close();
       expect(msg.string, equals('message1'));
     });
     test('multiple sub ', () async {
@@ -140,7 +132,7 @@ void main() {
       client.pubString('subject2', 'message2');
       var msg1 = await sub1.stream!.first;
       var msg2 = await sub2.stream!.first;
-      client.close();
+      await client.close();
       expect(msg1.string, equals('message1'));
       expect(msg2.string, equals('message2'));
     });
@@ -153,7 +145,7 @@ void main() {
       var msgStream = sub.stream!.asBroadcastStream();
       var msg1 = await msgStream.first;
       var msg2 = await msgStream.first;
-      client.close();
+      await client.close();
       expect(msg1.string, equals('message1'));
       expect(msg2.string, equals('message2'));
     });
@@ -166,7 +158,7 @@ void main() {
       var msgStream = sub.stream!.asBroadcastStream();
       var msg1 = await msgStream.first;
       var msg2 = await msgStream.first;
-      client.close();
+      await client.close();
       expect(msg1.string, equals('message1'));
       expect(msg2.string, equals('message2'));
     });
@@ -185,7 +177,7 @@ void main() {
       sub.unSub();
       expect(msg.string, equals('message1'));
 
-      client.close();
+      await client.close();
     });
     test('unsub before connect', () async {
       var client = Client();
@@ -195,7 +187,7 @@ void main() {
 
       sub = client.sub('subject1');
       sub.unSub();
-      client.close();
+      await client.close();
       expect(1, 1);
     });
     test('get max payload', () async {
@@ -205,7 +197,7 @@ void main() {
       //todo wait for connected
       await Future.delayed(Duration(seconds: 2));
       var max = client.maxPayload();
-      client.close();
+      await client.close();
 
       expect(max, isNotNull);
     });
@@ -216,7 +208,6 @@ void main() {
       var r = 0;
       var iteration = 100;
       sub.stream!.listen((msg) {
-        print(msg.string);
         r++;
       });
       for (var i = 0; i < iteration; i++) {
@@ -224,7 +215,7 @@ void main() {
         // await Future.delayed(Duration(milliseconds: 10));
       }
       await Future.delayed(Duration(seconds: 1));
-      client.close();
+      await client.close();
       expect(r, equals(iteration));
     });
     test('sub defect 13 binary', () async {
@@ -234,7 +225,6 @@ void main() {
       var r = 0;
       var iteration = 100;
       sub.stream!.listen((msg) {
-        print(msg.string);
         r++;
       });
       for (var i = 0; i < iteration; i++) {
@@ -242,7 +232,7 @@ void main() {
         // await Future.delayed(Duration(milliseconds: 10));
       }
       await Future.delayed(Duration(seconds: 1));
-      client.close();
+      await client.close();
       expect(r, equals(iteration));
     });
   });

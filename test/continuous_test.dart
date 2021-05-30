@@ -5,7 +5,7 @@ import 'dart:isolate';
 
 //please start nats-server on localhost before testing
 
-const iteration = 10000;
+const iteration = 1000;
 void run(SendPort sendPort) async {
   var client = Client();
   await client.connect(Uri.parse('ws://localhost:80'));
@@ -15,7 +15,7 @@ void run(SendPort sendPort) async {
     await Future.delayed(Duration(milliseconds: 1));
   }
   await client.ping();
-  client.close();
+  await client.close();
   sendPort.send('finish');
 }
 
@@ -43,7 +43,7 @@ void main() {
       await Future.delayed(Duration(seconds: 3));
 
       sub.close();
-      client.close();
+      await client.close();
 
       expect(r, equals(iteration));
     });

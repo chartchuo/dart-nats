@@ -101,7 +101,9 @@ class Client {
             _buffer.addAll(d);
             while (
                 _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
+              // if (status == Status.connected) {
               _processOp();
+              // }
             }
           }, onDone: () {
             status = Status.disconnected;
@@ -114,7 +116,7 @@ class Client {
           });
           return;
         } catch (err) {
-          close();
+          await close();
           _connectCompleter.completeError(err);
         }
       }
@@ -183,7 +185,9 @@ class Client {
         _info = Info.fromJson(jsonDecode(data));
         break;
       case 'ping':
-        _add('pong');
+        if (status == Status.connected) {
+          _add('pong');
+        }
         break;
       case '-err':
         _processErr(data);
@@ -351,40 +355,36 @@ class Client {
   final _inboxs = <String, Subscription>{};
 
   /// Request will send a request payload and deliver the response message,
-  /// or an error, including a timeout if no message was received properly.
+  /// TimeoutException on timeout.
   Future<Message> request(String subj, Uint8List data,
       {String? queueGroup, Duration? timeout}) {
-    timeout ??= Duration(seconds: 2);
-    // data ??= Uint8List(0);
-
     if (_inboxs[subj] == null) {
       var inbox = newInbox();
       _inboxs[subj] = sub(inbox, queueGroup: queueGroup);
     }
 
     var stream = _inboxs[subj]!.stream!;
+
     var respond = stream.take(1).single;
     pub(subj, data, replyTo: _inboxs[subj]!.subject);
 
-    // todo timeout
-
+    if (timeout != null) return respond.timeout(timeout);
     return respond;
   }
 
   /// requestString() helper to request()
   Future<Message> requestString(String subj, String data,
       {String? queueGroup, Duration? timeout}) {
-    // data ??= '';
     return request(subj, Uint8List.fromList(data.codeUnits),
         queueGroup: queueGroup, timeout: timeout);
   }
 
   ///close connection to NATS server unsub to server but still keep subscription list at client
-  void close() {
+  Future close() async {
     _backendSubs.forEach((_, s) => s = false);
     _inboxs.clear();
-    _channel?.sink.close();
-    // _socket?.close();
     status = Status.closed;
+    await _channel?.sink.close();
+    // _socket?.close();
   }
 }
