@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 import 'package:dart_nats/dart_nats.dart';
 
 // start nats server using
-// nats-server -DV -m 8222 -user foo -pass bar
+// nats-server -c nats.conf -DV -m 8222 -user foo -pass bar
 
 void main() {
   group('all', () {

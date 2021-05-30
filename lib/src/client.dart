@@ -386,5 +386,6 @@ class Client {
     status = Status.closed;
     await _channel?.sink.close();
     // _socket?.close();
+    _buffer = [];
   }
 }
