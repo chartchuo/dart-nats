@@ -32,5 +32,26 @@ void main() {
       await client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });
+    test('status stream', () async {
+      var client = Client();
+      var statusHistory = <Status>[];
+      client.statusStream.listen((s) {
+        // print(s);
+        statusHistory.add(s);
+      });
+      unawaited(
+          client.connect(Uri.parse('ws://localhost:80'), retryInterval: 1));
+      await client.close();
+      await client.connect(Uri.parse('ws://localhost:80'), retryInterval: 1);
+      await client.close();
+
+      expect(statusHistory[0], equals(Status.connecting));
+      expect(statusHistory[1], equals(Status.connected));
+      expect(statusHistory[2], equals(Status.closed));
+      expect(statusHistory[3], equals(Status.connecting));
+      expect(statusHistory[4], equals(Status.connected));
+      expect(statusHistory[5], equals(Status.closed));
+      expect(statusHistory[6], equals(Status.disconnected));
+    });
   });
 }

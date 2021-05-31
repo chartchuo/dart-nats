@@ -51,8 +51,16 @@ class Client {
   late Completer _pingCompleter;
   late Completer _connectCompleter;
 
+  var _status = Status.disconnected;
+
+  final _statusController = StreamController<Status>();
+
   ///status of the client
-  var status = Status.disconnected;
+  Status get status => _status;
+
+  /// Stream status for status update
+  Stream<Status> get statusStream => _statusController.stream;
+
   var _connectOption = ConnectOption(verbose: false);
 
   ///server info
@@ -63,6 +71,10 @@ class Client {
   final _pubBuffer = <_Pub>[];
 
   int _ssid = 0;
+
+  List<int> _buffer = [];
+  _ReceiveState _receiveState = _ReceiveState.idle;
+  String _receiveLine1 = '';
 
   /// Connect to NATS server
   Future connect(Uri uri,
@@ -80,15 +92,15 @@ class Client {
     void loop() async {
       for (var i = 0; i == 0 || retry; i++) {
         if (i == 0) {
-          status = Status.connecting;
+          _setStatus(Status.connecting);
         } else {
-          status = Status.reconnecting;
+          _setStatus(Status.reconnecting);
           await Future.delayed(Duration(seconds: retryInterval));
         }
 
         try {
           _channel = WebSocketChannel.connect(uri);
-          status = Status.connected;
+          _setStatus(Status.connected);
           _connectCompleter.complete();
 
           _addConnectOption(_connectOption);
@@ -97,22 +109,17 @@ class Client {
 
           _buffer = [];
           _channel!.stream.listen((d) {
-            // _socket!.listen((d) {
             _buffer.addAll(d);
             while (
                 _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
-              // if (status == Status.connected) {
               _processOp();
-              // }
             }
           }, onDone: () {
-            status = Status.disconnected;
+            _setStatus(Status.disconnected);
             _channel!.sink.close();
-            // _socket!.close();
           }, onError: (err) {
-            status = Status.disconnected;
+            _setStatus(Status.disconnected);
             _channel!.sink.close();
-            // _socket!.close();
           });
           return;
         } catch (err) {
@@ -141,9 +148,6 @@ class Client {
     });
   }
 
-  List<int> _buffer = [];
-  _ReceiveState _receiveState = _ReceiveState.idle;
-  String _receiveLine1 = '';
   void _processOp() async {
     ///find endline
     var nextLineIndex = _buffer.indexWhere((c) {
@@ -339,7 +343,6 @@ class Client {
   bool _add(String str) {
     if (_channel == null) return false; //todo throw error
     _channel!.sink.add(utf8.encode(str + '\r\n'));
-    // _socket!.add(utf8.encode(str + '\r\n'));
     return true;
   }
 
@@ -347,8 +350,6 @@ class Client {
     if (_channel == null) return false; //todo throw error
     _channel!.sink.add(msg);
     _channel!.sink.add(utf8.encode('\r\n'));
-    // _socket!.add(msg);
-    // _socket!.add(utf8.encode('\r\n'));
     return true;
   }
 
@@ -356,6 +357,16 @@ class Client {
 
   /// Request will send a request payload and deliver the response message,
   /// TimeoutException on timeout.
+  ///
+  /// Example:
+  /// ```dart
+  /// try {
+  ///   await client.request('service', Uint8List.fromList('request'.codeUnits),
+  ///       timeout: Duration(seconds: 2));
+  /// } on TimeoutException {
+  ///   timeout = true;
+  /// }
+  /// ```
   Future<Message> request(String subj, Uint8List data,
       {String? queueGroup, Duration? timeout}) {
     if (_inboxs[subj] == null) {
@@ -379,13 +390,17 @@ class Client {
         queueGroup: queueGroup, timeout: timeout);
   }
 
+  void _setStatus(Status newStatus) {
+    _status = newStatus;
+    _statusController.add(newStatus);
+  }
+
   ///close connection to NATS server unsub to server but still keep subscription list at client
   Future close() async {
     _backendSubs.forEach((_, s) => s = false);
     _inboxs.clear();
-    status = Status.closed;
+    _setStatus(Status.closed);
     await _channel?.sink.close();
-    // _socket?.close();
     _buffer = [];
   }
 }

@@ -1,7 +1,10 @@
+## 0.3.1
+* add statusStream  
+* add request timeout
+
 ## 0.3.0
 * Change transport from socket to WebSock 
 * Support Flutter Web
-
 
 ## 0.2.0
 * Add user passwor authentication

@@ -85,12 +85,13 @@ The following is a list of features currently supported and planned by this clie
 * [x] - Request, Respond
 * [x] - Queue subscribe
 * [ ] - caches, flush, drain
-* [ ] - Request timeout
+* [x] - Request timeout
 * [ ] - structured data
 * [ ] - Connection option (cluster, timeout,ping interval, max ping, echo,... )
 * [ ] - Random automatic reconnection, disable reconnect, number of attempts, pausing
 * [ ] - Connect to cluster,randomize, Automatic reconnect upon connection failure base server info
-* [ ] - Events/status disconnect handler, reconnect handler
-* [ ] - Buffering message during reconnect atempts
+* [x] - Events/status 
+* [ ] - disconnect handler, reconnect handler
+* [x] - Buffering message during reconnect atempts
 * [ ] - All authentication models, including NATS 2.0 JWT and seed keys
-* [ ] - TLS support
+* [ ] - NATS 2.2 

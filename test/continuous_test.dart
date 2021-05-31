@@ -27,7 +27,7 @@ void main() {
 
       sub.stream!.listen((msg) {
         if (r % 1000 == 0) {
-          print(msg.string);
+          // print(msg.string);
         }
         r++;
       });
@@ -35,7 +35,8 @@ void main() {
       var receivePort = ReceivePort();
       var iso = await Isolate.spawn(run, receivePort.sendPort);
       var out = await receivePort.first;
-      print(out);
+      // print(out);
+      expect(out, equals('finish'));
       iso.kill();
       //wait for last message send round trip to server
       await Future.delayed(Duration(seconds: 3));
