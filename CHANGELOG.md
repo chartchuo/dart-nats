@@ -1,3 +1,9 @@
+## 0.3.3
+* update package dependencies
+
+## 0.3.2
+* fix flutter web Nuid() error
+
 ## 0.3.1
 * add statusStream  
 * add request timeout

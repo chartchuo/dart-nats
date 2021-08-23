@@ -56,7 +56,7 @@ class Nuid {
     Random();
     var _rng = Random.secure();
 
-    _seq = _rng.nextInt(1 << 31) << 32 | _rng.nextInt(1 << 32);
+    _seq = _rng.nextInt(1 << 31) << 32 | _rng.nextInt(1 << 31);
     if (_seq > _maxSeq) {
       _seq = _seq % _maxSeq;
     }
