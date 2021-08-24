@@ -1,12 +1,12 @@
 # Dart-NATS 
 A Dart client for the [NATS](https://nats.io) messaging system. Design to use with Dart and flutter.
 
-# Flutter Web Support by WebSocket 
+### Flutter Web Support by WebSocket 
 ```dart
 client.connect(Uri.parse('ws://localhost:80'));
 ```
 
-# Flutter Other Platform Support by TCP Socket and WebSocket
+### Flutter Other Platform Support by TCP Socket and WebSocket
 ```dart
 client.tcpConnect('localhost');
 client.connect(Uri.parse('ws://localhost:80'));
