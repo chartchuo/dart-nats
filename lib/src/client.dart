@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -47,6 +48,8 @@ class _Pub {
 ///NATS client
 class Client {
   WebSocketChannel? _channel;
+  Socket? _socket;
+
   Info? _info;
   late Completer _pingCompleter;
   late Completer _connectCompleter;
@@ -340,17 +343,43 @@ class Client {
     }
   }
 
+  // bool _add(String str) {
+  //   if (_channel == null) return false; //todo throw error
+  //   _channel!.sink.add(utf8.encode(str + '\r\n'));
+  //   return true;
+  // }
+
   bool _add(String str) {
-    if (_channel == null) return false; //todo throw error
-    _channel!.sink.add(utf8.encode(str + '\r\n'));
-    return true;
+    if (_channel != null) {
+      _channel!.sink.add(utf8.encode(str + '\r\n'));
+      return true;
+    } else if (_socket != null) {
+      _socket!.add(utf8.encode(str + '\r\n'));
+      return true;
+    }
+    //todo throw
+    return false;
   }
 
+  // bool _addByte(List<int> msg) {
+  //   if (_channel == null) return false; //todo throw error
+  //   _channel!.sink.add(msg);
+  //   _channel!.sink.add(utf8.encode('\r\n'));
+  //   return true;
+  // }
+
   bool _addByte(List<int> msg) {
-    if (_channel == null) return false; //todo throw error
-    _channel!.sink.add(msg);
-    _channel!.sink.add(utf8.encode('\r\n'));
-    return true;
+    if (_channel != null) {
+      _channel!.sink.add(msg);
+      _channel!.sink.add(utf8.encode('\r\n'));
+      return true;
+    } else if (_socket != null) {
+      _socket!.add(msg);
+      _socket!.add(utf8.encode('\r\n'));
+      return true;
+    }
+    //todo throw
+    return false;
   }
 
   final _inboxs = <String, Subscription>{};
@@ -401,6 +430,70 @@ class Client {
     _inboxs.clear();
     _setStatus(Status.closed);
     await _channel?.sink.close();
+    await _socket?.close();
     _buffer = [];
+  }
+
+  ///Backward compatible with 0.2.x version
+  Future tcpConnect(String host,
+      {int port = 4222,
+      ConnectOption? connectOption,
+      int timeout = 5,
+      bool retry = true,
+      int retryInterval = 10}) async {
+    String? _host;
+    late int _port;
+    _connectCompleter = Completer();
+    if (status != Status.disconnected && status != Status.closed) {
+      return Future.error('Error: status not disconnected and not closed');
+    }
+    _host = host;
+    _port = port;
+
+    if (connectOption != null) _connectOption = connectOption;
+
+    void loop() async {
+      for (var i = 0; i == 0 || retry; i++) {
+        if (i == 0) {
+          _setStatus(Status.connecting);
+        } else {
+          _setStatus(Status.reconnecting);
+          await Future.delayed(Duration(seconds: retryInterval));
+        }
+
+        try {
+          _socket = await Socket.connect(_host, _port,
+              timeout: Duration(seconds: timeout));
+          _setStatus(Status.connected);
+          _connectCompleter.complete();
+
+          _addConnectOption(_connectOption);
+          _backendSubscriptAll();
+          _flushPubBuffer();
+
+          _buffer = [];
+          _socket!.listen((d) {
+            _buffer.addAll(d);
+            while (
+                _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
+              _processOp();
+            }
+          }, onDone: () {
+            _setStatus(Status.disconnected);
+            _socket!.close();
+          }, onError: (err) {
+            _setStatus(Status.disconnected);
+            _socket!.close();
+          });
+          return;
+        } catch (err) {
+          await close();
+          _connectCompleter.completeError(err);
+        }
+      }
+    }
+
+    loop();
+    return _connectCompleter.future;
   }
 }

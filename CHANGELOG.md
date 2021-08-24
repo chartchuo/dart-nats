@@ -1,3 +1,6 @@
+## 0.3.4
+* support tcp socket as 0.2.x by client.tcpConnect()
+
 ## 0.3.3
 * update package dependencies
 
