@@ -12,8 +12,10 @@ client.tcpConnect('localhost');
 client.connect(Uri.parse('ws://localhost:80'));
 ```
 
-## API Change
-To support Flutter Web. We change transport from socket to WebSocket and also change API call 
+## API Change from version 0.2.x
+To support Flutter Web. We change default transport from TCP socket to WebSocket. 
+TCP Socket still able to access by client.tcpConnect(); and we commit to maintain both transport 
+Migration from 0.2.x just change client.connect() to client.tcpConnect()
 
 ## Dart Examples:
 

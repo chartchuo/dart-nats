@@ -1,15 +1,18 @@
+## 0.3.5
+* Update readme
+
 ## 0.3.4
-* support tcp socket as 0.2.x by client.tcpConnect()
+* Support TCP socket as 0.2.x by client.tcpConnect()
 
 ## 0.3.3
-* update package dependencies
+* Update package dependencies
 
 ## 0.3.2
-* fix flutter web Nuid() error
+* Fix flutter web Nuid() error
 
 ## 0.3.1
-* add statusStream  
-* add request timeout
+* Add statusStream  
+* Add request timeout
 
 ## 0.3.0
 * Change transport from socket to WebSock 
