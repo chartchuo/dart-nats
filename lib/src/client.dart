@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'common.dart';
@@ -66,6 +67,9 @@ class Client {
 
   var _connectOption = ConnectOption(verbose: false);
 
+  /// ED25519 seed
+  List<int> seed = [];
+
   ///server info
   Info? get info => _info;
 
@@ -78,6 +82,22 @@ class Client {
   List<int> _buffer = [];
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
+  void _jwtSign() async {
+    if (_connectOption.jwt != null) {
+      // jwt.sig = sign(hash(jwt.header + jwt.body), private-key(jwt.issuer))(jwt.issuer is part of jwt.body)
+      var jwtParts = _connectOption.jwt?.split('.');
+      var algo = Ed25519();
+      var keyPair = await algo.newKeyPairFromSeed(seed);
+      var sink = Sha256().newHashSink();
+      sink.add(utf8.encode(jwtParts![0]));
+      sink.add(utf8.encode(jwtParts[1]));
+      sink.close();
+      var hash = await sink.hash();
+
+      var sig = await algo.sign(hash.bytes, keyPair: keyPair);
+      _connectOption.sig = base64.encode(sig.bytes as Uint8List);
+    }
+  }
 
   /// Connect to NATS server
   Future connect(Uri uri,
@@ -89,8 +109,8 @@ class Client {
     if (status != Status.disconnected && status != Status.closed) {
       return Future.error('Error: status not disconnected and not closed');
     }
-
     if (connectOption != null) _connectOption = connectOption;
+    _connectOption.verbose = false;
 
     void loop() async {
       for (var i = 0; i == 0 || retry; i++) {
@@ -105,6 +125,7 @@ class Client {
           _channel = WebSocketChannel.connect(uri);
           _setStatus(Status.connected);
           _connectCompleter.complete();
+          _jwtSign();
 
           _addConnectOption(_connectOption);
           _backendSubscriptAll();
@@ -451,7 +472,7 @@ class Client {
     _port = port;
 
     if (connectOption != null) _connectOption = connectOption;
-
+    _connectOption.verbose = false;
     void loop() async {
       for (var i = 0; i == 0 || retry; i++) {
         if (i == 0) {
@@ -466,10 +487,7 @@ class Client {
               timeout: Duration(seconds: timeout));
           _setStatus(Status.connected);
           _connectCompleter.complete();
-
-          _addConnectOption(_connectOption);
-          _backendSubscriptAll();
-          _flushPubBuffer();
+          var sendConnectOption = false;
 
           _buffer = [];
           _socket!.listen((d) {
@@ -477,6 +495,13 @@ class Client {
             while (
                 _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
               _processOp();
+              if (_info != null && !sendConnectOption) {
+                _jwtSign();
+                _addConnectOption(_connectOption);
+                _backendSubscriptAll();
+                _flushPubBuffer();
+                sendConnectOption = true;
+              }
             }
           }, onDone: () {
             _setStatus(Status.disconnected);

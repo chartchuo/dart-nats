@@ -33,6 +33,9 @@ class Info {
   /// max payload
   int? maxPayload;
 
+  /// nounce
+  String? nonce;
+
   ///client id assigned by server
   int? clientId;
 
@@ -52,6 +55,7 @@ class Info {
       this.host,
       this.port,
       this.maxPayload,
+      this.nonce,
       this.clientId});
 
   ///constructure from json
@@ -64,6 +68,7 @@ class Info {
     host = json['host'];
     port = json['port'];
     maxPayload = json['max_payload'];
+    nonce = json['nonce'];
     clientId = json['client_id'];
   }
 
@@ -78,6 +83,7 @@ class Info {
     data['host'] = host;
     data['port'] = port;
     data['max_payload'] = maxPayload;
+    data['nonce'] = nonce;
     data['client_id'] = clientId;
 
     return _removeNull(data);
@@ -97,6 +103,12 @@ class ConnectOption {
 
   /// Auehtnticatio Token
   String? auth_token;
+
+  /// JWT
+  String? jwt;
+
+  /// signature jwt.sig = sign(hash(jwt.header + jwt.body), private-key(jwt.issuer))(jwt.issuer is part of jwt.body)
+  String? sig;
 
   /// username
   String? user;
@@ -121,6 +133,7 @@ class ConnectOption {
       {this.verbose,
       this.pedantic,
       this.auth_token,
+      this.jwt,
       this.user,
       this.pass,
       this.tlsRequired,
@@ -135,6 +148,8 @@ class ConnectOption {
     pedantic = json['pedantic'];
     tlsRequired = json['tls_required'];
     auth_token = json['auth_token'];
+    jwt = json['jwt'];
+    sig = json['sig'];
     user = json['user'];
     pass = json['pass'];
     name = json['name'];
@@ -150,6 +165,8 @@ class ConnectOption {
     data['pedantic'] = pedantic;
     data['tls_required'] = tlsRequired;
     data['auth_token'] = auth_token;
+    data['jwt'] = jwt;
+    data['sig'] = jwt;
     data['user'] = user;
     data['pass'] = pass;
     data['name'] = name;
