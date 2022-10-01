@@ -166,7 +166,7 @@ class ConnectOption {
     data['tls_required'] = tlsRequired;
     data['auth_token'] = auth_token;
     data['jwt'] = jwt;
-    data['sig'] = jwt;
+    data['sig'] = sig;
     data['user'] = user;
     data['pass'] = pass;
     data['name'] = name;

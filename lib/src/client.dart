@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:base32/base32.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -51,7 +52,7 @@ class Client {
   WebSocketChannel? _channel;
   Socket? _socket;
 
-  Info? _info;
+  Info _info = Info();
   late Completer _pingCompleter;
   late Completer _connectCompleter;
 
@@ -67,8 +68,8 @@ class Client {
 
   var _connectOption = ConnectOption(verbose: false);
 
-  /// ED25519 seed
-  List<int> seed = [];
+  /// Nkeys seed
+  String seed = '';
 
   ///server info
   Info? get info => _info;
@@ -82,20 +83,18 @@ class Client {
   List<int> _buffer = [];
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
-  void _jwtSign() async {
-    if (_connectOption.jwt != null) {
-      // jwt.sig = sign(hash(jwt.header + jwt.body), private-key(jwt.issuer))(jwt.issuer is part of jwt.body)
-      var jwtParts = _connectOption.jwt?.split('.');
+  Future _sign() async {
+    if (_info.nonce != null) {
       var algo = Ed25519();
-      var keyPair = await algo.newKeyPairFromSeed(seed);
-      var sink = Sha256().newHashSink();
-      sink.add(utf8.encode(jwtParts![0]));
-      sink.add(utf8.encode(jwtParts[1]));
-      sink.close();
-      var hash = await sink.hash();
+      var raw = base32.decode(seed);
+      var key = raw.sublist(2, 34); //todo verify keytype and CRC16
 
-      var sig = await algo.sign(hash.bytes, keyPair: keyPair);
-      _connectOption.sig = base64.encode(sig.bytes as Uint8List);
+      var keyPair = await algo.newKeyPairFromSeed(key);
+
+      var sig =
+          await algo.sign(utf8.encode(_info.nonce ?? ''), keyPair: keyPair);
+
+      _connectOption.sig = base64.encode(sig.bytes);
     }
   }
 
@@ -125,7 +124,6 @@ class Client {
           _channel = WebSocketChannel.connect(uri);
           _setStatus(Status.connected);
           _connectCompleter.complete();
-          _jwtSign();
 
           _addConnectOption(_connectOption);
           _backendSubscriptAll();
@@ -211,6 +209,8 @@ class Client {
         break;
       case 'info':
         _info = Info.fromJson(jsonDecode(data));
+        await _sign();
+        _addConnectOption(_connectOption);
         break;
       case 'ping':
         if (status == Status.connected) {
@@ -260,7 +260,7 @@ class Client {
   }
 
   /// get server max payload
-  int? maxPayload() => _info?.maxPayload;
+  int? maxPayload() => _info.maxPayload;
 
   ///ping server current not implement pong verification
   Future ping() {
@@ -487,7 +487,7 @@ class Client {
               timeout: Duration(seconds: timeout));
           _setStatus(Status.connected);
           _connectCompleter.complete();
-          var sendConnectOption = false;
+          // var sendConnectOption = false;
 
           _buffer = [];
           _socket!.listen((d) {
@@ -495,13 +495,12 @@ class Client {
             while (
                 _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
               _processOp();
-              if (_info != null && !sendConnectOption) {
-                _jwtSign();
-                _addConnectOption(_connectOption);
-                _backendSubscriptAll();
-                _flushPubBuffer();
-                sendConnectOption = true;
-              }
+              // if (_info != null && !sendConnectOption) {
+              //   _addConnectOption(_connectOption);
+              //   _backendSubscriptAll();
+              //   _flushPubBuffer();
+              //   sendConnectOption = true;
+              // }
             }
           }, onDone: () {
             _setStatus(Status.disconnected);
