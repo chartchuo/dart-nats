@@ -65,7 +65,6 @@ class Client {
   late Completer _connectCompleter;
 
   var _status = Status.disconnected;
-  // late Stream<dynamic>? _stream;
 
   final _statusController = StreamController<Status>();
 
@@ -151,7 +150,6 @@ class Client {
           retryCount = 0;
 
           _buffer = [];
-          // _stream!.listen((d) {
           _channelStream.stream.listen((d) {
             _buffer.addAll(d);
             while (
@@ -188,12 +186,8 @@ class Client {
       case 'wss':
       case 'ws':
         _wsChannel = WebSocketChannel.connect(uri);
-        // _stream = _wsChannel!.stream;
         _wsChannel!.stream.listen((event) {
-          if (_channelStream.isClosed) {
-            //todo re-architect prevent this case
-            return;
-          }
+          if (_channelStream.isClosed) return;
           _channelStream.add(event);
         });
         break;
@@ -204,13 +198,9 @@ class Client {
         }
         _tcpSocket = await Socket.connect(uri.host, port,
             timeout: Duration(seconds: timeout));
-        // _stream = _tcpSocket!;
         _tcpSocket!.listen((event) {
           if (_secureSocket == null) {
-            if (_channelStream.isClosed) {
-              //todo re-architect prevent this case
-              return;
-            }
+            if (_channelStream.isClosed) return;
             _channelStream.add(event);
           }
         });
@@ -223,9 +213,9 @@ class Client {
         }
         _tcpSocket = await Socket.connect(uri.host, port,
             timeout: Duration(seconds: timeout));
-        // _stream = _tcpSocket!;
         _tcpSocket!.listen((event) {
           if (_secureSocket == null) {
+            if (_channelStream.isClosed) return;
             _channelStream.add(event);
           }
         });
@@ -305,6 +295,7 @@ class Client {
 
           _secureSocket = secureSocket;
           secureSocket.listen((event) {
+            if (_channelStream.isClosed) return;
             _channelStream.add(event);
           });
         }
@@ -558,7 +549,6 @@ class Client {
     _secureSocket = null;
     await _tcpSocket?.close();
     _tcpSocket = null;
-    // _stream = null;
     await _channelStream.close();
 
     _buffer = [];
