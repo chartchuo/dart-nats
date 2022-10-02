@@ -6,7 +6,7 @@ services:
       - "4222:4222"
       - "8080:8080"
     volumes:
-      - ./config:/config
+      - ./test/config:/config
     command: "-V -D -c /config/websocket.cfg"
 
   nats-jwt:
@@ -15,7 +15,7 @@ services:
       - "4223:4222"
       - "8083:8080"
     volumes:
-      - ./config:/config
+      - ./test/config:/config
     command: "-V -D -c /config/jwt.cfg"
 
   nats-token:
@@ -24,7 +24,7 @@ services:
       - "4224:4222"
       - "8084:8080"
     volumes:
-      - ./config:/config
+      - ./test/config:/config
     command: "-V -D -c /config/websocket.cfg --auth mytoken"
 
   nats-user:
@@ -33,7 +33,7 @@ services:
       - "4225:4222"
       - "8085:8080"
     volumes:
-      - ./config:/config
+      - ./test/config:/config
     command: "-V -D -c /config/websocket.cfg --user foo --pass bar"
 
   nats-nkey:
@@ -42,7 +42,7 @@ services:
       - "4226:4222"
       - "8086:8080"
     volumes:
-      - ./config:/config
+      - ./test/config:/config
     command: "-V -D -c /config/nkey.cfg"
 
   nats-tls:
@@ -50,6 +50,6 @@ services:
     ports:
       - "4443:4222"
     volumes:
-      - ./config:/config
+      - ./test/config:/config
     command: "-V -D --tls --tlscert=/config/server-cert.pem --tlskey=/config/server-key.pem"
 
