@@ -26,7 +26,7 @@ void main() {
       var sub = client.sub('iso');
       var r = 0;
 
-      sub.stream!.listen((msg) {
+      sub.stream.listen((msg) {
         if (r % 1000 == 0) {
           // print(msg.string);
         }

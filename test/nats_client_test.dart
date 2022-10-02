@@ -11,7 +11,7 @@ void main() {
       await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });
@@ -47,7 +47,7 @@ void main() {
       var sub = client.sub('subject1');
       var msgByte = Uint8List.fromList([1, 2, 3, 129, 130]);
       client.pub('subject1', msgByte);
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(msg.data, equals(msgByte));
     });
@@ -58,7 +58,7 @@ void main() {
       var msgByte = Uint8List.fromList(
           [1, 10, 3, 13, 10, 13, 130, 1, 10, 3, 13, 10, 13, 130]);
       client.pub('subject1', msgByte);
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(msg.data, equals(msgByte));
     });
@@ -69,7 +69,7 @@ void main() {
       var msgByte = Uint8List.fromList(
           List<int>.generate(1024 + 1024 * 4, (i) => i % 256));
       client.pub('subject1', msgByte);
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(msg.data, equals(msgByte));
     });
@@ -79,7 +79,7 @@ void main() {
       var sub = client.sub('subject1');
       var thaiString = utf8.encode('ทดสอบ');
       client.pub('subject1', thaiString as Uint8List);
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(msg.data, equals(thaiString));
     });
@@ -88,7 +88,7 @@ void main() {
       await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       client.pubString('subject1', 'testtesttest');
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(msg.string, equals('testtesttest'));
     });
@@ -97,7 +97,7 @@ void main() {
       await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       client.pubString('subject1', 'ทดสอบ');
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(msg.string, equals('ทดสอบ'));
     });
@@ -106,7 +106,7 @@ void main() {
       var sub = client.sub('subject1');
       client.pubString('subject1', 'message1');
       await client.connect(Uri.parse('ws://localhost:8080'));
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(msg.string, equals('message1'));
     });
@@ -116,7 +116,7 @@ void main() {
       var sub = client.sub('subject1');
       await Future.delayed(Duration(seconds: 1));
       client.pubString('subject1', 'message1', buffer: false);
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(msg.string, equals('message1'));
     });
@@ -128,8 +128,8 @@ void main() {
       await Future.delayed(Duration(seconds: 1));
       client.pubString('subject1', 'message1');
       client.pubString('subject2', 'message2');
-      var msg1 = await sub1.stream!.first;
-      var msg2 = await sub2.stream!.first;
+      var msg1 = await sub1.stream.first;
+      var msg2 = await sub2.stream.first;
       await client.close();
       expect(msg1.string, equals('message1'));
       expect(msg2.string, equals('message2'));
@@ -140,7 +140,7 @@ void main() {
       var sub = client.sub('subject1.*');
       client.pubString('subject1.1', 'message1');
       client.pubString('subject1.2', 'message2');
-      var msgStream = sub.stream!.asBroadcastStream();
+      var msgStream = sub.stream.asBroadcastStream();
       var msg1 = await msgStream.first;
       var msg2 = await msgStream.first;
       await client.close();
@@ -153,7 +153,7 @@ void main() {
       var sub = client.sub('subject1.>');
       client.pubString('subject1.a.1', 'message1');
       client.pubString('subject1.b.2', 'message2');
-      var msgStream = sub.stream!.asBroadcastStream();
+      var msgStream = sub.stream.asBroadcastStream();
       var msg1 = await msgStream.first;
       var msg2 = await msgStream.first;
       await client.close();
@@ -165,13 +165,13 @@ void main() {
       await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       client.pubString('subject1', 'message1');
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       client.unSub(sub);
       expect(msg.string, equals('message1'));
 
       sub = client.sub('subject1');
       client.pubString('subject1', 'message1');
-      msg = await sub.stream!.first;
+      msg = await sub.stream.first;
       sub.unSub();
       expect(msg.string, equals('message1'));
 
@@ -205,7 +205,7 @@ void main() {
       var sub = client.sub('sub');
       var r = 0;
       var iteration = 100;
-      sub.stream!.listen((msg) {
+      sub.stream.listen((msg) {
         r++;
       });
       for (var i = 0; i < iteration; i++) {
@@ -222,7 +222,7 @@ void main() {
       var sub = client.sub('sub');
       var r = 0;
       var iteration = 100;
-      sub.stream!.listen((msg) {
+      sub.stream.listen((msg) {
         r++;
       });
       for (var i = 0; i < iteration; i++) {

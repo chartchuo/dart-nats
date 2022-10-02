@@ -69,18 +69,20 @@ Publish Message
 ```dart
       natsClient.pubString('subject','message string');
 ```
+## Authentication
 
 Token Authtication 
+
 ```dart
 var client = Client();
-client.connect(Uri.parse('ws://localhost:8084'),
+client.connect(Uri.parse('nats://localhost'),
           connectOption: ConnectOption(authToken: 'mytoken'));
 ```
 
 User/Passwore Authentication
 ```dart
 var client = Client();
-client.connect(Uri.parse('ws://localhost:8085'),
+client.connect(Uri.parse('nats://localhost'),
           connectOption: ConnectOption(user: 'foo', pass: 'bar'));
 ```
 
@@ -90,7 +92,7 @@ var client = Client();
 client.seed =
     'SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY';
 client.connect(
-  Uri.parse('ws://localhost:8086'),
+  Uri.parse('nats://localhost'),
   retryInterval: 1,
   connectOption: ConnectOption(
     nkey: 'UDXU4RCSJNZOIQHZNWXHXORDPRTGNJAHAHFRGZNEEJCPQTT2M7NLCNF4',
@@ -104,11 +106,11 @@ var client = Client();
 client.seed =
     'SUAJGSBAKQHGYI7ZVKVR6WA7Z5U52URHKGGT6ZICUJXMG4LCTC2NTLQSF4';
 client.connect(
-  Uri.parse('nats://localhost:4223'),
+  Uri.parse('nats://localhost'),
   retryInterval: 1,
   connectOption: ConnectOption(
     jwt:
-        'eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJBU1pFQVNGMzdKS0dPTFZLTFdKT1hOM0xZUkpHNURJUFczUEpVT0s0WUlDNFFENlAyVFlRIiwiaWF0IjoxNjY0NTI0OTU5LCJpc3MiOiJBQUdTSkVXUlFTWFRDRkUzRVE3RzVPQldSVUhaVVlDSFdSM0dRVERGRldaSlM1Q1JLTUhOTjY3SyIsIm5hbWUiOiJzaWdudXAiLCJzdWIiOiJVQzZCUVY1Tlo1V0pQRUVZTTU0UkZBNU1VMk5NM0tON09WR01DU1VaV1dORUdZQVBNWEM0V0xZUCIsIm5hdHMiOnsicHViIjp7fSwic3ViIjp7fSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.8Q0HiN0h2tBvgpF2cAaz2E3WLPReKEnSmUWT43NSlXFNRpsCWpmkikxGgFn86JskEN4yast1uSj306JdOhyJBA',
+        '''eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJBU1pFQVNGMzdKS0dPTFZLTFdKT1hOM0xZUkpHNURJUFczUEpVT0s0WUlDNFFENlAyVFlRIiwiaWF0IjoxNjY0NTI0OTU5LCJpc3MiOiJBQUdTSkVXUlFTWFRDRkUzRVE3RzVPQldSVUhaVVlDSFdSM0dRVERGRldaSlM1Q1JLTUhOTjY3SyIsIm5hbWUiOiJzaWdudXAiLCJzdWIiOiJVQzZCUVY1Tlo1V0pQRUVZTTU0UkZBNU1VMk5NM0tON09WR01DU1VaV1dORUdZQVBNWEM0V0xZUCIsIm5hdHMiOnsicHViIjp7fSwic3ViIjp7fSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.8Q0HiN0h2tBvgpF2cAaz2E3WLPReKEnSmUWT43NSlXFNRpsCWpmkikxGgFn86JskEN4yast1uSj306JdOhyJBA''',
   ),
 );
 ```
@@ -141,6 +143,5 @@ The following is a list of features currently supported
 * [x] - NATS 2.x 
 
 Planned by this client:
-* [ ] - Structured data
 * [ ] - Connect to cluster
 * [ ] - TLS 

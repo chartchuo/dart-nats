@@ -1,8 +1,8 @@
 ///subscription model
 import 'dart:async';
 
-import 'message.dart';
 import 'client.dart';
+import 'message.dart';
 
 /// subscription class
 class Subscription {
@@ -30,7 +30,7 @@ class Subscription {
   }
 
   ///Stream output when server publish message
-  Stream<Message>? get stream => _stream;
+  Stream<Message> get stream => _stream;
 
   ///sink messat to listener
   void add(Message msg) {

@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
+import 'package:dart_nats/dart_nats.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
-import 'package:dart_nats/dart_nats.dart';
 
 // mkcert -install
 // mkcert -cert-file server-cert.pem -key-file server-key.pem localhost ::1
@@ -16,7 +16,7 @@ void main() {
       unawaited(client.tcpConnect('localhost', retryInterval: 1));
       var sub = client.sub('subject1');
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });
@@ -29,7 +29,7 @@ void main() {
           buffer: false);
       expect(result, true);
 
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });

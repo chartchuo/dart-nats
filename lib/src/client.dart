@@ -464,7 +464,7 @@ class Client {
       _inboxs[subj] = sub(inbox, queueGroup: queueGroup);
     }
 
-    var stream = _inboxs[subj]!.stream!;
+    var stream = _inboxs[subj]!.stream;
 
     var respond = stream.take(1).single;
     pub(subj, data, replyTo: _inboxs[subj]!.subject);

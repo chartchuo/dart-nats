@@ -17,7 +17,7 @@ void main() {
           buffer: false);
       expect(result, true);
 
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });
@@ -31,7 +31,7 @@ void main() {
           buffer: false);
       expect(result, true);
 
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });
@@ -49,7 +49,7 @@ void main() {
       );
       var sub = client.sub('subject.foo');
       client.pubString('subject.foo', 'message1');
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });
@@ -66,7 +66,7 @@ void main() {
       );
       var sub = client.sub('subject.foo');
       client.pubString('subject.foo', 'message1');
-      var msg = await sub.stream!.first;
+      var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });
