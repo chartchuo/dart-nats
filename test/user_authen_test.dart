@@ -4,14 +4,13 @@ import 'package:dart_nats/dart_nats.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
 
-// start nats server using
-// nats-server -c test/mem_resolver.conf -DV
+var port = 8082;
 
 void main() {
   group('all', () {
     test('simple', () async {
       var client = Client();
-      unawaited(client.connect(Uri.parse('ws://localhost:80'),
+      unawaited(client.connect(Uri.parse('ws://localhost:$port'),
           retryInterval: 1,
           connectOption: ConnectOption(user: 'foo', pass: 'bar')));
       var sub = client.sub('subject1');
@@ -22,7 +21,7 @@ void main() {
     });
     test('await', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'),
+      await client.connect(Uri.parse('ws://localhost:$port'),
           connectOption: ConnectOption(user: 'foo', pass: 'bar'));
       var sub = client.sub('subject1');
       var result = client.pub(

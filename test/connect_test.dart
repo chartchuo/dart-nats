@@ -1,18 +1,15 @@
 import 'dart:typed_data';
 
+import 'package:dart_nats/dart_nats.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
-import 'package:dart_nats/dart_nats.dart';
-
-// please start nats-server on localhost before testing
-// nats-server -c test/nats.conf
 
 void main() {
   group('all', () {
     test('simple', () async {
       var client = Client();
       unawaited(
-          client.connect(Uri.parse('ws://localhost:80'), retryInterval: 1));
+          client.connect(Uri.parse('ws://localhost:8080'), retryInterval: 1));
       var sub = client.sub('subject1');
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
       var msg = await sub.stream!.first;
@@ -21,7 +18,7 @@ void main() {
     });
     test('await', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       var result = client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
@@ -40,9 +37,9 @@ void main() {
         statusHistory.add(s);
       });
       unawaited(
-          client.connect(Uri.parse('ws://localhost:80'), retryInterval: 1));
+          client.connect(Uri.parse('ws://localhost:8080'), retryInterval: 1));
       await client.close();
-      await client.connect(Uri.parse('ws://localhost:80'), retryInterval: 1);
+      await client.connect(Uri.parse('ws://localhost:8080'), retryInterval: 1);
       await client.close();
 
       expect(statusHistory[0], equals(Status.connecting));

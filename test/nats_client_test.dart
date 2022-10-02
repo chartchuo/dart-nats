@@ -1,17 +1,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:test/test.dart';
 import 'package:dart_nats/dart_nats.dart';
-
-// please start nats-server on localhost before testing
-// nats-server -c test/nats.conf
+import 'package:test/test.dart';
 
 void main() {
   group('all', () {
     test('simple', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
       var msg = await sub.stream!.first;
@@ -46,7 +43,7 @@ void main() {
     });
     test('pub with Uint8List', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       var msgByte = Uint8List.fromList([1, 2, 3, 129, 130]);
       client.pub('subject1', msgByte);
@@ -56,7 +53,7 @@ void main() {
     });
     test('pub with Uint8List include return and  new line', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       var msgByte = Uint8List.fromList(
           [1, 10, 3, 13, 10, 13, 130, 1, 10, 3, 13, 10, 13, 130]);
@@ -67,7 +64,7 @@ void main() {
     });
     test('byte huge data', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       var msgByte = Uint8List.fromList(
           List<int>.generate(1024 + 1024 * 4, (i) => i % 256));
@@ -78,7 +75,7 @@ void main() {
     });
     test('UTF8', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       var thaiString = utf8.encode('ทดสอบ');
       client.pub('subject1', thaiString as Uint8List);
@@ -88,7 +85,7 @@ void main() {
     });
     test('pubString ascii', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       client.pubString('subject1', 'testtesttest');
       var msg = await sub.stream!.first;
@@ -97,7 +94,7 @@ void main() {
     });
     test('pubString Thai', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       client.pubString('subject1', 'ทดสอบ');
       var msg = await sub.stream!.first;
@@ -108,14 +105,14 @@ void main() {
       var client = Client();
       var sub = client.sub('subject1');
       client.pubString('subject1', 'message1');
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var msg = await sub.stream!.first;
       await client.close();
       expect(msg.string, equals('message1'));
     });
     test('pub with no buffer ', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       await Future.delayed(Duration(seconds: 1));
       client.pubString('subject1', 'message1', buffer: false);
@@ -125,7 +122,7 @@ void main() {
     });
     test('multiple sub ', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub1 = client.sub('subject1');
       var sub2 = client.sub('subject2');
       await Future.delayed(Duration(seconds: 1));
@@ -139,7 +136,7 @@ void main() {
     });
     test('Wildcard sub * ', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1.*');
       client.pubString('subject1.1', 'message1');
       client.pubString('subject1.2', 'message2');
@@ -152,7 +149,7 @@ void main() {
     });
     test('Wildcard sub > ', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1.>');
       client.pubString('subject1.a.1', 'message1');
       client.pubString('subject1.b.2', 'message2');
@@ -165,7 +162,7 @@ void main() {
     });
     test('unsub after connect', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       client.pubString('subject1', 'message1');
       var msg = await sub.stream!.first;
@@ -182,7 +179,7 @@ void main() {
     });
     test('unsub before connect', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       client.unSub(sub);
 
@@ -193,7 +190,7 @@ void main() {
     });
     test('get max payload', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
 
       //todo wait for connected
       await Future.delayed(Duration(seconds: 2));
@@ -204,7 +201,7 @@ void main() {
     });
     test('sub continuous msg', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('sub');
       var r = 0;
       var iteration = 100;
@@ -221,7 +218,7 @@ void main() {
     });
     test('sub defect 13 binary', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:80'));
+      await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('sub');
       var r = 0;
       var iteration = 100;

@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
+import 'package:dart_nats/dart_nats.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
-import 'package:dart_nats/dart_nats.dart';
 
 // start nats server using
 //nats-server --auth mytoken
@@ -12,6 +12,7 @@ void main() {
     test('simple', () async {
       var client = Client();
       unawaited(client.tcpConnect('localhost',
+          port: 4221,
           retryInterval: 1,
           connectOption: ConnectOption(auth_token: 'mytoken')));
       var sub = client.sub('subject1');
@@ -23,7 +24,7 @@ void main() {
     test('await', () async {
       var client = Client();
       await client.tcpConnect('localhost',
-          connectOption: ConnectOption(auth_token: 'mytoken'));
+          port: 4221, connectOption: ConnectOption(auth_token: 'mytoken'));
       var sub = client.sub('subject1');
       var result = client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
