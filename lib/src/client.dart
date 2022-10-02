@@ -371,9 +371,11 @@ class Client {
   }
 
   ///subscribe to subject option with queuegroup
-  Subscription sub(String subject, {String? queueGroup}) {
+  Subscription<T> sub<T>(String subject,
+      {String? queueGroup, T Function(String)? jsonConverter}) {
     _ssid++;
-    var s = Subscription(_ssid, subject, this, queueGroup: queueGroup);
+    var s = Subscription<T>(_ssid, subject, this,
+        queueGroup: queueGroup, jsonConverter: jsonConverter);
     _subs[_ssid] = s;
     if (status == Status.connected) {
       _sub(subject, _ssid, queueGroup: queueGroup);

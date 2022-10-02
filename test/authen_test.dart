@@ -19,7 +19,7 @@ void main() {
 
       var msg = await sub.stream.first;
       await client.close();
-      expect(String.fromCharCodes(msg.data), equals('message1'));
+      expect(String.fromCharCodes(msg.byte), equals('message1'));
     });
     test('user', () async {
       var client = Client();
@@ -33,7 +33,7 @@ void main() {
 
       var msg = await sub.stream.first;
       await client.close();
-      expect(String.fromCharCodes(msg.data), equals('message1'));
+      expect(String.fromCharCodes(msg.byte), equals('message1'));
     });
     test('jwt', () async {
       var client = Client();
@@ -51,7 +51,7 @@ void main() {
       client.pubString('subject.foo', 'message1');
       var msg = await sub.stream.first;
       await client.close();
-      expect(String.fromCharCodes(msg.data), equals('message1'));
+      expect(String.fromCharCodes(msg.byte), equals('message1'));
     });
     test('nkey', () async {
       var client = Client();
@@ -68,7 +68,7 @@ void main() {
       client.pubString('subject.foo', 'message1');
       var msg = await sub.stream.first;
       await client.close();
-      expect(String.fromCharCodes(msg.data), equals('message1'));
+      expect(String.fromCharCodes(msg.byte), equals('message1'));
     });
   });
 }

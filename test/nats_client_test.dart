@@ -13,7 +13,7 @@ void main() {
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
       var msg = await sub.stream.first;
       await client.close();
-      expect(String.fromCharCodes(msg.data), equals('message1'));
+      expect(String.fromCharCodes(msg.byte), equals('message1'));
     });
     test('newInbox', () {
       //just loop generate with out error
@@ -49,7 +49,7 @@ void main() {
       client.pub('subject1', msgByte);
       var msg = await sub.stream.first;
       await client.close();
-      expect(msg.data, equals(msgByte));
+      expect(msg.byte, equals(msgByte));
     });
     test('pub with Uint8List include return and  new line', () async {
       var client = Client();
@@ -60,7 +60,7 @@ void main() {
       client.pub('subject1', msgByte);
       var msg = await sub.stream.first;
       await client.close();
-      expect(msg.data, equals(msgByte));
+      expect(msg.byte, equals(msgByte));
     });
     test('byte huge data', () async {
       var client = Client();
@@ -71,7 +71,7 @@ void main() {
       client.pub('subject1', msgByte);
       var msg = await sub.stream.first;
       await client.close();
-      expect(msg.data, equals(msgByte));
+      expect(msg.byte, equals(msgByte));
     });
     test('UTF8', () async {
       var client = Client();
@@ -81,7 +81,7 @@ void main() {
       client.pub('subject1', thaiString as Uint8List);
       var msg = await sub.stream.first;
       await client.close();
-      expect(msg.data, equals(thaiString));
+      expect(msg.byte, equals(thaiString));
     });
     test('pubString ascii', () async {
       var client = Client();

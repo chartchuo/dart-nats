@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'client.dart';
 
 /// Message class
-class Message {
+class Message<T> {
   ///subscriber id auto generate by client
   final int sid;
 
@@ -14,13 +14,26 @@ class Message {
   final Client _client;
 
   ///payload of data in byte
-  final Uint8List data;
+  final Uint8List byte;
+
+  ///convert from json string to T for structure data
+  T Function(String)? jsonConverter;
+
+  ///payload of data in byte
+  T get data {
+    // if (jsonConverter == null) throw Exception('no converter. can not convert. use msg.byte instead');
+    if (jsonConverter == null) {
+      return byte as T;
+    }
+    return jsonConverter!(string);
+  }
 
   ///constructure
-  Message(this.subject, this.sid, this.data, this._client, {this.replyTo});
+  Message(this.subject, this.sid, this.byte, this._client,
+      {this.replyTo, this.jsonConverter});
 
   ///payload in string
-  String get string => utf8.decode(data);
+  String get string => utf8.decode(byte);
 
   ///Repond to message
   bool respond(Uint8List data) {

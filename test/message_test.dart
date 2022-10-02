@@ -13,7 +13,7 @@ void main() {
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
       var msg = await sub.stream.first;
       await client.close();
-      expect(String.fromCharCodes(msg.data), equals('message1'));
+      expect(String.fromCharCodes(msg.byte), equals('message1'));
     });
     test('respond', () async {
       var server = Client();
@@ -64,7 +64,7 @@ void main() {
       var msg = await sub.stream.first;
       msg = await sub.stream.first;
       await client.close();
-      expect(String.fromCharCodes(msg.data), equals(txt));
+      expect(String.fromCharCodes(msg.byte), equals(txt));
     });
   });
 }
