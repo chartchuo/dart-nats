@@ -152,8 +152,30 @@ class Client {
           _buffer = [];
           _channelStream.stream.listen((d) {
             _buffer.addAll(d);
+            // org code
+            // while (
+            //     _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
+            //   _processOp();
+            // }
+
+            //Thank aktxyz for contribution
             while (
                 _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
+              var n13 = _buffer.indexOf(13);
+              var msgFull =
+                  String.fromCharCodes(_buffer.take(n13)).toLowerCase().trim();
+              var msgList = msgFull.split(' ');
+              var msgType = msgList[0];
+              //print('... process $msgType ${_buffer.length}');
+
+              if (msgType == 'msg') {
+                var len =
+                    int.parse((msgList.length == 4 ? msgList[3] : msgList[4]));
+                if (len > 0 && _buffer.length < (msgFull.length + len + 4)) {
+                  break; // not a full payload, go around again
+                }
+              }
+
               _processOp();
             }
           }, onDone: () {
