@@ -45,37 +45,45 @@ Import and Declare object
 ```dart
 import 'package:dart_nats/dart_nats.dart' as nats;
 
-  nats.Client natsClient;
-  nats.Subscription fooSub, barSub;
+nats.Client natsClient;
+nats.Subscription fooSub, barSub;
 ```
 
 Simply connect to server and subscribe to subject
 ```dart
-  void connect() {
-    natsClient = nats.Client();
-    natsClient.connect(Uri.parse('ws://hostname');
-    fooSub = natsClient.sub('foo');
-    barSub = natsClient.sub('bar');
-  }
+void connect() {
+  natsClient = nats.Client();
+  natsClient.connect(Uri.parse('ws://hostname');
+  fooSub = natsClient.sub('foo');
+  barSub = natsClient.sub('bar');
+}
 ```
 Use as Stream in StreamBuilder
 ```dart
-          StreamBuilder(
-            stream: fooSub.stream,
-            builder: (context, AsyncSnapshot<nats.Message> snapshot) {
-              return Text(snapshot.hasData ? '${snapshot.data.string}' : '');
-            },
-          ),
+StreamBuilder(
+  stream: fooSub.stream,
+  builder: (context, AsyncSnapshot<nats.Message> snapshot) {
+    return Text(snapshot.hasData ? '${snapshot.data.string}' : '');
+  },
+),
 ```
 
 Publish Message
 ```dart
       natsClient.pubString('subject','message string');
 ```
+
+Dispose 
+```dart
+  void dispose() {
+    natsClient.close();
+    super.dispose();
+  }
+```
+
 ## Authentication
 
 Token Authtication 
-
 ```dart
 var client = Client();
 client.connect(Uri.parse('nats://localhost'),
@@ -118,19 +126,13 @@ client.connect(
 );
 ```
 
-Dispose 
-```dart
-  void dispose() {
-    natsClient.close();
-    super.dispose();
-  }
-```
+
 
 Full Flutter sample code [example/flutter/main.dart](https://github.com/chartchuo/dart-nats/blob/master/example/flutter/main_dart)
 
 
 ## Features
-The following is a list of features currently supported 
+The following is a list of features currently supported: 
 
 - [x] - Publish
 - [x] - Subscribe, unsubscribe
@@ -146,5 +148,5 @@ The following is a list of features currently supported
 - [x] - NATS 2.x 
 - [x] - TLS 
 
-Planned by this client:
+Planned:
 - [ ] - Connect to cluster

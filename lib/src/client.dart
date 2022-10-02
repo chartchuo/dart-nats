@@ -190,6 +190,10 @@ class Client {
         _wsChannel = WebSocketChannel.connect(uri);
         // _stream = _wsChannel!.stream;
         _wsChannel!.stream.listen((event) {
+          if (_channelStream.isClosed) {
+            //todo re-architect prevent this case
+            return;
+          }
           _channelStream.add(event);
         });
         break;
@@ -203,6 +207,10 @@ class Client {
         // _stream = _tcpSocket!;
         _tcpSocket!.listen((event) {
           if (_secureSocket == null) {
+            if (_channelStream.isClosed) {
+              //todo re-architect prevent this case
+              return;
+            }
             _channelStream.add(event);
           }
         });
