@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:base32/base32.dart';
-import 'package:ed25519_edwards/ed25519_edwards.dart' as ed;
+import 'package:cryptography/cryptography.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'common.dart';
@@ -98,21 +98,25 @@ class Client {
   String _receiveLine1 = '';
   Future _sign() async {
     if (_info.nonce != null) {
-      var raw = base32.decode(seed);
-      var key = raw.sublist(2, 34);
-      var sig = ed.sign(ed.PrivateKey(key), _info.nonce! as Uint8List);
-      _connectOption.sig = base64.encode(sig);
-
-      // var algo = Ed25519();
       // var raw = base32.decode(seed);
       // var key = raw.sublist(2, 34);
 
-      // var keyPair = await algo.newKeyPairFromSeed(key);
+      // var list = (_info.nonce ?? '').codeUnits;
+      // var bytes = Uint8List.fromList(list);
 
-      // var sig =
-      //     await algo.sign(utf8.encode(_info.nonce ?? ''), keyPair: keyPair);
+      // var sig = ed.sign(ed.PrivateKey(key), bytes);
+      // _connectOption.sig = base64.encode(sig);
 
-      // _connectOption.sig = base64.encode(sig.bytes);
+      var algo = Ed25519();
+      var raw = base32.decode(seed);
+      var key = raw.sublist(2, 34);
+
+      var keyPair = await algo.newKeyPairFromSeed(key);
+
+      var sig =
+          await algo.sign(utf8.encode(_info.nonce ?? ''), keyPair: keyPair);
+
+      _connectOption.sig = base64.encode(sig.bytes);
     }
   }
 
