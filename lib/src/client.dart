@@ -419,6 +419,7 @@ class Client {
 
   void _add(String str) {
     if (_wsChannel != null) {
+      if (_wsChannel?.closeCode == null) return;
       _wsChannel!.sink.add(utf8.encode(str + '\r\n'));
       return;
     } else if (_tcpSocket != null) {
