@@ -1,3 +1,10 @@
+## 0.4.0
+* client.connect() support with url schema example ws://host:port or nats://nost.port 
+* tls:// not support yet
+* discontinue client.tcpConnect()
+* add nkey authentication
+* add jwt authentication
+
 ## 0.3.5
 * Update readme
 

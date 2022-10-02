@@ -8,14 +8,12 @@ client.connect(Uri.parse('ws://localhost:80'));
 
 ### Flutter Other Platform Support by TCP Socket and WebSocket
 ```dart
-client.tcpConnect('localhost');
+client.connect(Uri.parse('nats://localhost'));
 client.connect(Uri.parse('ws://localhost:80'));
 ```
 
 ## API Change from version 0.2.x
 To support Flutter Web. We change default transport from TCP socket to WebSocket. 
-TCP Socket still able to access by client.tcpConnect(); and we commit to maintain both transport 
-Migration from 0.2.x just change client.connect() to client.tcpConnect()
 
 ## Dart Examples:
 
@@ -75,6 +73,49 @@ Publish Message
       natsClient.pubString('subject','message string');
 ```
 
+Token Authtication 
+```dart
+var client = Client();
+client.connect(Uri.parse('ws://localhost:8084'),
+          connectOption: ConnectOption(auth_token: 'mytoken'));
+```
+
+User/Passwore Authentication
+```dart
+var client = Client();
+client.connect(Uri.parse('ws://localhost:8085'),
+          connectOption: ConnectOption(user: 'foo', pass: 'bar'));
+```
+
+NKEY Authentication
+```dart
+var client = Client();
+client.seed =
+    'SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY';
+client.connect(
+  Uri.parse('ws://localhost:8086'),
+  retryInterval: 1,
+  connectOption: ConnectOption(
+    nkey: 'UDXU4RCSJNZOIQHZNWXHXORDPRTGNJAHAHFRGZNEEJCPQTT2M7NLCNF4',
+  ),
+);
+```
+
+JWT Authentication
+```dart
+var client = Client();
+client.seed =
+    'SUAJGSBAKQHGYI7ZVKVR6WA7Z5U52URHKGGT6ZICUJXMG4LCTC2NTLQSF4';
+client.connect(
+  Uri.parse('nats://localhost:4223'),
+  retryInterval: 1,
+  connectOption: ConnectOption(
+    jwt:
+        'eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJBU1pFQVNGMzdKS0dPTFZLTFdKT1hOM0xZUkpHNURJUFczUEpVT0s0WUlDNFFENlAyVFlRIiwiaWF0IjoxNjY0NTI0OTU5LCJpc3MiOiJBQUdTSkVXUlFTWFRDRkUzRVE3RzVPQldSVUhaVVlDSFdSM0dRVERGRldaSlM1Q1JLTUhOTjY3SyIsIm5hbWUiOiJzaWdudXAiLCJzdWIiOiJVQzZCUVY1Tlo1V0pQRUVZTTU0UkZBNU1VMk5NM0tON09WR01DU1VaV1dORUdZQVBNWEM0V0xZUCIsIm5hdHMiOnsicHViIjp7fSwic3ViIjp7fSwic3VicyI6LTEsImRhdGEiOi0xLCJwYXlsb2FkIjotMSwidHlwZSI6InVzZXIiLCJ2ZXJzaW9uIjoyfX0.8Q0HiN0h2tBvgpF2cAaz2E3WLPReKEnSmUWT43NSlXFNRpsCWpmkikxGgFn86JskEN4yast1uSj306JdOhyJBA',
+  ),
+);
+```
+
 Dispose 
 ```dart
   void dispose() {
@@ -96,14 +137,11 @@ The following is a list of features currently supported and planned by this clie
 * [x] - Unsubscribe after N message
 * [x] - Request, Respond
 * [x] - Queue subscribe
-* [ ] - caches, flush, drain
 * [x] - Request timeout
-* [ ] - structured data
-* [ ] - Connection option (cluster, timeout,ping interval, max ping, echo,... )
-* [ ] - Random automatic reconnection, disable reconnect, number of attempts, pausing
-* [ ] - Connect to cluster,randomize, Automatic reconnect upon connection failure base server info
 * [x] - Events/status 
-* [ ] - disconnect handler, reconnect handler
 * [x] - Buffering message during reconnect atempts
-* [ ] - All authentication models, including NATS 2.0 JWT and seed keys
-* [ ] - NATS 2.2 
+* [x] - All authentication models, including NATS 2.0 JWT and nkey
+* [x] - NATS 2.x 
+* [ ] - Structured data
+* [ ] - Connect to cluster
+* [ ] - TLS 
