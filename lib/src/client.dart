@@ -24,7 +24,7 @@ enum Status {
   disconnected,
 
   /// channel layer connect wait for info connect handshake
-  handshake,
+  infoHandshake,
 
   ///connected to server ready
   connected,
@@ -139,12 +139,9 @@ class Client {
         }
 
         try {
-          _connectUri(uri, timeout: timeout);
-          _setStatus(Status.handshake);
+          await _connectUri(uri, timeout: timeout);
+          _setStatus(Status.infoHandshake);
           retryCount = 0;
-          if (!_connectCompleter.isCompleted) {
-            _connectCompleter.complete();
-          }
 
           _buffer = [];
           _stream.listen((d) {
@@ -175,7 +172,7 @@ class Client {
     return _connectCompleter.future;
   }
 
-  void _connectUri(Uri uri, {int timeout = 5}) async {
+  Future _connectUri(Uri uri, {int timeout = 5}) async {
     if (uri.scheme == '') {
       throw Exception('No scheme in uri');
     }
@@ -259,6 +256,9 @@ class Client {
         _setStatus(Status.connected);
         _backendSubscriptAll();
         _flushPubBuffer();
+        if (!_connectCompleter.isCompleted) {
+          _connectCompleter.complete();
+        }
         break;
       case 'ping':
         if (status == Status.connected) {
@@ -331,6 +331,7 @@ class Client {
     if (status != Status.connected) {
       if (buffer) {
         _pubBuffer.add(_Pub(subject, data, replyTo));
+        return true;
       } else {
         return false;
       }
@@ -415,8 +416,10 @@ class Client {
   void _add(String str) {
     if (_wsChannel != null) {
       _wsChannel!.sink.add(utf8.encode(str + '\r\n'));
+      return;
     } else if (_tcpSocket != null) {
       _tcpSocket!.add(utf8.encode(str + '\r\n'));
+      return;
     }
     throw Exception('no connection');
   }
@@ -425,9 +428,11 @@ class Client {
     if (_wsChannel != null) {
       _wsChannel!.sink.add(msg);
       _wsChannel!.sink.add(utf8.encode('\r\n'));
+      return;
     } else if (_tcpSocket != null) {
       _tcpSocket!.add(msg);
       _tcpSocket!.add(utf8.encode('\r\n'));
+      return;
     }
     throw Exception('no connection');
   }
