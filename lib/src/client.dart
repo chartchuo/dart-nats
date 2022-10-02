@@ -60,7 +60,7 @@ class Client {
   late Completer _connectCompleter;
 
   var _status = Status.disconnected;
-  late Stream<dynamic> _stream;
+  late Stream<dynamic>? _stream;
 
   final _statusController = StreamController<Status>();
 
@@ -148,7 +148,7 @@ class Client {
           retryCount = 0;
 
           _buffer = [];
-          _stream.listen((d) {
+          _stream!.listen((d) {
             _buffer.addAll(d);
             while (
                 _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
@@ -419,7 +419,7 @@ class Client {
 
   void _add(String str) {
     if (_wsChannel != null) {
-      if (_wsChannel?.closeCode == null) return;
+      // if (_wsChannel?.closeCode == null) return;
       _wsChannel!.sink.add(utf8.encode(str + '\r\n'));
       return;
     } else if (_tcpSocket != null) {
@@ -493,6 +493,7 @@ class Client {
     _wsChannel = null;
     await _tcpSocket?.close();
     _tcpSocket = null;
+    _stream = null;
 
     _buffer = [];
   }

@@ -16,7 +16,7 @@ services:
       - "8083:8080"
     volumes:
       - ./config:/config
-    command: "-V -D -c /config/mem_resolver.cfg"
+    command: "-V -D -c /config/jwt.cfg"
 
   nats-token:
     image: nats
@@ -36,4 +36,12 @@ services:
       - ./config:/config
     command: "-V -D -c /config/websocket.cfg --user foo --pass bar"
 
+  nats-nkey:
+    image: nats
+    ports:
+      - "4226:4222"
+      - "8086:8080"
+    volumes:
+      - ./config:/config
+    command: "-V -D -c /config/nkey.cfg"
 

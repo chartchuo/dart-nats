@@ -48,8 +48,6 @@ void main() {
       });
       await client.connect(Uri.parse('ws://localhost:8080'), retryInterval: 1);
       await client.close();
-      await client.connect(Uri.parse('ws://localhost:8080'), retryInterval: 1);
-      await client.close();
 
       // no runtime error should be fine
       // expect only first and last status

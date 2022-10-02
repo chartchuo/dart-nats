@@ -107,6 +107,9 @@ class ConnectOption {
   /// JWT
   String? jwt;
 
+  /// NKEY
+  String? nkey;
+
   /// signature jwt.sig = sign(hash(jwt.header + jwt.body), private-key(jwt.issuer))(jwt.issuer is part of jwt.body)
   String? sig;
 
@@ -134,6 +137,7 @@ class ConnectOption {
       this.pedantic,
       this.auth_token,
       this.jwt,
+      this.nkey,
       this.user,
       this.pass,
       this.tlsRequired,
@@ -149,6 +153,7 @@ class ConnectOption {
     tlsRequired = json['tls_required'];
     auth_token = json['auth_token'];
     jwt = json['jwt'];
+    nkey = json['nkey'];
     sig = json['sig'];
     user = json['user'];
     pass = json['pass'];
@@ -166,6 +171,7 @@ class ConnectOption {
     data['tls_required'] = tlsRequired;
     data['auth_token'] = auth_token;
     data['jwt'] = jwt;
+    data['nkey'] = nkey;
     data['sig'] = sig;
     data['user'] = user;
     data['pass'] = pass;
