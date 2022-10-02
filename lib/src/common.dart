@@ -102,7 +102,7 @@ class ConnectOption {
   bool? tlsRequired;
 
   /// Auehtnticatio Token
-  String? auth_token;
+  String? authToken;
 
   /// JWT
   String? jwt;
@@ -135,7 +135,7 @@ class ConnectOption {
   ConnectOption(
       {this.verbose,
       this.pedantic,
-      this.auth_token,
+      this.authToken,
       this.jwt,
       this.nkey,
       this.user,
@@ -151,7 +151,7 @@ class ConnectOption {
     verbose = json['verbose'];
     pedantic = json['pedantic'];
     tlsRequired = json['tls_required'];
-    auth_token = json['auth_token'];
+    authToken = json['auth_token'];
     jwt = json['jwt'];
     nkey = json['nkey'];
     sig = json['sig'];
@@ -169,7 +169,7 @@ class ConnectOption {
     data['verbose'] = verbose;
     data['pedantic'] = pedantic;
     data['tls_required'] = tlsRequired;
-    data['auth_token'] = auth_token;
+    data['auth_token'] = authToken;
     data['jwt'] = jwt;
     data['nkey'] = nkey;
     data['sig'] = sig;

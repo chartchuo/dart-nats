@@ -74,7 +74,7 @@ Token Authtication
 ```dart
 var client = Client();
 client.connect(Uri.parse('ws://localhost:8084'),
-          connectOption: ConnectOption(auth_token: 'mytoken'));
+          connectOption: ConnectOption(authToken: 'mytoken'));
 ```
 
 User/Passwore Authentication
@@ -125,7 +125,7 @@ Full Flutter sample code [example/flutter/main.dart](https://github.com/chartchu
 
 
 ## Features
-The following is a list of features currently supported and planned by this client:
+The following is a list of features currently supported 
 
 * [x] - Publish
 * [x] - Subscribe, unsubscribe
@@ -139,6 +139,8 @@ The following is a list of features currently supported and planned by this clie
 * [x] - Buffering message during reconnect atempts
 * [x] - All authentication models, including NATS 2.0 JWT and nkey
 * [x] - NATS 2.x 
+
+Planned by this client:
 * [ ] - Structured data
 * [ ] - Connect to cluster
 * [ ] - TLS 

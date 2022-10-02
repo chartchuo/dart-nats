@@ -10,7 +10,7 @@ void main() {
     test('token', () async {
       var client = Client();
       await client.connect(Uri.parse('ws://localhost:8084'),
-          connectOption: ConnectOption(auth_token: 'mytoken'));
+          connectOption: ConnectOption(authToken: 'mytoken'));
       var sub = client.sub('subject1');
       var result = client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
