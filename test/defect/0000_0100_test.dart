@@ -26,8 +26,8 @@ void main() {
       var gotit = false;
       try {
         await client.connect(Uri.parse('ws://localhost:1234'));
-        var fooSub = client.sub('foo');
-        var barSub = client.sub('bar');
+        client.sub('foo');
+        client.sub('bar');
         // sleep(Duration(seconds: 20));
       } catch (e) {
         gotit = true;
