@@ -1,4 +1,7 @@
 ## 0.4.2
+* fix bug #20 larger MSG payloads not always working, check if full payload present in buffer
+
+## 0.4.2
 * TLS support
 
 ## 0.4.1

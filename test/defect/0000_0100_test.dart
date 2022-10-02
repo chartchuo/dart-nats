@@ -21,6 +21,20 @@ import 'package:test/test.dart';
 //   }
 void main() {
   group('all', () {
+    test('0016 Connect to invalid ws connection does not give error', () async {
+      var client = Client();
+      var gotit = false;
+      try {
+        await client.connect(Uri.parse('ws://localhost:1234'));
+        var fooSub = client.sub('foo');
+        var barSub = client.sub('bar');
+        // sleep(Duration(seconds: 20));
+      } catch (e) {
+        gotit = true;
+      }
+      await client.close();
+      expect(gotit, equals(true));
+    });
     test(
         '0020 larger MSG payloads not always working, check if full payload present in buffer',
         () async {
@@ -35,7 +49,7 @@ void main() {
       client.pubString('subject1', str21k);
       var msg = await sub.stream.first;
       await client.close();
-      expect(msg.string, str21k);
+      expect(msg.string, equals(str21k));
     });
   });
 }

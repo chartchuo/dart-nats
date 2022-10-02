@@ -146,6 +146,7 @@ class Client {
 
         try {
           await _connectUri(uri, timeout: timeout);
+
           _setStatus(Status.infoHandshake);
           retryCount = 0;
 
@@ -208,6 +209,8 @@ class Client {
       case 'wss':
       case 'ws':
         _wsChannel = WebSocketChannel.connect(uri);
+        if (_wsChannel == null) break;
+        _setStatus(Status.infoHandshake);
         _wsChannel!.stream.listen((event) {
           if (_channelStream.isClosed) return;
           _channelStream.add(event);
@@ -220,6 +223,8 @@ class Client {
         }
         _tcpSocket = await Socket.connect(uri.host, port,
             timeout: Duration(seconds: timeout));
+        if (_tcpSocket == null) break;
+        _setStatus(Status.infoHandshake);
         _tcpSocket!.listen((event) {
           if (_secureSocket == null) {
             if (_channelStream.isClosed) return;
@@ -235,6 +240,8 @@ class Client {
         }
         _tcpSocket = await Socket.connect(uri.host, port,
             timeout: Duration(seconds: timeout));
+        if (_tcpSocket == null) break;
+        _setStatus(Status.infoHandshake);
         _tcpSocket!.listen((event) {
           if (_secureSocket == null) {
             if (_channelStream.isClosed) return;
