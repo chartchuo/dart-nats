@@ -1,3 +1,6 @@
+## TLS, Token, User/Pass, NKey, JWT support NOW.
+##
+
 # Dart-NATS 
 A Dart client for the [NATS](https://nats.io) messaging system. Design to use with Dart and flutter.
 

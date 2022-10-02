@@ -1,3 +1,6 @@
+## 0.4.2
+* TLS support
+
 ## 0.4.1
 * fix wss://host:port 
 
