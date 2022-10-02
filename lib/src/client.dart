@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:base32/base32.dart';
-import 'package:cryptography/cryptography.dart';
+import 'package:ed25519_edwards/ed25519_edwards.dart' as ed;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'common.dart';
@@ -23,7 +23,10 @@ enum Status {
   /// discontected or not connected
   disconnected,
 
-  ///connected to server
+  /// channel layer connect wait for info connect handshake
+  handshake,
+
+  ///connected to server ready
   connected,
 
   ///alread close by close or server
@@ -49,14 +52,15 @@ class _Pub {
 
 ///NATS client
 class Client {
-  WebSocketChannel? _channel;
-  Socket? _socket;
+  WebSocketChannel? _wsChannel;
+  Socket? _tcpSocket;
 
   Info _info = Info();
   late Completer _pingCompleter;
   late Completer _connectCompleter;
 
   var _status = Status.disconnected;
+  late Stream<dynamic> _stream;
 
   final _statusController = StreamController<Status>();
 
@@ -69,7 +73,16 @@ class Client {
   var _connectOption = ConnectOption(verbose: false);
 
   /// Nkeys seed
-  String seed = '';
+  String get seed => _seed;
+  set seed(String newseed) {
+    // todo validate newseed
+    var raw = base32.decode(newseed);
+
+    if (raw.length != 36) throw Exception('invalid seed');
+    _seed = newseed;
+  }
+
+  String _seed = '';
 
   ///server info
   Info? get info => _info;
@@ -85,16 +98,21 @@ class Client {
   String _receiveLine1 = '';
   Future _sign() async {
     if (_info.nonce != null) {
-      var algo = Ed25519();
       var raw = base32.decode(seed);
-      var key = raw.sublist(2, 34); //todo verify keytype and CRC16
+      var key = raw.sublist(2, 34);
+      var sig = ed.sign(ed.PrivateKey(key), _info.nonce! as Uint8List);
+      _connectOption.sig = base64.encode(sig);
 
-      var keyPair = await algo.newKeyPairFromSeed(key);
+      // var algo = Ed25519();
+      // var raw = base32.decode(seed);
+      // var key = raw.sublist(2, 34);
 
-      var sig =
-          await algo.sign(utf8.encode(_info.nonce ?? ''), keyPair: keyPair);
+      // var keyPair = await algo.newKeyPairFromSeed(key);
 
-      _connectOption.sig = base64.encode(sig.bytes);
+      // var sig =
+      //     await algo.sign(utf8.encode(_info.nonce ?? ''), keyPair: keyPair);
+
+      // _connectOption.sig = base64.encode(sig.bytes);
     }
   }
 
@@ -112,8 +130,8 @@ class Client {
     _connectOption.verbose = false;
 
     void loop() async {
-      for (var i = 0; i == 0 || retry; i++) {
-        if (i == 0) {
+      for (var retryCount = 0; retryCount == 0 || retry; retryCount++) {
+        if (retryCount == 0) {
           _setStatus(Status.connecting);
         } else {
           _setStatus(Status.reconnecting);
@@ -121,16 +139,15 @@ class Client {
         }
 
         try {
-          _channel = WebSocketChannel.connect(uri);
-          _setStatus(Status.connected);
-          _connectCompleter.complete();
-
-          _addConnectOption(_connectOption);
-          _backendSubscriptAll();
-          _flushPubBuffer();
+          _connectUri(uri, timeout: timeout);
+          _setStatus(Status.handshake);
+          retryCount = 0;
+          if (!_connectCompleter.isCompleted) {
+            _connectCompleter.complete();
+          }
 
           _buffer = [];
-          _channel!.stream.listen((d) {
+          _stream.listen((d) {
             _buffer.addAll(d);
             while (
                 _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
@@ -138,21 +155,49 @@ class Client {
             }
           }, onDone: () {
             _setStatus(Status.disconnected);
-            _channel!.sink.close();
+            close();
           }, onError: (err) {
             _setStatus(Status.disconnected);
-            _channel!.sink.close();
+            close();
           });
           return;
         } catch (err) {
           await close();
-          _connectCompleter.completeError(err);
+          if (!_connectCompleter.isCompleted) {
+            _connectCompleter.completeError(err);
+          }
+          _setStatus(Status.disconnected);
         }
       }
     }
 
     loop();
     return _connectCompleter.future;
+  }
+
+  void _connectUri(Uri uri, {int timeout = 5}) async {
+    if (uri.scheme == '') {
+      throw Exception('No scheme in uri');
+    }
+    switch (uri.scheme) {
+      case 'ws':
+        _wsChannel = WebSocketChannel.connect(uri);
+        _stream = _wsChannel!.stream;
+        break;
+      case 'nats':
+        var port = uri.port;
+        if (port == 0) {
+          port = 4222;
+        }
+        _tcpSocket = await Socket.connect(uri.host, port,
+            timeout: Duration(seconds: timeout));
+        _stream = _tcpSocket!;
+        break;
+      case 'tls':
+        throw Exception('schema ${uri.scheme} not implement yet');
+      default:
+        throw Exception('schema ${uri.scheme} not support');
+    }
   }
 
   void _backendSubscriptAll() {
@@ -211,6 +256,9 @@ class Client {
         _info = Info.fromJson(jsonDecode(data));
         await _sign();
         _addConnectOption(_connectOption);
+        _setStatus(Status.connected);
+        _backendSubscriptAll();
+        _flushPubBuffer();
         break;
       case 'ping':
         if (status == Status.connected) {
@@ -364,43 +412,24 @@ class Client {
     }
   }
 
-  // bool _add(String str) {
-  //   if (_channel == null) return false; //todo throw error
-  //   _channel!.sink.add(utf8.encode(str + '\r\n'));
-  //   return true;
-  // }
-
-  bool _add(String str) {
-    if (_channel != null) {
-      _channel!.sink.add(utf8.encode(str + '\r\n'));
-      return true;
-    } else if (_socket != null) {
-      _socket!.add(utf8.encode(str + '\r\n'));
-      return true;
+  void _add(String str) {
+    if (_wsChannel != null) {
+      _wsChannel!.sink.add(utf8.encode(str + '\r\n'));
+    } else if (_tcpSocket != null) {
+      _tcpSocket!.add(utf8.encode(str + '\r\n'));
     }
-    //todo throw
-    return false;
+    throw Exception('no connection');
   }
 
-  // bool _addByte(List<int> msg) {
-  //   if (_channel == null) return false; //todo throw error
-  //   _channel!.sink.add(msg);
-  //   _channel!.sink.add(utf8.encode('\r\n'));
-  //   return true;
-  // }
-
-  bool _addByte(List<int> msg) {
-    if (_channel != null) {
-      _channel!.sink.add(msg);
-      _channel!.sink.add(utf8.encode('\r\n'));
-      return true;
-    } else if (_socket != null) {
-      _socket!.add(msg);
-      _socket!.add(utf8.encode('\r\n'));
-      return true;
+  void _addByte(List<int> msg) {
+    if (_wsChannel != null) {
+      _wsChannel!.sink.add(msg);
+      _wsChannel!.sink.add(utf8.encode('\r\n'));
+    } else if (_tcpSocket != null) {
+      _tcpSocket!.add(msg);
+      _tcpSocket!.add(utf8.encode('\r\n'));
     }
-    //todo throw
-    return false;
+    throw Exception('no connection');
   }
 
   final _inboxs = <String, Subscription>{};
@@ -450,74 +479,28 @@ class Client {
     _backendSubs.forEach((_, s) => s = false);
     _inboxs.clear();
     _setStatus(Status.closed);
-    await _channel?.sink.close();
-    await _socket?.close();
+    await _wsChannel?.sink.close();
+    _wsChannel = null;
+    await _tcpSocket?.close();
+    _tcpSocket = null;
+
     _buffer = [];
   }
 
+  /// discontinue tcpConnect. use connect(uri) instead
   ///Backward compatible with 0.2.x version
   Future tcpConnect(String host,
       {int port = 4222,
       ConnectOption? connectOption,
       int timeout = 5,
       bool retry = true,
-      int retryInterval = 10}) async {
-    String? _host;
-    late int _port;
-    _connectCompleter = Completer();
-    if (status != Status.disconnected && status != Status.closed) {
-      return Future.error('Error: status not disconnected and not closed');
-    }
-    _host = host;
-    _port = port;
-
-    if (connectOption != null) _connectOption = connectOption;
-    _connectOption.verbose = false;
-    void loop() async {
-      for (var i = 0; i == 0 || retry; i++) {
-        if (i == 0) {
-          _setStatus(Status.connecting);
-        } else {
-          _setStatus(Status.reconnecting);
-          await Future.delayed(Duration(seconds: retryInterval));
-        }
-
-        try {
-          _socket = await Socket.connect(_host, _port,
-              timeout: Duration(seconds: timeout));
-          _setStatus(Status.connected);
-          _connectCompleter.complete();
-          // var sendConnectOption = false;
-
-          _buffer = [];
-          _socket!.listen((d) {
-            _buffer.addAll(d);
-            while (
-                _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
-              _processOp();
-              // if (_info != null && !sendConnectOption) {
-              //   _addConnectOption(_connectOption);
-              //   _backendSubscriptAll();
-              //   _flushPubBuffer();
-              //   sendConnectOption = true;
-              // }
-            }
-          }, onDone: () {
-            _setStatus(Status.disconnected);
-            _socket!.close();
-          }, onError: (err) {
-            _setStatus(Status.disconnected);
-            _socket!.close();
-          });
-          return;
-        } catch (err) {
-          await close();
-          _connectCompleter.completeError(err);
-        }
-      }
-    }
-
-    loop();
-    return _connectCompleter.future;
+      int retryInterval = 10}) {
+    return connect(
+      Uri(scheme: 'nats', host: host, port: port),
+      retry: retry,
+      retryInterval: retryInterval,
+      timeout: timeout,
+      connectOption: connectOption,
+    );
   }
 }
