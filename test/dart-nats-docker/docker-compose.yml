@@ -45,3 +45,11 @@ services:
       - ./config:/config
     command: "-V -D -c /config/nkey.cfg"
 
+  nats-tls:
+    image: nats
+    ports:
+      - "4443:4222"
+    volumes:
+      - ./config:/config
+    command: "-V -D --tls --tlscert=/config/server-cert.pem --tlskey=/config/server-key.pem"
+

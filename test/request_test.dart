@@ -93,7 +93,7 @@ void main() {
         timeout = true;
       }
       await client.close();
-      service.close();
+      await service.close();
       await server.close();
       expect(timeout, equals(true));
     });

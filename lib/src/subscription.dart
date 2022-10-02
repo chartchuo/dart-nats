@@ -50,7 +50,7 @@ class Subscription<T> {
   }
 
   ///close the stream
-  void close() {
-    _controller.close();
+  Future close() async {
+    await _controller.close();
   }
 }

@@ -23,6 +23,9 @@ enum Status {
   /// discontected or not connected
   disconnected,
 
+  /// tlsHandshake
+  tlsHandshake,
+
   /// channel layer connect wait for info connect handshake
   infoHandshake,
 
@@ -54,18 +57,25 @@ class _Pub {
 class Client {
   WebSocketChannel? _wsChannel;
   Socket? _tcpSocket;
+  SecureSocket? _secureSocket;
+  bool _tlsRequired = false;
 
   Info _info = Info();
   late Completer _pingCompleter;
   late Completer _connectCompleter;
 
   var _status = Status.disconnected;
-  late Stream<dynamic>? _stream;
+  // late Stream<dynamic>? _stream;
 
   final _statusController = StreamController<Status>();
 
+  final _channelStream = StreamController();
+
   ///status of the client
   Status get status => _status;
+
+  /// accept bad certificate NOT recomend to use in production
+  bool acceptBadCert = false;
 
   /// Stream status for status update
   Stream<Status> get statusStream => _statusController.stream;
@@ -98,15 +108,6 @@ class Client {
   String _receiveLine1 = '';
   Future _sign() async {
     if (_info.nonce != null) {
-      // var raw = base32.decode(seed);
-      // var key = raw.sublist(2, 34);
-
-      // var list = (_info.nonce ?? '').codeUnits;
-      // var bytes = Uint8List.fromList(list);
-
-      // var sig = ed.sign(ed.PrivateKey(key), bytes);
-      // _connectOption.sig = base64.encode(sig);
-
       var algo = Ed25519();
       var raw = base32.decode(seed);
       var key = raw.sublist(2, 34);
@@ -121,11 +122,13 @@ class Client {
   }
 
   /// Connect to NATS server
-  Future connect(Uri uri,
-      {ConnectOption? connectOption,
-      int timeout = 5,
-      bool retry = true,
-      int retryInterval = 10}) async {
+  Future connect(
+    Uri uri, {
+    ConnectOption? connectOption,
+    int timeout = 5,
+    bool retry = true,
+    int retryInterval = 10,
+  }) async {
     _connectCompleter = Completer();
     if (status != Status.disconnected && status != Status.closed) {
       return Future.error('Error: status not disconnected and not closed');
@@ -148,7 +151,8 @@ class Client {
           retryCount = 0;
 
           _buffer = [];
-          _stream!.listen((d) {
+          // _stream!.listen((d) {
+          _channelStream.stream.listen((d) {
             _buffer.addAll(d);
             while (
                 _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
@@ -184,7 +188,10 @@ class Client {
       case 'wss':
       case 'ws':
         _wsChannel = WebSocketChannel.connect(uri);
-        _stream = _wsChannel!.stream;
+        // _stream = _wsChannel!.stream;
+        _wsChannel!.stream.listen((event) {
+          _channelStream.add(event);
+        });
         break;
       case 'nats':
         var port = uri.port;
@@ -193,10 +200,28 @@ class Client {
         }
         _tcpSocket = await Socket.connect(uri.host, port,
             timeout: Duration(seconds: timeout));
-        _stream = _tcpSocket!;
+        // _stream = _tcpSocket!;
+        _tcpSocket!.listen((event) {
+          if (_secureSocket == null) {
+            _channelStream.add(event);
+          }
+        });
         break;
       case 'tls':
-        throw Exception('schema ${uri.scheme} not implement yet');
+        _tlsRequired = true;
+        var port = uri.port;
+        if (port == 0) {
+          port = 4443;
+        }
+        _tcpSocket = await Socket.connect(uri.host, port,
+            timeout: Duration(seconds: timeout));
+        // _stream = _tcpSocket!;
+        _tcpSocket!.listen((event) {
+          if (_secureSocket == null) {
+            _channelStream.add(event);
+          }
+        });
+        break;
       default:
         throw Exception('schema ${uri.scheme} not support');
     }
@@ -256,6 +281,26 @@ class Client {
         break;
       case 'info':
         _info = Info.fromJson(jsonDecode(data));
+        if (_tlsRequired && !(_info.tlsRequired ?? false)) {
+          throw Exception('require TLS but server not required');
+        }
+
+        if (_info.tlsRequired ?? false) {
+          _setStatus(Status.tlsHandshake);
+          var secureSocket = await SecureSocket.secure(
+            _tcpSocket!,
+            onBadCertificate: (certificate) {
+              if (acceptBadCert) return true;
+              return false;
+            },
+          );
+
+          _secureSocket = secureSocket;
+          secureSocket.listen((event) {
+            _channelStream.add(event);
+          });
+        }
+
         await _sign();
         _addConnectOption(_connectOption);
         _setStatus(Status.connected);
@@ -425,6 +470,9 @@ class Client {
       // if (_wsChannel?.closeCode == null) return;
       _wsChannel!.sink.add(utf8.encode(str + '\r\n'));
       return;
+    } else if (_secureSocket != null) {
+      _secureSocket!.add(utf8.encode(str + '\r\n'));
+      return;
     } else if (_tcpSocket != null) {
       _tcpSocket!.add(utf8.encode(str + '\r\n'));
       return;
@@ -436,6 +484,10 @@ class Client {
     if (_wsChannel != null) {
       _wsChannel!.sink.add(msg);
       _wsChannel!.sink.add(utf8.encode('\r\n'));
+      return;
+    } else if (_secureSocket != null) {
+      _secureSocket!.add(msg);
+      _secureSocket!.add(utf8.encode('\r\n'));
       return;
     } else if (_tcpSocket != null) {
       _tcpSocket!.add(msg);
@@ -494,9 +546,12 @@ class Client {
     _setStatus(Status.closed);
     await _wsChannel?.sink.close();
     _wsChannel = null;
+    await _secureSocket?.close();
+    _secureSocket = null;
     await _tcpSocket?.close();
     _tcpSocket = null;
-    _stream = null;
+    // _stream = null;
+    await _channelStream.close();
 
     _buffer = [];
   }

@@ -30,6 +30,9 @@ class Info {
   /// port number
   int? port;
 
+  /// TLS Required
+  bool? tlsRequired;
+
   /// max payload
   int? maxPayload;
 
@@ -54,6 +57,7 @@ class Info {
       this.go,
       this.host,
       this.port,
+      this.tlsRequired,
       this.maxPayload,
       this.nonce,
       this.clientId});
@@ -67,6 +71,7 @@ class Info {
     go = json['go'];
     host = json['host'];
     port = json['port'];
+    tlsRequired = json['tls_required'];
     maxPayload = json['max_payload'];
     nonce = json['nonce'];
     clientId = json['client_id'];
@@ -82,6 +87,7 @@ class Info {
     data['go'] = go;
     data['host'] = host;
     data['port'] = port;
+    data['tls_required'] = tlsRequired;
     data['max_payload'] = maxPayload;
     data['nonce'] = nonce;
     data['client_id'] = clientId;

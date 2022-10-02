@@ -141,7 +141,7 @@ The following is a list of features currently supported
 - [x] - Buffering message during reconnect atempts
 - [x] - All authentication models, including NATS 2.0 JWT and nkey
 - [x] - NATS 2.x 
+- [x] - TLS 
 
 Planned by this client:
 - [ ] - Connect to cluster
-- [ ] - TLS 

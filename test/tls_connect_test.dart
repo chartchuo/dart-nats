@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:dart_nats/dart_nats.dart';
-import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
 
 // mkcert -install
@@ -11,18 +10,24 @@ import 'package:test/test.dart';
 //Todo
 void main() {
   group('all', () {
-    test('simple', () async {
+    test('nats:', () async {
       var client = Client();
-      unawaited(client.tcpConnect('localhost', retryInterval: 1));
+      client.acceptBadCert = true;
+      await client.connect(Uri.parse('nats://localhost:4443'));
       var sub = client.sub('subject1');
-      client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
+      var result = client.pub(
+          'subject1', Uint8List.fromList('message1'.codeUnits),
+          buffer: false);
+      expect(result, true);
+
       var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.byte), equals('message1'));
     });
-    test('await', () async {
+    test('tls:', () async {
       var client = Client();
-      await client.tcpConnect('localhost');
+      client.acceptBadCert = true;
+      await client.connect(Uri.parse('tls://localhost:4443'));
       var sub = client.sub('subject1');
       var result = client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
