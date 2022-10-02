@@ -1,4 +1,4 @@
-## 0.4.2
+## 0.4.4
 * fix bug #20 larger MSG payloads not always working, check if full payload present in buffer
 
 ## 0.4.2
