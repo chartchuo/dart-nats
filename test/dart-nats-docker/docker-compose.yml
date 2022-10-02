@@ -9,24 +9,6 @@ services:
       - ./config:/config
     command: "-V -D -c /config/websocket.cfg"
 
-  nats-token:
-    image: nats
-    ports:
-      - "4221:4222"
-      - "8081:8080"
-    volumes:
-      - ./config:/config
-    command: "-V -D -c /config/websocket.cfg --auth mytoken"
-
-  nats-user:
-    image: nats
-    ports:
-      - "4220:4222"
-      - "8082:8080"
-    volumes:
-      - ./config:/config
-    command: "-V -D -c /config/websocket.cfg --user foo --pass bar"
-
   nats-jwt:
     image: nats
     ports:
@@ -35,5 +17,23 @@ services:
     volumes:
       - ./config:/config
     command: "-V -D -c /config/mem_resolver.cfg"
+
+  nats-token:
+    image: nats
+    ports:
+      - "4224:4222"
+      - "8084:8080"
+    volumes:
+      - ./config:/config
+    command: "-V -D -c /config/websocket.cfg --auth mytoken"
+
+  nats-user:
+    image: nats
+    ports:
+      - "4225:4222"
+      - "8085:8080"
+    volumes:
+      - ./config:/config
+    command: "-V -D -c /config/websocket.cfg --user foo --pass bar"
 
 

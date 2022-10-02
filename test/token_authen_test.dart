@@ -4,7 +4,7 @@ import 'package:dart_nats/dart_nats.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
 
-var port = 8081;
+var port = 8084;
 
 void main() {
   group('all', () {
