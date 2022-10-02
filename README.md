@@ -12,9 +12,6 @@ client.connect(Uri.parse('nats://localhost'));
 client.connect(Uri.parse('ws://localhost:80'));
 ```
 
-## API Change from version 0.2.x
-To support Flutter Web. We change default transport from TCP socket to WebSocket. 
-
 ## Dart Examples:
 
 Run the `example/main.dart`:
@@ -53,7 +50,7 @@ Simply connect to server and subscribe to subject
 ```dart
   void connect() {
     natsClient = nats.Client();
-    natsClient.connect(Uri.parse('wss://demo.nats.io:443');
+    natsClient.connect(Uri.parse('ws://hostname');
     fooSub = natsClient.sub('foo');
     barSub = natsClient.sub('bar');
   }

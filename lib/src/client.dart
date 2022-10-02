@@ -181,6 +181,7 @@ class Client {
       throw Exception('No scheme in uri');
     }
     switch (uri.scheme) {
+      case 'wss':
       case 'ws':
         _wsChannel = WebSocketChannel.connect(uri);
         _stream = _wsChannel!.stream;

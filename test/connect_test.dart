@@ -39,6 +39,19 @@ void main() {
       await client.close();
       expect(String.fromCharCodes(msg.data), equals('message1'));
     });
+    test('wss', () async {
+      var client = Client();
+      await client.connect(Uri.parse('wss://demo.nats.io:443'));
+      var sub = client.sub('subject1');
+      var result = client.pub(
+          'subject1', Uint8List.fromList('message1'.codeUnits),
+          buffer: false);
+      expect(result, true);
+
+      var msg = await sub.stream!.first;
+      await client.close();
+      expect(String.fromCharCodes(msg.data), equals('message1'));
+    });
     test('status stream', () async {
       var client = Client();
       var statusHistory = <Status>[];
