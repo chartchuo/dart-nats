@@ -129,19 +129,19 @@ Full Flutter sample code [example/flutter/main.dart](https://github.com/chartchu
 ## Features
 The following is a list of features currently supported 
 
-* [x] - Publish
-* [x] - Subscribe, unsubscribe
-* [x] - NUID, Inbox
-* [x] - Reconnect to single server when connection lost and resume subscription
-* [x] - Unsubscribe after N message
-* [x] - Request, Respond
-* [x] - Queue subscribe
-* [x] - Request timeout
-* [x] - Events/status 
-* [x] - Buffering message during reconnect atempts
-* [x] - All authentication models, including NATS 2.0 JWT and nkey
-* [x] - NATS 2.x 
+- [x] - Publish
+- [x] - Subscribe, unsubscribe
+- [x] - NUID, Inbox
+- [x] - Reconnect to single server when connection lost and resume subscription
+- [x] - Unsubscribe after N message
+- [x] - Request, Respond
+- [x] - Queue subscribe
+- [x] - Request timeout
+- [x] - Events/status 
+- [x] - Buffering message during reconnect atempts
+- [x] - All authentication models, including NATS 2.0 JWT and nkey
+- [x] - NATS 2.x 
 
 Planned by this client:
-* [ ] - Connect to cluster
-* [ ] - TLS 
+- [ ] - Connect to cluster
+- [ ] - TLS 
