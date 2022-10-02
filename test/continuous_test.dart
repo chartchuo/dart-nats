@@ -42,7 +42,7 @@ void main() {
       //wait for last message send round trip to server
       await Future.delayed(Duration(seconds: 3));
 
-      sub.close();
+      await sub.close();
       await client.close();
 
       expect(r, equals(iteration));

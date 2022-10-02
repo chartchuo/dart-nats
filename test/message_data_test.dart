@@ -33,7 +33,7 @@ void main() {
       var receive = await inboxSub.stream.first;
 
       await requester.close();
-      service.close();
+      await service.close();
       expect(receive.string, equals('respond'));
     });
     test('resquest', () async {
@@ -50,7 +50,7 @@ void main() {
           'service', Uint8List.fromList('request'.codeUnits));
 
       await client.close();
-      service.close();
+      await service.close();
       expect(receive.string, equals('respond'));
     });
     test('long message', () async {
