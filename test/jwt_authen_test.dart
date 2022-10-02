@@ -1,12 +1,10 @@
-import 'dart:io';
-
 import 'package:dart_nats/dart_nats.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('all', () {
-    test('simple', () async {
+  group('jwt', () {
+    test('jwt', () async {
       var client = Client();
       client.seed =
           'SUAJGSBAKQHGYI7ZVKVR6WA7Z5U52URHKGGT6ZICUJXMG4LCTC2NTLQSF4';
@@ -20,7 +18,6 @@ void main() {
           ),
         ),
       );
-      sleep(Duration(seconds: 30));
       var sub = client.sub('subject.foo');
       client.pubString('subject.foo', 'message1');
       var msg = await sub.stream!.first;
