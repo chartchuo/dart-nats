@@ -312,7 +312,7 @@ class Client {
           throw Exception('require TLS but server not required');
         }
 
-        if (_info.tlsRequired ?? false) {
+        if ((_info.tlsRequired ?? false) && _tcpSocket != null) {
           _setStatus(Status.tlsHandshake);
           var secureSocket = await SecureSocket.secure(
             _tcpSocket!,
