@@ -578,7 +578,7 @@ class Client {
   final _inboxs = <String, Subscription>{};
 
   /// Request will send a request payload and deliver the response message,
-  /// TimeoutException on timeout.
+  /// return null on timeout.
   ///
   /// Example:
   /// ```dart
@@ -589,26 +589,35 @@ class Client {
   ///   timeout = true;
   /// }
   /// ```
-  Future<Message> request(String subj, Uint8List data,
-      {String? queueGroup, Duration? timeout}) {
+  Future<Message<T>?> request<T>(String subj, Uint8List data,
+      {String? queueGroup, Duration? timeout}) async {
     if (_inboxs[subj] == null) {
       var inbox = newInbox();
-      _inboxs[subj] = sub(inbox, queueGroup: queueGroup);
+      _inboxs[subj] = sub<T>(inbox, queueGroup: queueGroup);
     }
 
     var stream = _inboxs[subj]!.stream;
 
-    var respond = stream.take(1).single;
     pub(subj, data, replyTo: _inboxs[subj]!.subject);
+    Message resp;
+    try {
+      if (timeout != null) {
+        resp = await stream.take(1).single.timeout(timeout);
+      } else {
+        resp = await stream.take(1).single;
+      }
+    } on TimeoutException {
+      return null;
+    }
 
-    if (timeout != null) return respond.timeout(timeout);
-    return respond;
+    var msg = Message<T>(resp.subject, resp.sid, resp.byte, this);
+    return msg;
   }
 
   /// requestString() helper to request()
-  Future<Message> requestString(String subj, String data,
+  Future<Message<T>?> requestString<T>(String subj, String data,
       {String? queueGroup, Duration? timeout}) {
-    return request(subj, Uint8List.fromList(data.codeUnits),
+    return request<T>(subj, Uint8List.fromList(data.codeUnits),
         queueGroup: queueGroup, timeout: timeout);
   }
 

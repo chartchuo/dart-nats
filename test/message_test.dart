@@ -51,7 +51,7 @@ void main() {
 
       await client.close();
       await service.close();
-      expect(receive.string, equals('respond'));
+      expect(receive?.string, equals('respond'));
     });
     test('long message', () async {
       var txt =

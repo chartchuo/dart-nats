@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -53,7 +52,7 @@ void main() {
 
       await client.close();
       await server.close();
-      expect(receive.string, equals('respond'));
+      expect(receive?.string, equals('respond'));
     });
     test('resquest with timeout', () async {
       var server = Client();
@@ -72,7 +71,7 @@ void main() {
 
       await client.close();
       await server.close();
-      expect(receive.string, equals('respond'));
+      expect(receive?.string, equals('respond'));
     });
     test('resquest with timeout exception', () async {
       var server = Client();
@@ -84,18 +83,15 @@ void main() {
       }));
 
       var client = Client();
-      var timeout = false;
       await client.connect(Uri.parse('ws://localhost:8080'));
-      try {
-        await client.request('service', Uint8List.fromList('request'.codeUnits),
-            timeout: Duration(seconds: 2));
-      } on TimeoutException {
-        timeout = true;
-      }
+
+      var repy = await client.request(
+          'service', Uint8List.fromList('request'.codeUnits),
+          timeout: Duration(seconds: 2));
       await client.close();
       await service.close();
       await server.close();
-      expect(timeout, equals(true));
+      expect(repy, equals(null));
     });
     test('repeat resquest', () async {
       var server = Client();
@@ -118,7 +114,7 @@ void main() {
 
       await client.close();
       await server.close();
-      expect(receive.string, equals('respond'));
+      expect(receive?.string, equals('respond'));
     });
   });
 }
