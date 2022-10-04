@@ -45,6 +45,12 @@ enum Status {
   // draining_pubs,
 }
 
+enum _ClientStatus {
+  init,
+  used,
+  closed,
+}
+
 class _Pub {
   final String? subject;
   final List<int> data;
@@ -55,6 +61,7 @@ class _Pub {
 
 ///NATS client
 class Client {
+  _ClientStatus _clientStatus = _ClientStatus.init;
   WebSocketChannel? _wsChannel;
   Socket? _tcpSocket;
   SecureSocket? _secureSocket;
@@ -125,133 +132,158 @@ class Client {
     Uri uri, {
     ConnectOption? connectOption,
     int timeout = 5,
-    bool retry = true,
+    bool retry = false,
     int retryInterval = 10,
   }) async {
     _connectCompleter = Completer();
+    if (_clientStatus != _ClientStatus.init) {
+      throw Exception(
+          'client in use. only new initial client can call connect');
+    }
+    _clientStatus != _ClientStatus.used;
     if (status != Status.disconnected && status != Status.closed) {
       return Future.error('Error: status not disconnected and not closed');
     }
     if (connectOption != null) _connectOption = connectOption;
     _connectOption.verbose = false;
 
-    void loop() async {
-      for (var retryCount = 0; retryCount == 0 || retry; retryCount++) {
-        if (retryCount == 0) {
-          _setStatus(Status.connecting);
-        } else {
-          _setStatus(Status.reconnecting);
-          await Future.delayed(Duration(seconds: retryInterval));
-        }
-
-        try {
-          await _connectUri(uri, timeout: timeout);
-
-          _setStatus(Status.infoHandshake);
-          retryCount = 0;
-
-          _buffer = [];
-          _channelStream.stream.listen((d) {
-            _buffer.addAll(d);
-            // org code
-            // while (
-            //     _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
-            //   _processOp();
-            // }
-
-            //Thank aktxyz for contribution
-            while (
-                _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
-              var n13 = _buffer.indexOf(13);
-              var msgFull =
-                  String.fromCharCodes(_buffer.take(n13)).toLowerCase().trim();
-              var msgList = msgFull.split(' ');
-              var msgType = msgList[0];
-              //print('... process $msgType ${_buffer.length}');
-
-              if (msgType == 'msg') {
-                var len =
-                    int.parse((msgList.length == 4 ? msgList[3] : msgList[4]));
-                if (len > 0 && _buffer.length < (msgFull.length + len + 4)) {
-                  break; // not a full payload, go around again
-                }
-              }
-
-              _processOp();
-            }
-          }, onDone: () {
-            _setStatus(Status.disconnected);
-            close();
-          }, onError: (err) {
-            _setStatus(Status.disconnected);
-            close();
-          });
-          return;
-        } catch (err) {
-          await close();
-          if (!_connectCompleter.isCompleted) {
-            _connectCompleter.completeError(err);
-          }
-          _setStatus(Status.disconnected);
-        }
-      }
-    }
-
-    loop();
+    _connectLoop(uri,
+        timeout: timeout, retry: retry, retryInterval: retryInterval);
     return _connectCompleter.future;
   }
 
-  Future _connectUri(Uri uri, {int timeout = 5}) async {
-    if (uri.scheme == '') {
-      throw Exception('No scheme in uri');
-    }
-    switch (uri.scheme) {
-      case 'wss':
-      case 'ws':
-        _wsChannel = WebSocketChannel.connect(uri);
-        if (_wsChannel == null) break;
-        _setStatus(Status.infoHandshake);
-        _wsChannel!.stream.listen((event) {
-          if (_channelStream.isClosed) return;
-          _channelStream.add(event);
-        });
-        break;
-      case 'nats':
-        var port = uri.port;
-        if (port == 0) {
-          port = 4222;
+  void _connectLoop(
+    Uri uri, {
+    int timeout = 5,
+    required bool retry,
+    required int retryInterval,
+  }) async {
+    for (var retryCount = 0; retryCount == 0 || retry; retryCount++) {
+      if (retryCount == 0) {
+        _setStatus(Status.connecting);
+      } else {
+        _setStatus(Status.reconnecting);
+        await Future.delayed(Duration(seconds: retryInterval));
+      }
+
+      try {
+        var sucess = await _connectUri(uri, timeout: timeout);
+        if (!sucess) {
+          continue;
         }
-        _tcpSocket = await Socket.connect(uri.host, port,
-            timeout: Duration(seconds: timeout));
-        if (_tcpSocket == null) break;
+
         _setStatus(Status.infoHandshake);
-        _tcpSocket!.listen((event) {
-          if (_secureSocket == null) {
+        retryCount = 0;
+
+        _buffer = [];
+        _channelStream.stream.listen((d) {
+          _buffer.addAll(d);
+          // org code
+          // while (
+          //     _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
+          //   _processOp();
+          // }
+
+          //Thank aktxyz for contribution
+          while (_receiveState == _ReceiveState.idle && _buffer.contains(13)) {
+            var n13 = _buffer.indexOf(13);
+            var msgFull =
+                String.fromCharCodes(_buffer.take(n13)).toLowerCase().trim();
+            var msgList = msgFull.split(' ');
+            var msgType = msgList[0];
+            //print('... process $msgType ${_buffer.length}');
+
+            if (msgType == 'msg') {
+              var len =
+                  int.parse((msgList.length == 4 ? msgList[3] : msgList[4]));
+              if (len > 0 && _buffer.length < (msgFull.length + len + 4)) {
+                break; // not a full payload, go around again
+              }
+            }
+
+            _processOp();
+          }
+        }, onDone: () {
+          _setStatus(Status.disconnected);
+          close();
+        }, onError: (err) {
+          _setStatus(Status.disconnected);
+          close();
+        });
+        return;
+      } catch (err) {
+        await close();
+        if (!_connectCompleter.isCompleted) {
+          _connectCompleter.completeError(err);
+        }
+        _setStatus(Status.disconnected);
+      }
+    }
+    if (!_connectCompleter.isCompleted) {
+      _connectCompleter.completeError('can not connect');
+    }
+  }
+
+  Future<bool> _connectUri(Uri uri, {int timeout = 5}) async {
+    try {
+      if (uri.scheme == '') {
+        throw Exception('No scheme in uri');
+      }
+      switch (uri.scheme) {
+        case 'wss':
+        case 'ws':
+          _wsChannel = WebSocketChannel.connect(uri);
+          if (_wsChannel == null) {
+            return false;
+          }
+          _setStatus(Status.infoHandshake);
+          _wsChannel!.stream.listen((event) {
             if (_channelStream.isClosed) return;
             _channelStream.add(event);
+          });
+          return true;
+        case 'nats':
+          var port = uri.port;
+          if (port == 0) {
+            port = 4222;
           }
-        });
-        break;
-      case 'tls':
-        _tlsRequired = true;
-        var port = uri.port;
-        if (port == 0) {
-          port = 4443;
-        }
-        _tcpSocket = await Socket.connect(uri.host, port,
-            timeout: Duration(seconds: timeout));
-        if (_tcpSocket == null) break;
-        _setStatus(Status.infoHandshake);
-        _tcpSocket!.listen((event) {
-          if (_secureSocket == null) {
-            if (_channelStream.isClosed) return;
-            _channelStream.add(event);
+          _tcpSocket = await Socket.connect(uri.host, port,
+              timeout: Duration(seconds: timeout));
+          if (_tcpSocket == null) {
+            return false;
           }
-        });
-        break;
-      default:
-        throw Exception('schema ${uri.scheme} not support');
+          _setStatus(Status.infoHandshake);
+          _tcpSocket!.listen((event) {
+            if (_secureSocket == null) {
+              if (_channelStream.isClosed) return;
+              _channelStream.add(event);
+            }
+          });
+          return true;
+        case 'tls':
+          _tlsRequired = true;
+          var port = uri.port;
+          if (port == 0) {
+            port = 4443;
+          }
+          _tcpSocket = await Socket.connect(uri.host, port,
+              timeout: Duration(seconds: timeout));
+          if (_tcpSocket == null) break;
+          _setStatus(Status.infoHandshake);
+          _tcpSocket!.listen((event) {
+            if (_secureSocket == null) {
+              if (_channelStream.isClosed) return;
+              _channelStream.add(event);
+            }
+          });
+          return true;
+        default:
+          throw Exception('schema ${uri.scheme} not support');
+      }
+    } catch (e) {
+      return false;
     }
+    return false;
   }
 
   void _backendSubscriptAll() {
@@ -581,6 +613,7 @@ class Client {
     await _channelStream.close();
 
     _buffer = [];
+    _clientStatus = _ClientStatus.closed;
   }
 
   /// discontinue tcpConnect. use connect(uri) instead

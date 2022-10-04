@@ -28,7 +28,7 @@ void main() {
     });
     test('await', () async {
       var client = Client();
-      await client.connect(Uri.parse('ws://localhost:8080'));
+      await client.connect(Uri.parse('nats://localhost'));
       var sub = client.sub('subject1');
       var result = client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),

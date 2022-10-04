@@ -149,4 +149,4 @@ The following is a list of features currently supported:
 - [x] - TLS 
 
 Planned:
-- [ ] - Connect to cluster
+- [ ] - Connect list of servers

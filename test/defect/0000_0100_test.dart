@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dart_nats/dart_nats.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
@@ -21,18 +23,28 @@ import 'package:test/test.dart';
 //   }
 void main() {
   group('all', () {
-    test('0016 Connect to invalid ws connection does not give error', () async {
+    test('0016 ws: Connect to invalid ws connection does not give error',
+        () async {
       var client = Client();
       var gotit = false;
       try {
         await client.connect(Uri.parse('ws://localhost:1234'));
-        client.sub('foo');
-        client.sub('bar');
-        // sleep(Duration(seconds: 20));
       } catch (e) {
         gotit = true;
       }
       await client.close();
+      expect(gotit, equals(true));
+    });
+    test('0016 nats: Connect to invalid ws connection does not give error',
+        () async {
+      var client = Client();
+      var gotit = false;
+      try {
+        await client.connect(Uri.parse('nats://localhost:1234'));
+      } catch (e) {
+        gotit = true;
+      }
+      sleep(Duration(seconds: 1)); //switch to async task
       expect(gotit, equals(true));
     });
     test(
