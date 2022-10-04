@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -83,15 +84,18 @@ void main() {
       }));
 
       var client = Client();
+      var gotit = false;
       await client.connect(Uri.parse('ws://localhost:8080'));
-
-      var repy = await client.request(
-          'service', Uint8List.fromList('request'.codeUnits),
-          timeout: Duration(seconds: 2));
+      try {
+        await client.request('service', Uint8List.fromList('request'.codeUnits),
+            timeout: Duration(seconds: 2));
+      } on TimeoutException {
+        gotit = true;
+      }
       await client.close();
       await service.close();
       await server.close();
-      expect(repy, equals(null));
+      expect(gotit, equals(true));
     });
     test('repeat resquest', () async {
       var server = Client();
