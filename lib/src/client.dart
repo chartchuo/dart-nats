@@ -578,7 +578,7 @@ class Client {
   final _inboxs = <String, Subscription>{};
 
   /// Request will send a request payload and deliver the response message,
-  /// return null on timeout.
+  /// TimeoutException on timeout.
   ///
   /// Example:
   /// ```dart
@@ -589,7 +589,7 @@ class Client {
   ///   timeout = true;
   /// }
   /// ```
-  Future<Message<T>?> request<T>(String subj, Uint8List data,
+  Future<Message<T>> request<T>(String subj, Uint8List data,
       {String? queueGroup, Duration? timeout}) async {
     if (_inboxs[subj] == null) {
       var inbox = newInbox();
@@ -600,14 +600,10 @@ class Client {
 
     pub(subj, data, replyTo: _inboxs[subj]!.subject);
     Message resp;
-    try {
-      if (timeout != null) {
-        resp = await stream.take(1).single.timeout(timeout);
-      } else {
-        resp = await stream.take(1).single;
-      }
-    } on TimeoutException {
-      return null;
+    if (timeout != null) {
+      resp = await stream.take(1).single.timeout(timeout);
+    } else {
+      resp = await stream.take(1).single;
     }
 
     var msg = Message<T>(resp.subject, resp.sid, resp.byte, this);
@@ -615,7 +611,7 @@ class Client {
   }
 
   /// requestString() helper to request()
-  Future<Message<T>?> requestString<T>(String subj, String data,
+  Future<Message<T>> requestString<T>(String subj, String data,
       {String? queueGroup, Duration? timeout}) {
     return request<T>(subj, Uint8List.fromList(data.codeUnits),
         queueGroup: queueGroup, timeout: timeout);

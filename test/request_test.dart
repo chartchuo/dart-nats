@@ -52,7 +52,7 @@ void main() {
 
       await client.close();
       await server.close();
-      expect(receive?.string, equals('respond'));
+      expect(receive.string, equals('respond'));
     });
     test('resquest with timeout', () async {
       var server = Client();
@@ -71,7 +71,7 @@ void main() {
 
       await client.close();
       await server.close();
-      expect(receive?.string, equals('respond'));
+      expect(receive.string, equals('respond'));
     });
     test('resquest with timeout exception', () async {
       var server = Client();
@@ -114,7 +114,7 @@ void main() {
 
       await client.close();
       await server.close();
-      expect(receive?.string, equals('respond'));
+      expect(receive.string, equals('respond'));
     });
   });
 }

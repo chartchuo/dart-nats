@@ -73,7 +73,7 @@ void main() {
       await client.connect(Uri.parse('ws://localhost:8080'));
       var receive =
           await client.requestString('service', jsonEncode(s1.toJson()));
-      var s2 = Student.fromJson(jsonDecode(receive!.string));
+      var s2 = Student.fromJson(jsonDecode(receive.string));
       await client.close();
       await server.close();
       expect(s1.score, equals(s2.score));
