@@ -189,3 +189,19 @@ class ConnectOption {
     return _removeNull(data);
   }
 }
+
+/// NatsException
+class NatsException implements Exception {
+  /// Description of the cause of the timeout.
+  final String? message;
+
+  /// NatsException
+  NatsException(this.message);
+
+  @override
+  String toString() {
+    var result = 'NatsException';
+    if (message != null) result = '$result: $message';
+    return result;
+  }
+}

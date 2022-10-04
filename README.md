@@ -9,10 +9,20 @@ A Dart client for the [NATS](https://nats.io) messaging system. Design to use wi
 client.connect(Uri.parse('ws://localhost:80'));
 ```
 
+
 ### Flutter Other Platform Support by TCP Socket and WebSocket
 ```dart
 client.connect(Uri.parse('nats://localhost'));
 client.connect(Uri.parse('ws://localhost:80'));
+```
+
+### Turn off background retry and catch exception
+```dart
+try {
+  await client.connect(Uri.parse('ws://localhost:1234'), retry: false);
+} on NatsException {
+  //Error handle
+}
 ```
 
 ## Dart Examples:
@@ -125,6 +135,7 @@ client.connect(
   ),
 );
 ```
+
 
 
 

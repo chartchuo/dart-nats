@@ -1,3 +1,6 @@
+## 0.4.6
+* fix bug #16 Connect to invalid ws connection does not give error
+
 ## 0.4.5
 * fix bug wss: connecting bug
 

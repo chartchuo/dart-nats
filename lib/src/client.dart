@@ -5,7 +5,6 @@ import 'dart:typed_data';
 
 import 'package:base32/base32.dart';
 import 'package:cryptography/cryptography.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'common.dart';
 import 'inbox.dart';
@@ -62,7 +61,7 @@ class _Pub {
 ///NATS client
 class Client {
   _ClientStatus _clientStatus = _ClientStatus.init;
-  WebSocketChannel? _wsChannel;
+  WebSocket? _wsChannel;
   Socket? _tcpSocket;
   SecureSocket? _secureSocket;
   bool _tlsRequired = false;
@@ -75,7 +74,7 @@ class Client {
 
   final _statusController = StreamController<Status>();
 
-  final _channelStream = StreamController();
+  var _channelStream = StreamController();
 
   ///status of the client
   Status get status => _status;
@@ -132,7 +131,7 @@ class Client {
     Uri uri, {
     ConnectOption? connectOption,
     int timeout = 5,
-    bool retry = false,
+    bool retry = true,
     int retryInterval = 10,
   }) async {
     _connectCompleter = Completer();
@@ -167,6 +166,9 @@ class Client {
       }
 
       try {
+        if (_channelStream.isClosed) {
+          _channelStream = StreamController();
+        }
         var sucess = await _connectUri(uri, timeout: timeout);
         if (!sucess) {
           continue;
@@ -220,7 +222,9 @@ class Client {
       }
     }
     if (!_connectCompleter.isCompleted) {
-      _connectCompleter.completeError('can not connect');
+      _clientStatus = _ClientStatus.init;
+      _connectCompleter
+          .completeError(NatsException('can not connect ${uri.toString()}'));
     }
   }
 
@@ -232,12 +236,16 @@ class Client {
       switch (uri.scheme) {
         case 'wss':
         case 'ws':
-          _wsChannel = WebSocketChannel.connect(uri);
+          try {
+            _wsChannel = await WebSocket.connect(uri.toString());
+          } catch (e) {
+            return false;
+          }
           if (_wsChannel == null) {
             return false;
           }
           _setStatus(Status.infoHandshake);
-          _wsChannel!.stream.listen((event) {
+          _wsChannel?.listen((event) {
             if (_channelStream.isClosed) return;
             _channelStream.add(event);
           });
@@ -528,7 +536,7 @@ class Client {
   void _add(String str) {
     if (_wsChannel != null) {
       // if (_wsChannel?.closeCode == null) return;
-      _wsChannel!.sink.add(utf8.encode(str + '\r\n'));
+      _wsChannel?.add(utf8.encode(str + '\r\n'));
       return;
     } else if (_secureSocket != null) {
       _secureSocket!.add(utf8.encode(str + '\r\n'));
@@ -542,16 +550,16 @@ class Client {
 
   void _addByte(List<int> msg) {
     if (_wsChannel != null) {
-      _wsChannel!.sink.add(msg);
-      _wsChannel!.sink.add(utf8.encode('\r\n'));
+      _wsChannel?.add(msg);
+      _wsChannel?.add(utf8.encode('\r\n'));
       return;
     } else if (_secureSocket != null) {
-      _secureSocket!.add(msg);
-      _secureSocket!.add(utf8.encode('\r\n'));
+      _secureSocket?.add(msg);
+      _secureSocket?.add(utf8.encode('\r\n'));
       return;
     } else if (_tcpSocket != null) {
-      _tcpSocket!.add(msg);
-      _tcpSocket!.add(utf8.encode('\r\n'));
+      _tcpSocket?.add(msg);
+      _tcpSocket?.add(utf8.encode('\r\n'));
       return;
     }
     throw Exception('no connection');
@@ -601,16 +609,19 @@ class Client {
 
   ///close connection to NATS server unsub to server but still keep subscription list at client
   Future close() async {
+    _setStatus(Status.closed);
+    if (_clientStatus == _ClientStatus.init) return;
     _backendSubs.forEach((_, s) => s = false);
     _inboxs.clear();
-    _setStatus(Status.closed);
-    await _wsChannel?.sink.close();
+    await _wsChannel?.close();
     _wsChannel = null;
     await _secureSocket?.close();
     _secureSocket = null;
     await _tcpSocket?.close();
     _tcpSocket = null;
-    await _channelStream.close();
+    if (!_channelStream.isClosed) {
+      await _channelStream.close();
+    }
 
     _buffer = [];
     _clientStatus = _ClientStatus.closed;

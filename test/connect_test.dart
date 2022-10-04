@@ -46,7 +46,7 @@ void main() {
         // print(s);
         statusHistory.add(s);
       });
-      await client.connect(Uri.parse('ws://localhost:8080'), retryInterval: 1);
+      await client.connect(Uri.parse('ws://localhost:8080'));
       await client.close();
 
       // no runtime error should be fine

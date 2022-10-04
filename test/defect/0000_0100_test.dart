@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dart_nats/dart_nats.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
@@ -28,8 +26,8 @@ void main() {
       var client = Client();
       var gotit = false;
       try {
-        await client.connect(Uri.parse('ws://localhost:1234'));
-      } catch (e) {
+        await client.connect(Uri.parse('ws://localhost:1234'), retry: false);
+      } on NatsException {
         gotit = true;
       }
       await client.close();
@@ -40,19 +38,17 @@ void main() {
       var client = Client();
       var gotit = false;
       try {
-        await client.connect(Uri.parse('nats://localhost:1234'));
-      } catch (e) {
+        await client.connect(Uri.parse('nats://localhost:1234'), retry: false);
+      } on NatsException {
         gotit = true;
       }
-      sleep(Duration(seconds: 1)); //switch to async task
       expect(gotit, equals(true));
     });
     test(
         '0020 larger MSG payloads not always working, check if full payload present in buffer',
         () async {
       var client = Client();
-      unawaited(
-          client.connect(Uri.parse('nats://localhost'), retryInterval: 1));
+      unawaited(client.connect(Uri.parse('nats://localhost')));
       var sub = client.sub('subject1');
       var str21k = '';
       for (var i = 0; i < 21000; i++) {
