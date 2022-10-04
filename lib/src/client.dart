@@ -93,7 +93,7 @@ class Client {
     // todo validate newseed
     var raw = base32.decode(newseed);
 
-    if (raw.length != 36) throw Exception('invalid seed');
+    if (raw.length != 36) throw Exception(NatsException('invalid seed'));
     _seed = newseed;
   }
 
@@ -126,6 +126,46 @@ class Client {
     }
   }
 
+  ///NATS Client Constructure
+  Client() {
+    _steamHandle();
+  }
+  void _steamHandle() {
+    _channelStream.stream.listen((d) {
+      _buffer.addAll(d);
+      // org code
+      // while (
+      //     _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
+      //   _processOp();
+      // }
+
+      //Thank aktxyz for contribution
+      while (_receiveState == _ReceiveState.idle && _buffer.contains(13)) {
+        var n13 = _buffer.indexOf(13);
+        var msgFull =
+            String.fromCharCodes(_buffer.take(n13)).toLowerCase().trim();
+        var msgList = msgFull.split(' ');
+        var msgType = msgList[0];
+        //print('... process $msgType ${_buffer.length}');
+
+        if (msgType == 'msg') {
+          var len = int.parse((msgList.length == 4 ? msgList[3] : msgList[4]));
+          if (len > 0 && _buffer.length < (msgFull.length + len + 4)) {
+            break; // not a full payload, go around again
+          }
+        }
+
+        _processOp();
+      }
+    }, onDone: () {
+      _setStatus(Status.disconnected);
+      close();
+    }, onError: (err) {
+      _setStatus(Status.disconnected);
+      close();
+    });
+  }
+
   /// Connect to NATS server
   Future connect(
     Uri uri, {
@@ -133,11 +173,12 @@ class Client {
     int timeout = 5,
     bool retry = true,
     int retryInterval = 10,
+    int retryCount = 3,
   }) async {
     _connectCompleter = Completer();
     if (_clientStatus != _ClientStatus.init) {
-      throw Exception(
-          'client in use. only new initial client can call connect');
+      throw Exception(NatsException(
+          'client in use. only new initial client can call connect'));
     }
     _clientStatus != _ClientStatus.used;
     if (status != Status.disconnected && status != Status.closed) {
@@ -145,24 +186,26 @@ class Client {
     }
     if (connectOption != null) _connectOption = connectOption;
     _connectOption.verbose = false;
-
-    _connectLoop(uri,
-        timeout: timeout, retry: retry, retryInterval: retryInterval);
+    _connectLoop(
+      uri,
+      timeout: timeout,
+      retry: retry,
+      retryInterval: retryInterval,
+      retryCount: retryCount,
+    );
     return _connectCompleter.future;
   }
 
-  void _connectLoop(
-    Uri uri, {
-    int timeout = 5,
-    required bool retry,
-    required int retryInterval,
-  }) async {
-    for (var retryCount = 0; retryCount == 0 || retry; retryCount++) {
-      if (retryCount == 0) {
+  void _connectLoop(Uri uri,
+      {int timeout = 5,
+      required bool retry,
+      required int retryInterval,
+      required int retryCount}) async {
+    for (var count = 0; count < retryCount && retry; count++) {
+      if (count == 0) {
         _setStatus(Status.connecting);
       } else {
         _setStatus(Status.reconnecting);
-        await Future.delayed(Duration(seconds: retryInterval));
       }
 
       try {
@@ -171,47 +214,14 @@ class Client {
         }
         var sucess = await _connectUri(uri, timeout: timeout);
         if (!sucess) {
+          await Future.delayed(Duration(seconds: retryInterval));
           continue;
         }
 
-        _setStatus(Status.infoHandshake);
-        retryCount = 0;
+        // _setStatus(Status.infoHandshake);
 
         _buffer = [];
-        _channelStream.stream.listen((d) {
-          _buffer.addAll(d);
-          // org code
-          // while (
-          //     _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
-          //   _processOp();
-          // }
 
-          //Thank aktxyz for contribution
-          while (_receiveState == _ReceiveState.idle && _buffer.contains(13)) {
-            var n13 = _buffer.indexOf(13);
-            var msgFull =
-                String.fromCharCodes(_buffer.take(n13)).toLowerCase().trim();
-            var msgList = msgFull.split(' ');
-            var msgType = msgList[0];
-            //print('... process $msgType ${_buffer.length}');
-
-            if (msgType == 'msg') {
-              var len =
-                  int.parse((msgList.length == 4 ? msgList[3] : msgList[4]));
-              if (len > 0 && _buffer.length < (msgFull.length + len + 4)) {
-                break; // not a full payload, go around again
-              }
-            }
-
-            _processOp();
-          }
-        }, onDone: () {
-          _setStatus(Status.disconnected);
-          close();
-        }, onError: (err) {
-          _setStatus(Status.disconnected);
-          close();
-        });
         return;
       } catch (err) {
         await close();
@@ -231,7 +241,7 @@ class Client {
   Future<bool> _connectUri(Uri uri, {int timeout = 5}) async {
     try {
       if (uri.scheme == '') {
-        throw Exception('No scheme in uri');
+        throw Exception(NatsException('No scheme in uri'));
       }
       switch (uri.scheme) {
         case 'wss':
@@ -286,7 +296,7 @@ class Client {
           });
           return true;
         default:
-          throw Exception('schema ${uri.scheme} not support');
+          throw Exception(NatsException('schema ${uri.scheme} not support'));
       }
     } catch (e) {
       return false;
@@ -349,7 +359,7 @@ class Client {
       case 'info':
         _info = Info.fromJson(jsonDecode(data));
         if (_tlsRequired && !(_info.tlsRequired ?? false)) {
-          throw Exception('require TLS but server not required');
+          throw Exception(NatsException('require TLS but server not required'));
         }
 
         if ((_info.tlsRequired ?? false) && _tcpSocket != null) {
@@ -545,7 +555,7 @@ class Client {
       _tcpSocket!.add(utf8.encode(str + '\r\n'));
       return;
     }
-    throw Exception('no connection');
+    throw Exception(NatsException('no connection'));
   }
 
   void _addByte(List<int> msg) {
@@ -562,7 +572,7 @@ class Client {
       _tcpSocket?.add(utf8.encode('\r\n'));
       return;
     }
-    throw Exception('no connection');
+    throw Exception(NatsException('no connection'));
   }
 
   final _inboxs = <String, Subscription>{};
@@ -610,7 +620,6 @@ class Client {
   ///close connection to NATS server unsub to server but still keep subscription list at client
   Future close() async {
     _setStatus(Status.closed);
-    if (_clientStatus == _ClientStatus.init) return;
     _backendSubs.forEach((_, s) => s = false);
     _inboxs.clear();
     await _wsChannel?.close();
@@ -619,9 +628,6 @@ class Client {
     _secureSocket = null;
     await _tcpSocket?.close();
     _tcpSocket = null;
-    if (!_channelStream.isClosed) {
-      await _channelStream.close();
-    }
 
     _buffer = [];
     _clientStatus = _ClientStatus.closed;
