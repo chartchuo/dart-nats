@@ -83,20 +83,20 @@ class Nkeys {
   }
 
   /// get public key
-  Future<String> publicKey() async {
-    var pub = await keyPair.extractPublicKey();
-    var bytes = <int>[prefixByte];
-    bytes.addAll(pub.bytes);
-    return _encode(prefixByte, bytes);
-  }
+  // Future<String> publicKey() async {
+  //   var pub = await keyPair.extractPublicKey();
+  //   var bytes = <int>[prefixByte];
+  //   bytes.addAll(pub.bytes);
+  //   return _encode(prefixByte, bytes);
+  // }
 
   /// get private key
-  Future<String> privateKey() async {
-    var pri = await keyPair.extractPrivateKeyBytes();
-    var bytes = <int>[prefixByte];
-    bytes.addAll(pri);
-    return _encode(PrefixBytePrivate, bytes);
-  }
+  // Future<String> privateKey() async {
+  //   var pri = await keyPair.extractPrivateKeyBytes();
+  //   var bytes = <int>[prefixByte];
+  //   bytes.addAll(pri);
+  //   return _encode(PrefixBytePrivate, bytes);
+  // }
 
   /// Sign message
   Future<Signature> sign(List<int> message) {
@@ -105,27 +105,27 @@ class Nkeys {
   }
 
   /// verify
-  static Future<bool> verify(List<int> message, Signature signature) {
-    var ed = DartEd25519();
-    return ed.verify(message, signature: signature);
-  }
+  // static Future<bool> verify(List<int> message, Signature signature) {
+  //   var ed = DartEd25519();
+  //   return ed.verify(message, signature: signature);
+  // }
 }
 
-int _prefix(String src) {
-  var b = base32.decode(src);
+// int _prefix(String src) {
+//   var b = base32.decode(src);
 
-  var prefix = b[0];
-  if (_checkValidPrefixByte(prefix)) {
-    return prefix;
-  }
+//   var prefix = b[0];
+//   if (_checkValidPrefixByte(prefix)) {
+//     return prefix;
+//   }
 
-  // Might be a seed.
-  var b1 = b[0] & 248;
-  if (b1 == PrefixByteSeed) {
-    return PrefixByteSeed;
-  }
-  return PrefixByteUnknown;
-}
+//   // Might be a seed.
+//   var b1 = b[0] & 248;
+//   if (b1 == PrefixByteSeed) {
+//     return PrefixByteSeed;
+//   }
+//   return PrefixByteUnknown;
+// }
 
 int _checkValidPublicPrefixByte(int prefix) {
   switch (prefix) {
@@ -153,20 +153,20 @@ bool _checkValidPrefixByte(int prefix) {
   return false;
 }
 
-String _encode(int prefix, List<int> src) {
-  if (!_checkValidPrefixByte(prefix)) {
-    throw NkeysException('encode invalid prefix');
-  }
+// String _encode(int prefix, List<int> src) {
+//   if (!_checkValidPrefixByte(prefix)) {
+//     throw NkeysException('encode invalid prefix');
+//   }
 
-  var raw = [prefix];
-  raw.addAll(src);
+//   var raw = [prefix];
+//   raw.addAll(src);
 
-  // Calculate and write crc16 checksum
-  raw.addAll(_crc16(raw));
-  var bytes = Uint8List.fromList(raw);
+//   // Calculate and write crc16 checksum
+//   raw.addAll(_crc16(raw));
+//   var bytes = Uint8List.fromList(raw);
 
-  return _b32Encode(bytes);
-}
+//   return _b32Encode(bytes);
+// }
 
 Uint8List _crc16(List<int> bytes) {
   // CCITT

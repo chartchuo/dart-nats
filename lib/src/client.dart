@@ -116,14 +116,6 @@ class Client {
       var nkeys = await Nkeys.fromSeed(seed);
       var sig = await nkeys.sign(utf8.encode(_info.nonce ?? ''));
 
-      // var algo = DartEd25519();
-      // var raw = base32.decode(seed);
-      // var key = raw.sublist(2, 34);
-
-      // var keyPair = await algo.newKeyPairFromSeed(key);
-
-      // var sig =
-      //     await algo.sign(utf8.encode(_info.nonce ?? ''), keyPair: keyPair);
       _connectOption.sig = base64.encode(sig.bytes);
     }
   }
@@ -219,8 +211,6 @@ class Client {
           await Future.delayed(Duration(seconds: retryInterval));
           continue;
         }
-
-        // _setStatus(Status.infoHandshake);
 
         _buffer = [];
 
