@@ -26,6 +26,14 @@ void main() {
         () async {
       var client = Client();
       var gotit = false;
+      client.statusStream.listen(
+        (s) {
+          print(s);
+        },
+        onError: (e) {
+          gotit = true;
+        },
+      );
       try {
         await client.connect(Uri.parse('ws://localhost:1234'),
             retry: false, retryInterval: 1);

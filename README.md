@@ -19,7 +19,7 @@ client.connect(Uri.parse('ws://localhost:80'));
 ### Turn off background retry and catch exception
 ```dart
 try {
-  await client.connect(Uri.parse('ws://localhost:1234'), retry: false);
+  await client.connect(Uri.parse('nats://localhost:1234'), retry: false);
 } on NatsException {
   //Error handle
 }

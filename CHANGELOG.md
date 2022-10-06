@@ -1,3 +1,6 @@
+## 0.4.8
+* fix #23 Unsupported operation: Platform._version
+
 ## 0.4.7
 * add generic type to client.request()
 * fix reconnect issue

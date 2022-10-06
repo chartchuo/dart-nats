@@ -4,14 +4,13 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:base32/base32.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'common.dart';
 import 'inbox.dart';
 import 'message.dart';
 import 'nkeys.dart';
 import 'subscription.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
-
 
 enum _ReceiveState {
   idle, //op=msg -> msg
@@ -241,7 +240,7 @@ class Client {
         case 'wss':
         case 'ws':
           try {
-            _wsChannel =  WebSocketChannel.connect(uri);
+            _wsChannel = WebSocketChannel.connect(uri);
           } catch (e) {
             return false;
           }
@@ -252,6 +251,9 @@ class Client {
           _wsChannel?.stream.listen((event) {
             if (_channelStream.isClosed) return;
             _channelStream.add(event);
+          }, onError: (e) {
+            close();
+            throw NatsException('listen ws error: $e');
           });
           return true;
         case 'nats':

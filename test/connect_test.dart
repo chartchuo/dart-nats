@@ -114,17 +114,18 @@ void main() {
     test('status stream retry fail', () async {
       var client = Client();
       var statusHistory = <Status>[];
-      client.statusStream.listen((s) {
-        // print(s);
-        statusHistory.add(s);
-      });
       try {
+        client.statusStream.listen((s) {
+          print(s);
+          statusHistory.add(s);
+        });
         await client.connect(
-          Uri.parse('ws://localhost:1234'),
+          Uri.parse('nats://localhost:1234'),
           retry: true,
           retryCount: 3,
           retryInterval: 1,
         );
+        print('after connect');
       } on NatsException {
         //
       } on WebSocketChannelException {
