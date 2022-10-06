@@ -10,6 +10,8 @@ import 'common.dart';
 import 'inbox.dart';
 import 'message.dart';
 import 'subscription.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+
 
 enum _ReceiveState {
   idle, //op=msg -> msg
@@ -61,7 +63,7 @@ class _Pub {
 ///NATS client
 class Client {
   _ClientStatus _clientStatus = _ClientStatus.init;
-  WebSocket? _wsChannel;
+  WebSocketChannel? _wsChannel;
   Socket? _tcpSocket;
   SecureSocket? _secureSocket;
   bool _tlsRequired = false;
@@ -247,7 +249,7 @@ class Client {
         case 'wss':
         case 'ws':
           try {
-            _wsChannel = await WebSocket.connect(uri.toString());
+            _wsChannel =  WebSocketChannel.connect(uri);
           } catch (e) {
             return false;
           }
@@ -255,7 +257,7 @@ class Client {
             return false;
           }
           _setStatus(Status.infoHandshake);
-          _wsChannel?.listen((event) {
+          _wsChannel?.stream.listen((event) {
             if (_channelStream.isClosed) return;
             _channelStream.add(event);
           });
@@ -546,7 +548,7 @@ class Client {
   void _add(String str) {
     if (_wsChannel != null) {
       // if (_wsChannel?.closeCode == null) return;
-      _wsChannel?.add(utf8.encode(str + '\r\n'));
+      _wsChannel?.sink.add(utf8.encode(str + '\r\n'));
       return;
     } else if (_secureSocket != null) {
       _secureSocket!.add(utf8.encode(str + '\r\n'));
@@ -560,8 +562,8 @@ class Client {
 
   void _addByte(List<int> msg) {
     if (_wsChannel != null) {
-      _wsChannel?.add(msg);
-      _wsChannel?.add(utf8.encode('\r\n'));
+      _wsChannel?.sink.add(msg);
+      _wsChannel?.sink.add(utf8.encode('\r\n'));
       return;
     } else if (_secureSocket != null) {
       _secureSocket?.add(msg);
@@ -627,7 +629,7 @@ class Client {
     _setStatus(Status.closed);
     _backendSubs.forEach((_, s) => s = false);
     _inboxs.clear();
-    await _wsChannel?.close();
+    await _wsChannel?.sink.close();
     _wsChannel = null;
     await _secureSocket?.close();
     _secureSocket = null;
