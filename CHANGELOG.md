@@ -1,5 +1,5 @@
 ## 0.4.7
-* add generic type to client.request<T>()
+* add generic type to client.request()
 * fix reconnect issue
 * fix retry issue
 
