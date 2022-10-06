@@ -1,6 +1,7 @@
 import 'package:dart_nats/dart_nats.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 // larger MSG payloads not always working, check if full payload present in buffer #20
 //  while (_receiveState == _ReceiveState.idle && _buffer.contains(13)) {
 
@@ -29,6 +30,10 @@ void main() {
         await client.connect(Uri.parse('ws://localhost:1234'),
             retry: false, retryInterval: 1);
       } on NatsException {
+        gotit = true;
+      } on WebSocketChannelException {
+        gotit = true;
+      } catch (e) {
         gotit = true;
       }
       await client.close();
