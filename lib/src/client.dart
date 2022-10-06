@@ -4,11 +4,11 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:base32/base32.dart';
-import 'package:cryptography/cryptography.dart';
 
 import 'common.dart';
 import 'inbox.dart';
 import 'message.dart';
+import 'nkeys.dart';
 import 'subscription.dart';
 
 enum _ReceiveState {
@@ -113,15 +113,17 @@ class Client {
   String _receiveLine1 = '';
   Future _sign() async {
     if (_info.nonce != null) {
-      var algo = Ed25519();
-      var raw = base32.decode(seed);
-      var key = raw.sublist(2, 34);
+      var nkeys = await Nkeys.fromSeed(seed);
+      var sig = await nkeys.sign(utf8.encode(_info.nonce ?? ''));
 
-      var keyPair = await algo.newKeyPairFromSeed(key);
+      // var algo = DartEd25519();
+      // var raw = base32.decode(seed);
+      // var key = raw.sublist(2, 34);
 
-      var sig =
-          await algo.sign(utf8.encode(_info.nonce ?? ''), keyPair: keyPair);
+      // var keyPair = await algo.newKeyPairFromSeed(key);
 
+      // var sig =
+      //     await algo.sign(utf8.encode(_info.nonce ?? ''), keyPair: keyPair);
       _connectOption.sig = base64.encode(sig.bytes);
     }
   }
@@ -176,9 +178,9 @@ class Client {
     int retryCount = 3,
   }) async {
     _connectCompleter = Completer();
-    if (_clientStatus != _ClientStatus.init) {
-      throw Exception(NatsException(
-          'client in use. only new initial client can call connect'));
+    if (_clientStatus == _ClientStatus.used) {
+      throw Exception(
+          NatsException('client in use. must close before call connect'));
     }
     _clientStatus != _ClientStatus.used;
     if (status != Status.disconnected && status != Status.closed) {
@@ -201,7 +203,7 @@ class Client {
       required bool retry,
       required int retryInterval,
       required int retryCount}) async {
-    for (var count = 0; count < retryCount && retry; count++) {
+    for (var count = 0; count == 0 || (count < retryCount && retry); count++) {
       if (count == 0) {
         _setStatus(Status.connecting);
       } else {

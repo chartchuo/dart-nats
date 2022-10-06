@@ -190,7 +190,7 @@ class ConnectOption {
   }
 }
 
-/// NatsException
+/// Nats Exception
 class NatsException implements Exception {
   /// Description of the cause of the timeout.
   final String? message;
@@ -201,6 +201,22 @@ class NatsException implements Exception {
   @override
   String toString() {
     var result = 'NatsException';
+    if (message != null) result = '$result: $message';
+    return result;
+  }
+}
+
+/// nkeys Exception
+class NkeysException implements Exception {
+  /// Description of the cause of the timeout.
+  final String? message;
+
+  /// NkeysException
+  NkeysException(this.message);
+
+  @override
+  String toString() {
+    var result = 'NkeysException';
     if (message != null) result = '$result: $message';
     return result;
   }

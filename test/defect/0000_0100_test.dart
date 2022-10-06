@@ -26,7 +26,8 @@ void main() {
       var client = Client();
       var gotit = false;
       try {
-        await client.connect(Uri.parse('ws://localhost:1234'), retry: false);
+        await client.connect(Uri.parse('ws://localhost:1234'),
+            retry: false, retryInterval: 1);
       } on NatsException {
         gotit = true;
       }
@@ -38,7 +39,8 @@ void main() {
       var client = Client();
       var gotit = false;
       try {
-        await client.connect(Uri.parse('nats://localhost:1234'), retry: false);
+        await client.connect(Uri.parse('nats://localhost:1234'),
+            retry: false, retryInterval: 1);
       } on NatsException {
         gotit = true;
       }

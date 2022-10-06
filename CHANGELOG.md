@@ -1,3 +1,8 @@
+## 0.4.7
+* add generic type to client.request<T>()
+* fix reconnect issue
+* fix retry issue
+
 ## 0.4.6
 * fix bug #16 Connect to invalid ws connection does not give error
 
