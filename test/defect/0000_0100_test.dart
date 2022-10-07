@@ -74,5 +74,15 @@ void main() {
       await client.close();
       expect(msg.string, equals(str21k));
     });
+    test('0022 Connection to nats with macos and mobile:', () async {
+      var client = Client();
+      unawaited(
+          client.connect(Uri.parse('nats://demo.nats.io'), retryInterval: 1));
+      var sub = client.sub('subject1');
+      client.pubString('subject1', 'message1');
+      var msg = await sub.stream.first;
+      await client.close();
+      expect(String.fromCharCodes(msg.byte), equals('message1'));
+    });
   });
 }

@@ -1,5 +1,8 @@
+## 0.4.9
+* fix #22 error when connect to nats://demo.nats.io
+
 ## 0.4.8
-* fix #23 Unsupported operation: Platform._version
+* fix #23 Unsupported operation: Platform._version with WebSocket
 
 ## 0.4.7
 * add generic type to client.request()

@@ -113,7 +113,7 @@ class Client {
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
   Future _sign() async {
-    if (_info.nonce != null) {
+    if (_info.nonce != null && seed != '') {
       var nkeys = await Nkeys.fromSeed(seed);
       var sig = await nkeys.sign(utf8.encode(_info.nonce ?? ''));
 
