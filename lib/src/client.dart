@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:base32/base32.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'common.dart';
@@ -88,17 +87,17 @@ class Client {
 
   var _connectOption = ConnectOption(verbose: false);
 
+  Nkeys? _nkeys;
+
   /// Nkeys seed
-  String get seed => _seed;
-  set seed(String newseed) {
-    // todo validate newseed
-    var raw = base32.decode(newseed);
-
-    if (raw.length != 36) throw Exception(NatsException('invalid seed'));
-    _seed = newseed;
+  String? get seed => _nkeys?.seed;
+  set seed(String? newseed) {
+    if (newseed == null) {
+      _nkeys = null;
+      return;
+    }
+    _nkeys = Nkeys.fromSeed(newseed);
   }
-
-  String _seed = '';
 
   ///server info
   Info? get info => _info;
@@ -113,11 +112,10 @@ class Client {
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
   Future _sign() async {
-    if (_info.nonce != null && seed != '') {
-      var nkeys = Nkeys.fromSeed(seed);
-      var sig = nkeys.sign(utf8.encode(_info.nonce ?? ''));
+    if (_info.nonce != null && seed != null) {
+      var sig = _nkeys?.sign(utf8.encode(_info.nonce ?? ''));
 
-      _connectOption.sig = base64.encode(sig);
+      _connectOption.sig = base64.encode(sig!);
     }
   }
 
