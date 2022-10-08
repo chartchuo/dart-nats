@@ -113,28 +113,6 @@ void main() {
       await server.close();
       expect(s1.score, equals(s2.score));
     });
-    test('resquest register jsonEncoder', () async {
-      var server = Client();
-      server.registerJsonDecoder<Student>(json2Student);
-      server.registerJsonEncoder<Student>(student2json);
-      await server.connect(Uri.parse('nats://localhost:4222'));
-      var service = server.sub<Student>('service');
-      unawaited(service.stream.first.then((m) {
-        m.respondString(jsonEncode(m.data.toJson()));
-      }));
-
-      var client = Client();
-      var s1 = Student('id', 'name', 1);
-      client.registerJsonDecoder<Student>(json2Student);
-      client.registerJsonEncoder<Student>(student2json);
-      await client.connect(Uri.parse('ws://localhost:8080'));
-      var receive = await client.requestString<Student>(
-          'service', jsonEncode(s1.toJson()));
-      var s2 = receive.data;
-      await client.close();
-      await server.close();
-      expect(s1.score, equals(s2.score));
-    });
   });
 }
 

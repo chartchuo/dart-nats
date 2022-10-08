@@ -100,9 +100,9 @@ class Client {
   }
 
   final _jsonDecoder = <Type, dynamic Function(String)>{};
-  final _jsonEncoder = <Type, String Function(dynamic)>{};
+  // final _jsonEncoder = <Type, String Function(Type)>{};
 
-  /// add json encoder for type <T>
+  /// add json decoder for type <T>
   void registerJsonDecoder<T>(T Function(String) f) {
     if (T == dynamic) {
       NatsException('can not register dyname type');
@@ -111,12 +111,12 @@ class Client {
   }
 
   /// add json encoder for type <T>
-  void registerJsonEncoder<T>(String Function(T) f) {
-    if (T == dynamic) {
-      NatsException('can not register dyname type');
-    }
-    _jsonDecoder[T] = f;
-  }
+  // void registerJsonEncoder<T>(String Function(T) f) {
+  //   if (T == dynamic) {
+  //     NatsException('can not register dyname type');
+  //   }
+  //   _jsonEncoder[T] = f as String Function(Type);
+  // }
 
   ///server info
   Info? get info => _info;
@@ -467,7 +467,6 @@ class Client {
   var defaultPubBuffer = true;
 
   ///publish by byte (Uint8List) return true if sucess sending or buffering
-  ///data can be Uint8List or Type already register with registerEncoder()
   ///return false if not connect
   bool pub(String? subject, Uint8List data, {String? replyTo, bool? buffer}) {
     buffer ??= defaultPubBuffer;
@@ -511,9 +510,17 @@ class Client {
   T Function(String) _getJsonDecoder<T>() {
     var c = _jsonDecoder[T];
     if (c == null) {
-      throw NatsException('no converter for type $T');
+      throw NatsException('no decoder for type $T');
     }
     return c as T Function(String);
+  }
+
+  String Function(dynamic) _getJsonEncoder(Type T) {
+    var c = _jsonDecoder[T];
+    if (c == null) {
+      throw NatsException('no encoder for type $T');
+    }
+    return c as String Function(dynamic);
   }
 
   ///subscribe to subject option with queuegroup
