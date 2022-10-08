@@ -19,9 +19,15 @@ void main() {
       var nkeys = Nkeys.fromSeed(
           'SUAKJESHKJ5POJJINJFMCVYAASA7LQTL5ZOMMTYOWRZCM3JRZRS3OIVKZA');
       var p = nkeys.publicKey();
-
       expect(p,
           equals('UBYKMUQEJ7U2KFHB37IUOX6NBTJAWGY6SDO3DFRVOBNXVDUPPOTNWXD5'));
+
+      //second test case
+      nkeys = Nkeys.fromSeed(
+          'SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY');
+      p = nkeys.publicKey();
+      expect(p,
+          equals('UDXU4RCSJNZOIQHZNWXHXORDPRTGNJAHAHFRGZNEEJCPQTT2M7NLCNF4'));
     });
     test('private key', () async {
       var nkeys = Nkeys.fromSeed(
