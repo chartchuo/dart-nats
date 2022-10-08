@@ -17,20 +17,20 @@ class Message<T> {
   final Uint8List byte;
 
   ///convert from json string to T for structure data
-  T Function(String)? jsonConverter;
+  T Function(String)? jsonDecoder;
 
   ///payload of data in byte
   T get data {
-    // if (jsonConverter == null) throw Exception('no converter. can not convert. use msg.byte instead');
-    if (jsonConverter == null) {
+    // if (jsonDecoder == null) throw Exception('no converter. can not convert. use msg.byte instead');
+    if (jsonDecoder == null) {
       return byte as T;
     }
-    return jsonConverter!(string);
+    return jsonDecoder!(string);
   }
 
   ///constructure
   Message(this.subject, this.sid, this.byte, this._client,
-      {this.replyTo, this.jsonConverter});
+      {this.replyTo, this.jsonDecoder});
 
   ///payload in string
   String get string => utf8.decode(byte);

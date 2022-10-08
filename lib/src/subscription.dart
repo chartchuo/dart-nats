@@ -19,11 +19,11 @@ class Subscription<T> {
   late Stream<Message<T>> _stream;
 
   ///convert from json string to T for structure data
-  T Function(String)? jsonConverter;
+  T Function(String)? jsonDecoder;
 
   ///constructure
   Subscription(this.sid, this.subject, this._client,
-      {this.queueGroup, this.jsonConverter}) {
+      {this.queueGroup, this.jsonDecoder}) {
     _controller = StreamController<Message<T>>();
     _stream = _controller.stream.asBroadcastStream();
   }
@@ -45,7 +45,7 @@ class Subscription<T> {
       raw.byte,
       _client,
       replyTo: raw.replyTo,
-      jsonConverter: jsonConverter,
+      jsonDecoder: jsonDecoder,
     ));
   }
 

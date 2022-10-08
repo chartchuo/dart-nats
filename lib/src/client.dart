@@ -99,6 +99,25 @@ class Client {
     _nkeys = Nkeys.fromSeed(newseed);
   }
 
+  final _jsonDecoder = <Type, dynamic Function(String)>{};
+  final _jsonEncoder = <Type, String Function(dynamic)>{};
+
+  /// add json encoder for type <T>
+  void registerJsonDecoder<T>(T Function(String) f) {
+    if (T == dynamic) {
+      NatsException('can not register dyname type');
+    }
+    _jsonDecoder[T] = f;
+  }
+
+  /// add json encoder for type <T>
+  void registerJsonEncoder<T>(String Function(T) f) {
+    if (T == dynamic) {
+      NatsException('can not register dyname type');
+    }
+    _jsonDecoder[T] = f;
+  }
+
   ///server info
   Info? get info => _info;
 
@@ -123,6 +142,7 @@ class Client {
   Client() {
     _steamHandle();
   }
+
   void _steamHandle() {
     _channelStream.stream.listen((d) {
       _buffer.addAll(d);
@@ -447,6 +467,7 @@ class Client {
   var defaultPubBuffer = true;
 
   ///publish by byte (Uint8List) return true if sucess sending or buffering
+  ///data can be Uint8List or Type already register with registerEncoder()
   ///return false if not connect
   bool pub(String? subject, Uint8List data, {String? replyTo, bool? buffer}) {
     buffer ??= defaultPubBuffer;
@@ -487,12 +508,29 @@ class Client {
     return true;
   }
 
+  T Function(String) _getJsonDecoder<T>() {
+    var c = _jsonDecoder[T];
+    if (c == null) {
+      throw NatsException('no converter for type $T');
+    }
+    return c as T Function(String);
+  }
+
   ///subscribe to subject option with queuegroup
-  Subscription<T> sub<T>(String subject,
-      {String? queueGroup, T Function(String)? jsonConverter}) {
+  Subscription<T> sub<T>(
+    String subject, {
+    String? queueGroup,
+    T Function(String)? jsonDecoder,
+  }) {
     _ssid++;
+
+    //get registered json decoder
+    if (T != dynamic && jsonDecoder == null) {
+      jsonDecoder = _getJsonDecoder();
+    }
+
     var s = Subscription<T>(_ssid, subject, this,
-        queueGroup: queueGroup, jsonConverter: jsonConverter);
+        queueGroup: queueGroup, jsonDecoder: jsonDecoder);
     _subs[_ssid] = s;
     if (status == Status.connected) {
       _sub(subject, _ssid, queueGroup: queueGroup);
@@ -583,11 +621,22 @@ class Client {
   ///   timeout = true;
   /// }
   /// ```
-  Future<Message<T>> request<T>(String subj, Uint8List data,
-      {String? queueGroup, Duration? timeout}) async {
+  Future<Message<T>> request<T>(
+    String subj,
+    Uint8List data, {
+    String? queueGroup,
+    Duration? timeout,
+    T Function(String)? jsonDecoder,
+  }) async {
+    //get registered json decoder
+    if (T != dynamic && jsonDecoder == null) {
+      jsonDecoder = _getJsonDecoder();
+    }
+
     if (_inboxs[subj] == null) {
       var inbox = newInbox();
-      _inboxs[subj] = sub<T>(inbox, queueGroup: queueGroup);
+      _inboxs[subj] =
+          sub<T>(inbox, queueGroup: queueGroup, jsonDecoder: jsonDecoder);
     }
 
     var stream = _inboxs[subj]!.stream;
@@ -600,15 +649,26 @@ class Client {
       resp = await stream.take(1).single;
     }
 
-    var msg = Message<T>(resp.subject, resp.sid, resp.byte, this);
+    var msg = Message<T>(resp.subject, resp.sid, resp.byte, this,
+        jsonDecoder: jsonDecoder);
     return msg;
   }
 
   /// requestString() helper to request()
-  Future<Message<T>> requestString<T>(String subj, String data,
-      {String? queueGroup, Duration? timeout}) {
-    return request<T>(subj, Uint8List.fromList(data.codeUnits),
-        queueGroup: queueGroup, timeout: timeout);
+  Future<Message<T>> requestString<T>(
+    String subj,
+    String data, {
+    String? queueGroup,
+    Duration? timeout,
+    T Function(String)? jsonDecoder,
+  }) {
+    return request<T>(
+      subj,
+      Uint8List.fromList(data.codeUnits),
+      queueGroup: queueGroup,
+      timeout: timeout,
+      jsonDecoder: jsonDecoder,
+    );
   }
 
   void _setStatus(Status newStatus) {
