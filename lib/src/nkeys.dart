@@ -44,11 +44,11 @@ class Nkeys {
     if (!_checkValidPrefixByte(prefixByte)) {
       throw NkeysException('invalid prefix byte $prefixByte');
     }
+    rawSeed ??= ed.seed(keyPair.privateKey);
   }
 
   /// generate new nkeys
   static Nkeys newNkeys(int prefixByte) {
-    // var ed = DartEd25519();
     var kp = ed.generateKey();
 
     return Nkeys(prefixByte, kp);
@@ -70,7 +70,6 @@ class Nkeys {
     }
 
     var rawSeed = raw.sublist(2, 34);
-    // var ed = DartEd25519();
     var key = ed.newKeyFromSeed(rawSeed);
     var kp = ed.KeyPair(key, ed.public(key));
 
@@ -95,16 +94,13 @@ class Nkeys {
 
   /// Sign message
   List<int> sign(List<int> message) {
-    // var ed = DartEd25519();'
     var msg = Uint8List.fromList(message);
     var r = List<int>.from(ed.sign(keyPair.privateKey, msg));
     return r;
-    // return ed.sign(message, keyPair: keyPair);
   }
 
   /// verify
   // static Future<bool> verify(List<int> message, Signature signature) {
-  //   var ed = DartEd25519();
   //   return ed.verify(message, signature: signature);
   // }
 }
