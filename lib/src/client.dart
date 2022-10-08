@@ -515,13 +515,13 @@ class Client {
     return c as T Function(String);
   }
 
-  String Function(dynamic) _getJsonEncoder(Type T) {
-    var c = _jsonDecoder[T];
-    if (c == null) {
-      throw NatsException('no encoder for type $T');
-    }
-    return c as String Function(dynamic);
-  }
+  // String Function(dynamic) _getJsonEncoder(Type T) {
+  //   var c = _jsonDecoder[T];
+  //   if (c == null) {
+  //     throw NatsException('no encoder for type $T');
+  //   }
+  //   return c as String Function(dynamic);
+  // }
 
   ///subscribe to subject option with queuegroup
   Subscription<T> sub<T>(
