@@ -34,17 +34,18 @@ class Nkeys {
   ed.KeyPair keyPair;
 
   /// seed string
-  Uint8List? rawSeed;
+  Uint8List get rawSeed {
+    return ed.seed(keyPair.privateKey);
+  }
 
   /// prefixByte
   int prefixByte;
 
   ///create nkeys by keypair
-  Nkeys(this.prefixByte, this.keyPair, {this.rawSeed}) {
+  Nkeys(this.prefixByte, this.keyPair) {
     if (!_checkValidPrefixByte(prefixByte)) {
       throw NkeysException('invalid prefix byte $prefixByte');
     }
-    rawSeed ??= ed.seed(keyPair.privateKey);
   }
 
   /// generate new nkeys
@@ -73,13 +74,33 @@ class Nkeys {
     var key = ed.newKeyFromSeed(rawSeed);
     var kp = ed.KeyPair(key, ed.public(key));
 
-    return Nkeys(b2, kp, rawSeed: rawSeed);
+    return Nkeys(b2, kp);
+  }
+
+  /// Create new pair
+  static Nkeys createPair(int prefix) {
+    var kp = ed.generateKey();
+    return Nkeys(prefix, kp);
+  }
+
+  /// Create new User type KeyPair
+  static Nkeys createUser() {
+    return createPair(PrefixByteUser);
+  }
+
+  /// Create new Account type KeyPair
+  static Nkeys createAccount() {
+    return createPair(PrefixByteAccount);
+  }
+
+  /// Create new Operator type KeyPair
+  static Nkeys createOperator() {
+    return createPair(PrefixByteOperator);
   }
 
   /// get public key
   String get seed {
-    if (rawSeed == null) throw NatsException('no seed');
-    return _encodeSeed(prefixByte, rawSeed!);
+    return _encodeSeed(prefixByte, rawSeed);
   }
 
   /// get public key
@@ -100,26 +121,59 @@ class Nkeys {
   }
 
   /// verify
-  // static Future<bool> verify(List<int> message, Signature signature) {
-  //   return ed.verify(message, signature: signature);
-  // }
+  static bool verify(String publicKey, List<int> message, List<int> signature) {
+    var r = _decode(publicKey);
+    var prefix = r[0][0];
+    if (!_checkValidPrefixByte(prefix)) {
+      NkeysException('Ivalid Public key');
+      return false;
+    }
+
+    var pub = r[1].toList();
+    if (pub.length < ed.PublicKeySize) {
+      NkeysException('Ivalid Public key');
+      return false;
+    }
+    while (pub.length > ed.PublicKeySize) {
+      pub.removeLast();
+    }
+    return ed.verify(ed.PublicKey(pub), Uint8List.fromList(message),
+        Uint8List.fromList(signature));
+  }
 }
 
-// int _prefix(String src) {
-//   var b = base32.decode(src);
+/// return [0]=prefix [1]=byte data [2]=type if prefix is 'S' seed
+List<Uint8List> _decode(String src) {
+  var b = base32.decode(src).toList();
+  var ret = <Uint8List>[];
 
-//   var prefix = b[0];
-//   if (_checkValidPrefixByte(prefix)) {
-//     return prefix;
-//   }
+  var prefix = b[0];
+  if (_checkValidPrefixByte(prefix)) {
+    ret.add(Uint8List.fromList([prefix]));
+    b.removeAt(0);
+    ret.add(Uint8List.fromList(b));
+    return ret;
+  }
 
-//   // Might be a seed.
-//   var b1 = b[0] & 248;
-//   if (b1 == PrefixByteSeed) {
-//     return PrefixByteSeed;
-//   }
-//   return PrefixByteUnknown;
-// }
+  // Might be a seed.
+  // Need to do the reverse here to get back to internal representation.
+  var b1 = b[0] & 248; // 248 = 11111000
+  var b2 = ((b[0] & 7) << 5) | ((b[1] & 248) >> 3); // 7 = 00000111
+
+  if (b1 == PrefixByteSeed) {
+    ret.add(Uint8List.fromList([PrefixByteSeed]));
+    b.removeAt(0);
+    b.removeAt(0);
+    ret.add(Uint8List.fromList(b));
+    ret.add(Uint8List.fromList([b2]));
+    return ret;
+  }
+
+  ret.add(Uint8List.fromList([PrefixByteUnknown]));
+  b.removeAt(0);
+  ret.add(Uint8List.fromList(b));
+  return ret;
+}
 
 int _checkValidPublicPrefixByte(int prefix) {
   switch (prefix) {
@@ -185,11 +239,11 @@ Uint8List _crc16(List<int> bytes) {
 // EncodeSeed will encode a raw key with the prefix and then seed prefix and crc16 and then base32 encoded.
 String _encodeSeed(int public, List<int> src) {
   if (_checkValidPublicPrefixByte(public) == PrefixByteUnknown) {
-    throw NatsException('Invalid public prefix byte');
+    throw NkeysException('Invalid public prefix byte');
   }
 
   if (src.length != 32) {
-    throw NatsException('Invalid src langth');
+    throw NkeysException('Invalid src langth');
   }
 
   // In order to make this human printable for both bytes, we need to do a little

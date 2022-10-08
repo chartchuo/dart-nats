@@ -7,13 +7,16 @@ A Dart client for the [NATS](https://nats.io) messaging system. Design to use wi
 ### Flutter Web Support by WebSocket 
 ```dart
 client.connect(Uri.parse('ws://localhost:80'));
+client.connect(Uri.parse('wss://localhost:443'));
 ```
 
 
-### Flutter Other Platform Support by TCP Socket and WebSocket
+### Flutter Other Platform Support both TCP Socket and WebSocket
 ```dart
-client.connect(Uri.parse('nats://localhost'));
+client.connect(Uri.parse('nats://localhost:4222'));
+client.connect(Uri.parse('tls://localhost:4222'));
 client.connect(Uri.parse('ws://localhost:80'));
+client.connect(Uri.parse('wss://localhost:443'));
 ```
 
 ### Turn off background retry and catch exception
@@ -38,7 +41,7 @@ import 'package:dart_nats/dart_nats.dart';
 
 void main() async {
   var client = Client();
-  client.connect(Uri.parse('ws://localhost:80'));
+  client.connect(Uri.parse('nats://localhost'));
   var sub = client.sub('subject1');
   client.pubString('subject1', 'message1');
   var msg = await sub.stream.first;
@@ -63,7 +66,7 @@ Simply connect to server and subscribe to subject
 ```dart
 void connect() {
   natsClient = nats.Client();
-  natsClient.connect(Uri.parse('ws://hostname');
+  natsClient.connect(Uri.parse('nats://hostname');
   fooSub = natsClient.sub('foo');
   barSub = natsClient.sub('bar');
 }

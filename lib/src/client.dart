@@ -131,8 +131,8 @@ class Client {
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
   Future _sign() async {
-    if (_info.nonce != null && seed != null) {
-      var sig = _nkeys?.sign(utf8.encode(_info.nonce ?? ''));
+    if (_info.nonce != null && _nkeys != null) {
+      var sig = _nkeys?.sign(utf8.encode(_info.nonce!));
 
       _connectOption.sig = base64.encode(sig!);
     }
