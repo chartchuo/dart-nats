@@ -1,7 +1,6 @@
 import 'package:dart_nats/dart_nats.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 // larger MSG payloads not always working, check if full payload present in buffer #20
 //  while (_receiveState == _ReceiveState.idle && _buffer.contains(13)) {
 
@@ -22,31 +21,31 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 //   }
 void main() {
   group('all', () {
-    test('0016 ws: Connect to invalid ws connection does not give error',
-        () async {
-      var client = Client();
-      var gotit = false;
-      client.statusStream.listen(
-        (s) {
-          print(s);
-        },
-        onError: (e) {
-          gotit = true;
-        },
-      );
-      try {
-        await client.connect(Uri.parse('ws://localhost:1234'),
-            retry: false, retryInterval: 1);
-      } on NatsException {
-        gotit = true;
-      } on WebSocketChannelException {
-        gotit = true;
-      } catch (e) {
-        gotit = true;
-      }
-      await client.close();
-      expect(gotit, equals(true));
-    });
+    // test('0016 ws: Connect to invalid ws connection does not give error',
+    //     () async {
+    //   var client = Client();
+    //   var gotit = false;
+    //   client.statusStream.listen(
+    //     (s) {
+    //       print(s);
+    //     },
+    //     onError: (e) {
+    //       gotit = true;
+    //     },
+    //   );
+    //   try {
+    //     await client.connect(Uri.parse('ws://localhost:1234'),
+    //         retry: false, retryInterval: 1);
+    //   } on NatsException {
+    //     gotit = true;
+    //   } on WebSocketChannelException {
+    //     gotit = true;
+    //   } catch (e) {
+    //     gotit = true;
+    //   }
+    //   await client.close();
+    //   expect(gotit, equals(true));
+    // });
     test('0016 nats: Connect to invalid ws connection does not give error',
         () async {
       var client = Client();
