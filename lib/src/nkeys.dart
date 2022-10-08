@@ -1,9 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:base32/base32.dart';
-import 'package:cryptography/cryptography.dart';
-import 'package:cryptography/dart.dart';
 import 'package:dart_nats/src/common.dart';
+import 'package:ed25519_edwards/ed25519_edwards.dart' as ed;
 
 /// PrefixByteSeed is the version byte used for encoded NATS Seeds
 const PrefixByteSeed = 18 << 3; // Base32-encodes to 'S...'
@@ -32,7 +31,7 @@ const PrefixByteUnknown = 23 << 3; // Base32-encodes to 'X...'
 ///Nkeys
 class Nkeys {
   /// key pair
-  SimpleKeyPair keyPair;
+  ed.KeyPair keyPair;
 
   /// seed string
   Uint8List? rawSeed;
@@ -48,14 +47,15 @@ class Nkeys {
   }
 
   /// generate new nkeys
-  static Future<Nkeys> newNkeys(int prefixByte) async {
-    var ed = DartEd25519();
-    var kp = await ed.newKeyPair();
+  static Nkeys newNkeys(int prefixByte) {
+    // var ed = DartEd25519();
+    var kp = ed.generateKey();
+
     return Nkeys(prefixByte, kp);
   }
 
   /// new nkeys from seed
-  static Future<Nkeys> fromSeed(String seed) async {
+  static Nkeys fromSeed(String seed) {
     var raw = base32.decode(seed);
 
     // Need to do the reverse here to get back to internal representation.
@@ -70,8 +70,9 @@ class Nkeys {
     }
 
     var rawSeed = raw.sublist(2, 34);
-    var ed = DartEd25519();
-    var kp = await ed.newKeyPairFromSeed(rawSeed);
+    // var ed = DartEd25519();
+    var key = ed.newKeyFromSeed(rawSeed);
+    var kp = ed.KeyPair(key, ed.public(key));
 
     return Nkeys(b2, kp, rawSeed: rawSeed);
   }
@@ -83,25 +84,22 @@ class Nkeys {
   }
 
   /// get public key
-  // Future<String> publicKey() async {
-  //   var pub = await keyPair.extractPublicKey();
-  //   var bytes = <int>[prefixByte];
-  //   bytes.addAll(pub.bytes);
-  //   return _encode(prefixByte, bytes);
-  // }
+  String publicKey() {
+    return _encode(prefixByte, keyPair.publicKey.bytes);
+  }
 
   /// get private key
-  // Future<String> privateKey() async {
-  //   var pri = await keyPair.extractPrivateKeyBytes();
-  //   var bytes = <int>[prefixByte];
-  //   bytes.addAll(pri);
-  //   return _encode(PrefixBytePrivate, bytes);
-  // }
+  String privateKey() {
+    return _encode(PrefixBytePrivate, keyPair.privateKey.bytes);
+  }
 
   /// Sign message
-  Future<Signature> sign(List<int> message) {
-    var ed = DartEd25519();
-    return ed.sign(message, keyPair: keyPair);
+  List<int> sign(List<int> message) {
+    // var ed = DartEd25519();'
+    var msg = Uint8List.fromList(message);
+    var r = List<int>.from(ed.sign(keyPair.privateKey, msg));
+    return r;
+    // return ed.sign(message, keyPair: keyPair);
   }
 
   /// verify
@@ -153,20 +151,20 @@ bool _checkValidPrefixByte(int prefix) {
   return false;
 }
 
-// String _encode(int prefix, List<int> src) {
-//   if (!_checkValidPrefixByte(prefix)) {
-//     throw NkeysException('encode invalid prefix');
-//   }
+String _encode(int prefix, List<int> src) {
+  if (!_checkValidPrefixByte(prefix)) {
+    throw NkeysException('encode invalid prefix');
+  }
 
-//   var raw = [prefix];
-//   raw.addAll(src);
+  var raw = [prefix];
+  raw.addAll(src);
 
-//   // Calculate and write crc16 checksum
-//   raw.addAll(_crc16(raw));
-//   var bytes = Uint8List.fromList(raw);
+  // Calculate and write crc16 checksum
+  raw.addAll(_crc16(raw));
+  var bytes = Uint8List.fromList(raw);
 
-//   return _b32Encode(bytes);
-// }
+  return _b32Encode(bytes);
+}
 
 Uint8List _crc16(List<int> bytes) {
   // CCITT

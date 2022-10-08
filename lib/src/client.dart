@@ -114,10 +114,10 @@ class Client {
   String _receiveLine1 = '';
   Future _sign() async {
     if (_info.nonce != null && seed != '') {
-      var nkeys = await Nkeys.fromSeed(seed);
-      var sig = await nkeys.sign(utf8.encode(_info.nonce ?? ''));
+      var nkeys = Nkeys.fromSeed(seed);
+      var sig = nkeys.sign(utf8.encode(_info.nonce ?? ''));
 
-      _connectOption.sig = base64.encode(sig.bytes);
+      _connectOption.sig = base64.encode(sig);
     }
   }
 
