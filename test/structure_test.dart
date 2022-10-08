@@ -14,7 +14,7 @@ void main() {
 
       await client.connect(Uri.parse('nats://localhost:4222'),
           retryInterval: 1);
-      var sub = client.sub<String>('subject1', jsonConverter: string2string);
+      var sub = client.sub<String>('subject1', jsonDecoder: string2string);
       client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
       var msg = await sub.stream.first;
       await client.close();
@@ -25,7 +25,21 @@ void main() {
       var client = Client();
       await client.connect(Uri.parse('nats://localhost:4222'),
           retryInterval: 1);
-      var sub = client.sub<Student>('subject1', jsonConverter: josn2Student);
+      var sub = client.sub<Student>('subject1', jsonDecoder: json2Student);
+      var student = Student('id', 'name', 1);
+      client.pubString('subject1', jsonEncode(student.toJson()));
+      var msg = await sub.stream.first;
+      await client.close();
+      expect(msg.data.id, student.id);
+      expect(msg.data.name, student.name);
+      expect(msg.data.score, student.score);
+    });
+    test('sub register jsonDecoder', () async {
+      var client = Client();
+      await client.connect(Uri.parse('nats://localhost:4222'),
+          retryInterval: 1);
+      client.registerJsonDecoder<Student>(json2Student);
+      var sub = client.sub<Student>('subject1');
       var student = Student('id', 'name', 1);
       client.pubString('subject1', jsonEncode(student.toJson()));
       var msg = await sub.stream.first;
@@ -38,7 +52,7 @@ void main() {
       var client = Client();
       await client.connect(Uri.parse('nats://localhost:4222'),
           retryInterval: 1);
-      var sub = client.sub('subject1', jsonConverter: josn2Student);
+      var sub = client.sub('subject1', jsonDecoder: json2Student);
       var student = Student('id', 'name', 1);
       client.pubString('subject1', jsonEncode(student.toJson()));
       var msg = await sub.stream.first;
@@ -47,7 +61,7 @@ void main() {
       expect(msg.data.name, student.name);
       expect(msg.data.score, student.score);
     });
-    test('sub no type no converter', () async {
+    test('sub no type no jsonDecoder', () async {
       var client = Client();
       await client.connect(Uri.parse('nats://localhost:4222'),
           retryInterval: 1);
@@ -63,7 +77,8 @@ void main() {
     test('resquest', () async {
       var server = Client();
       await server.connect(Uri.parse('nats://localhost:4222'));
-      var service = server.sub<Student>('service', jsonConverter: josn2Student);
+      server.registerJsonDecoder<Student>(json2Student);
+      var service = server.sub<Student>('service');
       unawaited(service.stream.first.then((m) {
         m.respondString(jsonEncode(m.data.toJson()));
       }));
@@ -78,6 +93,48 @@ void main() {
       await server.close();
       expect(s1.score, equals(s2.score));
     });
+    test('resquest register jsonDecoder', () async {
+      var server = Client();
+      server.registerJsonDecoder<Student>(json2Student);
+      await server.connect(Uri.parse('nats://localhost:4222'));
+      var service = server.sub<Student>('service');
+      unawaited(service.stream.first.then((m) {
+        m.respondString(jsonEncode(m.data.toJson()));
+      }));
+
+      var client = Client();
+      client.registerJsonDecoder<Student>(json2Student);
+      var s1 = Student('id', 'name', 1);
+      await client.connect(Uri.parse('ws://localhost:8080'));
+      var receive = await client.requestString<Student>(
+          'service', jsonEncode(s1.toJson()));
+      var s2 = receive.data;
+      await client.close();
+      await server.close();
+      expect(s1.score, equals(s2.score));
+    });
+    test('resquest register jsonEncoder', () async {
+      var server = Client();
+      server.registerJsonDecoder<Student>(json2Student);
+      server.registerJsonEncoder<Student>(student2json);
+      await server.connect(Uri.parse('nats://localhost:4222'));
+      var service = server.sub<Student>('service');
+      unawaited(service.stream.first.then((m) {
+        m.respondString(jsonEncode(m.data.toJson()));
+      }));
+
+      var client = Client();
+      var s1 = Student('id', 'name', 1);
+      client.registerJsonDecoder<Student>(json2Student);
+      client.registerJsonEncoder<Student>(student2json);
+      await client.connect(Uri.parse('ws://localhost:8080'));
+      var receive = await client.requestString<Student>(
+          'service', jsonEncode(s1.toJson()));
+      var s2 = receive.data;
+      await client.close();
+      await server.close();
+      expect(s1.score, equals(s2.score));
+    });
   });
 }
 
@@ -85,7 +142,11 @@ String string2string(String input) {
   return input;
 }
 
-Student josn2Student(String json) {
+Student json2Student(String json) {
   var map = jsonDecode(json);
   return Student.fromJson(map);
+}
+
+String student2json(Student student) {
+  return jsonEncode(student.toJson());
 }
