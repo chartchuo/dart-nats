@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:mutex/mutex.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'common.dart';
@@ -614,7 +615,23 @@ class Client {
     throw Exception(NatsException('no connection'));
   }
 
+  var _inboxPrefix = '_INBOX';
+
+  /// get Inbox prefix default '_INBOX'
+  set inboxPrefix(String i) {
+    if (_clientStatus == _ClientStatus.used) {
+      throw NatsException('inbox prefix can not change when connection in use');
+    }
+    _inboxPrefix = i;
+  }
+
+  /// set Inbox prefix default '_INBOX'
+  String get inboxPrefix => _inboxPrefix;
+
   final _inboxs = <String, Subscription>{};
+  final _mutex = Mutex();
+  String? _inboxSubPrefix;
+  Subscription? _inboxSub;
 
   /// Request will send a request payload and deliver the response message,
   /// TimeoutException on timeout.
@@ -631,31 +648,35 @@ class Client {
   Future<Message<T>> request<T>(
     String subj,
     Uint8List data, {
-    String? queueGroup,
-    Duration? timeout,
+    Duration timeout = const Duration(seconds: 2),
     T Function(String)? jsonDecoder,
   }) async {
+    Message resp;
+    //ensure no other request
+    await _mutex.acquire();
     //get registered json decoder
     if (T != dynamic && jsonDecoder == null) {
       jsonDecoder = _getJsonDecoder();
     }
 
-    if (_inboxs[subj] == null) {
-      var inbox = newInbox();
-      _inboxs[subj] =
-          sub<T>(inbox, queueGroup: queueGroup, jsonDecoder: jsonDecoder);
+    if (_inboxSubPrefix == null) {
+      _inboxSubPrefix = inboxPrefix + '.' + Nuid().next();
+      _inboxSub = sub<T>(_inboxSubPrefix! + '.>', jsonDecoder: jsonDecoder);
     }
+    var inbox = _inboxSubPrefix! + '.' + Nuid().next();
+    var stream = _inboxSub!.stream;
 
-    var stream = _inboxs[subj]!.stream;
+    pub(subj, data, replyTo: inbox);
 
-    pub(subj, data, replyTo: _inboxs[subj]!.subject);
-    Message resp;
-    if (timeout != null) {
-      resp = await stream.take(1).single.timeout(timeout);
-    } else {
-      resp = await stream.take(1).single;
+    try {
+      do {
+        resp = await stream.take(1).single.timeout(timeout);
+      } while (resp.subject != inbox);
+    } on TimeoutException {
+      throw TimeoutException('request time > $timeout');
+    } finally {
+      _mutex.release();
     }
-
     var msg = Message<T>(resp.subject, resp.sid, resp.byte, this,
         jsonDecoder: jsonDecoder);
     return msg;
@@ -665,14 +686,12 @@ class Client {
   Future<Message<T>> requestString<T>(
     String subj,
     String data, {
-    String? queueGroup,
-    Duration? timeout,
+    Duration timeout = const Duration(seconds: 2),
     T Function(String)? jsonDecoder,
   }) {
     return request<T>(
       subj,
       Uint8List.fromList(data.codeUnits),
-      queueGroup: queueGroup,
       timeout: timeout,
       jsonDecoder: jsonDecoder,
     );

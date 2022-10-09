@@ -125,14 +125,12 @@ class Nkeys {
     var r = _decode(publicKey);
     var prefix = r[0][0];
     if (!_checkValidPrefixByte(prefix)) {
-      NkeysException('Ivalid Public key');
-      return false;
+      throw NkeysException('Ivalid Public key');
     }
 
     var pub = r[1].toList();
     if (pub.length < ed.PublicKeySize) {
-      NkeysException('Ivalid Public key');
-      return false;
+      throw NkeysException('Ivalid Public key');
     }
     while (pub.length > ed.PublicKeySize) {
       pub.removeLast();

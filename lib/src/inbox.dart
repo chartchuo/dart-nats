@@ -1,15 +1,14 @@
-import 'dart:typed_data';
 import 'dart:math';
+import 'dart:typed_data';
 
 var _nuid = Nuid();
 
 ///generate inbox
-String newInbox({bool secure = true}) {
-  const _inboxPrefix = '_INBOX.';
+String newInbox({String inboxPrefix = '_INBOX', bool secure = true}) {
   if (secure) {
     _nuid = Nuid();
   }
-  return _inboxPrefix + _nuid.next();
+  return inboxPrefix + _nuid.next();
 }
 
 ///nuid port from go nats

@@ -97,28 +97,32 @@ void main() {
       await server.close();
       expect(gotit, equals(true));
     });
-    test('repeat resquest', () async {
+    test('future request to 2 service', () async {
       var server = Client();
       await server.connect(Uri.parse('ws://localhost:8080'));
-      var service = server.sub('service');
-      service.stream.listen((m) {
-        m.respond(Uint8List.fromList('respond'.codeUnits));
+      var service1 = server.sub('service1');
+      service1.stream.listen((m) {
+        m.respond(Uint8List.fromList('respond1'.codeUnits));
+      });
+      var service2 = server.sub('service2');
+      service2.stream.listen((m) {
+        m.respond(Uint8List.fromList('respond2'.codeUnits));
       });
 
       var client = Client();
       await client.connect(Uri.parse('ws://localhost:8080'));
-      var receive = await client.request(
-          'service', Uint8List.fromList('request'.codeUnits));
-      receive = await client.request(
-          'service', Uint8List.fromList('request'.codeUnits));
-      receive = await client.request(
-          'service', Uint8List.fromList('request'.codeUnits));
-      receive = await client.request(
-          'service', Uint8List.fromList('request'.codeUnits));
-
+      Future<Message> receive1;
+      Future<Message> receive2;
+      unawaited(receive2 =
+          client.request('service2', Uint8List.fromList('request'.codeUnits)));
+      unawaited(receive1 =
+          client.request('service1', Uint8List.fromList('request'.codeUnits)));
+      var r1 = await receive1;
+      var r2 = await receive2;
       await client.close();
       await server.close();
-      expect(receive.string, equals('respond'));
+      expect(r1.string, equals('respond1'));
+      expect(r2.string, equals('respond2'));
     });
   });
 }
