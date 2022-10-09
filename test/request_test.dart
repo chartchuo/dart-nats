@@ -55,6 +55,24 @@ void main() {
       await server.close();
       expect(receive.string, equals('respond'));
     });
+    test('custom inbox', () async {
+      var server = Client();
+      await server.connect(Uri.parse('ws://localhost:8080'));
+      var service = server.sub('service');
+      unawaited(service.stream.first.then((m) {
+        m.respond(Uint8List.fromList('respond'.codeUnits));
+      }));
+
+      var client = Client();
+      client.inboxPrefix = '_INBOX.test_test';
+      await client.connect(Uri.parse('ws://localhost:8080'));
+      var receive = await client.request(
+          'service', Uint8List.fromList('request'.codeUnits));
+
+      await client.close();
+      await server.close();
+      expect(receive.string, equals('respond'));
+    });
     test('resquest with timeout', () async {
       var server = Client();
       await server.connect(Uri.parse('ws://localhost:8080'));

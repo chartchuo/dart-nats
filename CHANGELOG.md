@@ -1,3 +1,9 @@
+## 0.5.0
+* Add nkeys publicKey privateKey functions
+* Revamp rqeust 
+* Custom inbox prefix
+* Inbound structure data
+
 ## 0.4.9
 * fix #22 error when connect to nats://demo.nats.io
 

@@ -86,6 +86,29 @@ Publish Message
       natsClient.pubString('subject','message string');
 ```
 
+Request 
+```dart
+var client = Client();
+client.inboxPrefix = '_INBOX.test_test';
+await client.connect(Uri.parse('nats://localhost:4222'));
+var receive = await client.request(
+    'service', Uint8List.fromList('request'.codeUnits));
+```
+
+Structure Request 
+```dart
+var client = Client();
+await client.connect(Uri.parse('nats://localhost:4222'));
+client.registerJsonDecoder<Student>(json2Student);
+var receive = await client.requestString<Student>('service', '');
+var student = receive.data;
+
+
+Student json2Student(String json) {
+  return Student.fromJson(jsonDecode(json));
+}
+```
+
 Dispose 
 ```dart
   void dispose() {
