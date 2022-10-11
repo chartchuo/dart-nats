@@ -108,9 +108,19 @@ class Nkeys {
     return _encode(prefixByte, keyPair.publicKey.bytes);
   }
 
+  /// raw public key
+  List<int> rawPublicKey() {
+    return keyPair.publicKey.bytes;
+  }
+
   /// get private key
   String privateKey() {
     return _encode(PrefixBytePrivate, keyPair.privateKey.bytes);
+  }
+
+  /// get raw private key
+  List<int> rawPrivateKey() {
+    return keyPair.privateKey.bytes;
   }
 
   /// Sign message
@@ -137,6 +147,16 @@ class Nkeys {
     }
     return ed.verify(ed.PublicKey(pub), Uint8List.fromList(message),
         Uint8List.fromList(signature));
+  }
+
+  /// decide public expect prefix
+  /// throw exception if error
+  static Uint8List decode(int expectPrefix, String src) {
+    var res = _decode(src);
+    if (res[0] != expectPrefix) {
+      throw NkeysException('encode invalid prefix');
+    }
+    return res[1];
   }
 }
 
