@@ -1,3 +1,6 @@
+## 0.5.1
+* Add retry forver 
+
 ## 0.5.0
 * Add nkeys publicKey privateKey functions
 * Revamp rqeust 
