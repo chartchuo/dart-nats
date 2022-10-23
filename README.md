@@ -23,6 +23,15 @@ client.connect(Uri.parse('wss://localhost:443'));
 ```dart
   // unawait 
    client.connect(Uri.parse('nats://localhost:4222'), retry: true, retryCount: -1);
+  
+  // await for connect if need
+   await client.wait4Connected();
+
+   // listen to status stream
+   client.statusStream.lesten((status){
+    // 
+    print(status);
+   });
 ```
 
 ### Turn off retry and catch exception

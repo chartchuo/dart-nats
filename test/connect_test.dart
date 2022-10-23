@@ -96,7 +96,6 @@ void main() {
       await client.tcpClose();
       await client.wait4Connected();
 
-      // await client.connect(Uri.parse('nats://localhost'));
       result = client.pub('subject1', Uint8List.fromList('message2'.codeUnits),
           buffer: false);
       expect(result, true);
