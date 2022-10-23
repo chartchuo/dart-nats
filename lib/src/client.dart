@@ -73,7 +73,7 @@ class Client {
 
   var _status = Status.disconnected;
 
-  final _statusController = StreamController<Status>();
+  final _statusController = StreamController<Status>.broadcast();
 
   var _channelStream = StreamController();
 
@@ -200,13 +200,23 @@ class Client {
     }
     if (connectOption != null) _connectOption = connectOption;
     _connectOption.verbose = false;
-    _connectLoop(
-      uri,
-      timeout: timeout,
-      retry: retry,
-      retryInterval: retryInterval,
-      retryCount: retryCount,
-    );
+    do {
+      _connectLoop(
+        uri,
+        timeout: timeout,
+        retry: retry,
+        retryInterval: retryInterval,
+        retryCount: retryCount,
+      );
+      if (!retry || retryCount != -1) {
+        return _connectCompleter.future;
+      }
+      await for (var s in statusStream) {
+        if (s == Status.disconnected) {
+          break;
+        }
+      }
+    } while (retry && retryCount == -1);
     return _connectCompleter.future;
   }
 
@@ -215,7 +225,9 @@ class Client {
       required bool retry,
       required int retryInterval,
       required int retryCount}) async {
-    for (var count = 0; count == 0 || (count < retryCount && retry); count++) {
+    for (var count = 0;
+        count == 0 || ((count < retryCount || retryCount == -1) && retry);
+        count++) {
       if (count == 0) {
         _setStatus(Status.connecting);
       } else {
@@ -733,5 +745,20 @@ class Client {
       timeout: timeout,
       connectOption: connectOption,
     );
+  }
+
+  /// close tcp connect Only for testing
+  Future<void> tcpClose() async {
+    await _tcpSocket?.close();
+    _setStatus(Status.disconnected);
+  }
+
+  /// wait until client connected
+  Future<void> wait4Connected() async {
+    await for (var s in statusStream) {
+      if (s == Status.connected) {
+        break;
+      }
+    }
   }
 }
