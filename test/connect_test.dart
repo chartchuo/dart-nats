@@ -73,6 +73,36 @@ void main() {
       msg = await sub.stream.first;
       expect(String.fromCharCodes(msg.byte), equals('message2'));
     });
+    test('retry background', () async {
+      var client = Client();
+      unawaited(client.connect(
+        Uri.parse('nats://localhost'),
+        retry: true,
+        retryCount: -1,
+        timeout: 2,
+        retryInterval: 2,
+      ));
+
+      await client.wait4Connected();
+      var sub = client.sub('subject1');
+      var result = client.pub(
+          'subject1', Uint8List.fromList('message1'.codeUnits),
+          buffer: false);
+      expect(result, true);
+
+      var msg = await sub.stream.first;
+      expect(String.fromCharCodes(msg.byte), equals('message1'));
+
+      await client.tcpClose();
+      await client.wait4Connected();
+
+      // await client.connect(Uri.parse('nats://localhost'));
+      result = client.pub('subject1', Uint8List.fromList('message2'.codeUnits),
+          buffer: false);
+      expect(result, true);
+      msg = await sub.stream.first;
+      expect(String.fromCharCodes(msg.byte), equals('message2'));
+    });
     test('status stream', () async {
       var client = Client();
       var statusHistory = <Status>[];
