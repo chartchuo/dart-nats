@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:dart_nats/dart_nats.dart';
-import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
 // larger MSG payloads not always working, check if full payload present in buffer #20
 //  while (_receiveState == _ReceiveState.idle && _buffer.contains(13)) {

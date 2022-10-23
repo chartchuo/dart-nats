@@ -755,6 +755,9 @@ class Client {
 
   /// wait until client connected
   Future<void> wait4Connected() async {
+    if (status == Status.connected) {
+      return;
+    }
     await for (var s in statusStream) {
       if (s == Status.connected) {
         break;

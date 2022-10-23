@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:dart_nats/dart_nats.dart';
-import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
 
 //dart test test\chrome_test.dart -p chrome
