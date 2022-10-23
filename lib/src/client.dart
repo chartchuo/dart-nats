@@ -73,6 +73,9 @@ class Client {
 
   var _status = Status.disconnected;
 
+  /// true if connected
+  bool get connected => _status == Status.connected;
+
   final _statusController = StreamController<Status>.broadcast();
 
   var _channelStream = StreamController();
@@ -663,6 +666,9 @@ class Client {
     Duration timeout = const Duration(seconds: 2),
     T Function(String)? jsonDecoder,
   }) async {
+    if (!connected) {
+      throw NatsException("request error: client not connected");
+    }
     Message resp;
     //ensure no other request
     await _mutex.acquire();
