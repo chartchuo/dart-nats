@@ -197,10 +197,10 @@ class Client {
       throw Exception(
           NatsException('client in use. must close before call connect'));
     }
-    _clientStatus = _ClientStatus.used;
     if (status != Status.disconnected && status != Status.closed) {
       return Future.error('Error: status not disconnected and not closed');
     }
+    _clientStatus = _ClientStatus.used;
     if (connectOption != null) _connectOption = connectOption;
     _connectOption.verbose = false;
     do {
