@@ -174,12 +174,12 @@ class Client {
 
         _processOp();
       }
-    }, onDone: () {
-      _setStatus(Status.disconnected);
-      close();
-    }, onError: (err) {
-      _setStatus(Status.disconnected);
-      close();
+      // }, onDone: () {
+      //   _setStatus(Status.disconnected);
+      //   close();
+      // }, onError: (err) {
+      //   _setStatus(Status.disconnected);
+      //   close();
     });
   }
 
@@ -285,6 +285,8 @@ class Client {
           _wsChannel?.stream.listen((event) {
             if (_channelStream.isClosed) return;
             _channelStream.add(event);
+          }, onDone: () {
+            _setStatus(Status.disconnected);
           }, onError: (e) {
             close();
             throw NatsException('listen ws error: $e');
@@ -295,8 +297,11 @@ class Client {
           if (port == 0) {
             port = 4222;
           }
-          _tcpSocket = await Socket.connect(uri.host, port,
-              timeout: Duration(seconds: timeout));
+          _tcpSocket = await Socket.connect(
+            uri.host,
+            port,
+            timeout: Duration(seconds: timeout),
+          );
           if (_tcpSocket == null) {
             return false;
           }
@@ -306,6 +311,8 @@ class Client {
               if (_channelStream.isClosed) return;
               _channelStream.add(event);
             }
+          }).onDone(() {
+            _setStatus(Status.disconnected);
           });
           return true;
         case 'tls':
