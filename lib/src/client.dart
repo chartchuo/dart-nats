@@ -197,7 +197,7 @@ class Client {
       throw Exception(
           NatsException('client in use. must close before call connect'));
     }
-    _clientStatus != _ClientStatus.used;
+    _clientStatus = _ClientStatus.used;
     if (status != Status.disconnected && status != Status.closed) {
       return Future.error('Error: status not disconnected and not closed');
     }
@@ -211,12 +211,24 @@ class Client {
         retryInterval: retryInterval,
         retryCount: retryCount,
       );
+
+      if (_clientStatus == _ClientStatus.closed || status == Status.closed) {
+        if (!_connectCompleter.isCompleted) {
+          _connectCompleter.complete();
+        }
+        close();
+        _clientStatus = _ClientStatus.closed;
+        return;
+      }
       if (!retry || retryCount != -1) {
         return _connectCompleter.future;
       }
       await for (var s in statusStream) {
         if (s == Status.disconnected) {
           break;
+        }
+        if (s == Status.closed) {
+          return;
         }
       }
     } while (retry && retryCount == -1);
@@ -259,7 +271,7 @@ class Client {
       }
     }
     if (!_connectCompleter.isCompleted) {
-      _clientStatus = _ClientStatus.init;
+      _clientStatus = _ClientStatus.closed;
       _connectCompleter
           .completeError(NatsException('can not connect ${uri.toString()}'));
     }
