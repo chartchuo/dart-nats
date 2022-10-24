@@ -779,12 +779,17 @@ class Client {
   }
 
   /// wait until client connected
-  Future<void> wait4Connected() async {
-    if (status == Status.connected) {
+  Future<void> waitUntilConnected() async {
+    await waitUntil(Status.connected);
+  }
+
+  /// wait untril status
+  Future<void> waitUntil(Status s) async {
+    if (status == s) {
       return;
     }
-    await for (var s in statusStream) {
-      if (s == Status.connected) {
+    await for (var st in statusStream) {
+      if (st == s) {
         break;
       }
     }

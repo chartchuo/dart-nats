@@ -83,7 +83,7 @@ void main() {
         retryInterval: 2,
       ));
 
-      await client.wait4Connected();
+      await client.waitUntilConnected();
       var sub = client.sub('subject1');
       var result = client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
@@ -94,7 +94,7 @@ void main() {
       expect(String.fromCharCodes(msg.byte), equals('message1'));
 
       await client.tcpClose();
-      await client.wait4Connected();
+      await client.waitUntilConnected();
 
       result = client.pub('subject1', Uint8List.fromList('message2'.codeUnits),
           buffer: false);
