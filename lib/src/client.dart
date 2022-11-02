@@ -697,7 +697,11 @@ class Client {
     }
 
     if (_inboxSubPrefix == null) {
-      _inboxSubPrefix = inboxPrefix + '.' + Nuid().next();
+      if (inboxPrefix == '_INBOX') {
+        _inboxSubPrefix = inboxPrefix + '.' + Nuid().next();
+      } else {
+        _inboxSubPrefix = inboxPrefix;
+      }
       _inboxSub = sub<T>(_inboxSubPrefix! + '.>', jsonDecoder: jsonDecoder);
     }
     var inbox = _inboxSubPrefix! + '.' + Nuid().next();
