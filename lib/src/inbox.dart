@@ -27,10 +27,22 @@ class Nuid {
   late int _seq;
   late int _inc;
 
+  static final Nuid _nuid = Nuid._createInstance();
+
+  Nuid._createInstance() {
+    randomizePrefix();
+    resetSequential();
+  }
+
   ///constructure
   Nuid() {
     randomizePrefix();
     resetSequential();
+  }
+
+  /// get instance
+  static getInstance() {
+    return _nuid;
   }
 
   ///generate next nuid
