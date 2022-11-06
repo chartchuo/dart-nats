@@ -12,7 +12,7 @@ void main() {
       await client.connect(Uri.parse('ws://localhost:8084'),
           connectOption: ConnectOption(authToken: 'mytoken'));
       var sub = client.sub('subject1');
-      var result = client.pub(
+      var result = await client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
           buffer: false);
       expect(result, true);
@@ -26,7 +26,7 @@ void main() {
       await client.connect(Uri.parse('ws://localhost:8085'),
           connectOption: ConnectOption(user: 'foo', pass: 'bar'));
       var sub = client.sub('subject1');
-      var result = client.pub(
+      var result = await client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
           buffer: false);
       expect(result, true);

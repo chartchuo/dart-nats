@@ -31,7 +31,7 @@ void main() {
       var client = Client();
       await client.connect(Uri.parse('nats://localhost'));
       var sub = client.sub('subject1');
-      var result = client.pub(
+      var result = await client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
           buffer: false);
       expect(result, true);
@@ -44,7 +44,7 @@ void main() {
       var client = Client();
       await client.connect(Uri.parse('nats://localhost'), retry: false);
       var sub = client.sub('subject1');
-      var result = client.pub(
+      var result = await client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
           buffer: false);
       expect(result, true);
@@ -57,7 +57,7 @@ void main() {
       var client = Client();
       await client.connect(Uri.parse('nats://localhost'));
       var sub = client.sub('subject1');
-      var result = client.pub(
+      var result = await client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
           buffer: false);
       expect(result, true);
@@ -67,7 +67,8 @@ void main() {
       expect(String.fromCharCodes(msg.byte), equals('message1'));
 
       await client.connect(Uri.parse('nats://localhost'));
-      result = client.pub('subject1', Uint8List.fromList('message2'.codeUnits),
+      result = await client.pub(
+          'subject1', Uint8List.fromList('message2'.codeUnits),
           buffer: false);
       expect(result, true);
       msg = await sub.stream.first;
@@ -85,7 +86,7 @@ void main() {
 
       await client.waitUntilConnected();
       var sub = client.sub('subject1');
-      var result = client.pub(
+      var result = await client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
           buffer: false);
       expect(result, true);
@@ -96,7 +97,8 @@ void main() {
       await client.tcpClose();
       await client.waitUntilConnected();
 
-      result = client.pub('subject1', Uint8List.fromList('message2'.codeUnits),
+      result = await client.pub(
+          'subject1', Uint8List.fromList('message2'.codeUnits),
           buffer: false);
       expect(result, true);
       msg = await sub.stream.first;

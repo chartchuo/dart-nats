@@ -18,6 +18,14 @@ services:
       - ./test/config:/config
     command: "-V -D -c /config/jwt.cfg"
 
+  nats-jwt2:
+    image: nats
+    ports:
+      - "4227:4222"
+    volumes:
+      - ./test/config:/config
+    command: "-V -D -c /config/jwt2.cfg"
+
   nats-token:
     image: nats
     ports:

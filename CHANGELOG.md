@@ -1,5 +1,9 @@
+## 0.6.0
+* support verbos acknowledge 
+* chang pub, pubString to async 
+
 ## 0.5.1
-* Add retry forver 
+* Add retry 
 
 ## 0.5.0
 * Add nkeys publicKey privateKey functions

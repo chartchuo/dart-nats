@@ -16,7 +16,7 @@ void main() {
       client.acceptBadCert = true;
       await client.connect(Uri.parse('nats://localhost:4443'));
       var sub = client.sub('subject1');
-      var result = client.pub(
+      var result = await client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
           buffer: false);
       expect(result, true);
@@ -30,7 +30,7 @@ void main() {
       client.acceptBadCert = true;
       await client.connect(Uri.parse('tls://localhost:4443'));
       var sub = client.sub('subject1');
-      var result = client.pub(
+      var result = await client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
           buffer: false);
       expect(result, true);
@@ -46,7 +46,7 @@ void main() {
       client.acceptBadCert = true;
       await client.connect(Uri.parse('wss://localhost:8443'));
       var sub = client.sub('subject1');
-      var result = client.pub(
+      var result = await client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
           buffer: false);
       expect(result, true);

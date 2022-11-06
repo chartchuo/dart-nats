@@ -61,6 +61,7 @@ class _Pub {
 
 ///NATS client
 class Client {
+  var _ackStream = StreamController<bool>.broadcast();
   _ClientStatus _clientStatus = _ClientStatus.init;
   WebSocketChannel? _wsChannel;
   Socket? _tcpSocket;
@@ -202,7 +203,7 @@ class Client {
     }
     _clientStatus = _ClientStatus.used;
     if (connectOption != null) _connectOption = connectOption;
-    _connectOption.verbose = false;
+    _connectOption.verbose ??= false;
     do {
       _connectLoop(
         uri,
@@ -430,7 +431,16 @@ class Client {
 
         await _sign();
         _addConnectOption(_connectOption);
-        _setStatus(Status.connected);
+        if (_connectOption.verbose == true) {
+          var ack = await _ackStream.stream.first;
+          if (ack) {
+            _setStatus(Status.connected);
+          } else {
+            _setStatus(Status.disconnected);
+          }
+        } else {
+          _setStatus(Status.connected);
+        }
         _backendSubscriptAll();
         _flushPubBuffer();
         if (!_connectCompleter.isCompleted) {
@@ -443,19 +453,21 @@ class Client {
         }
         break;
       case '-err':
-        _processErr(data);
+        // _processErr(data);
+        if (_connectOption.verbose == true) {
+          _ackStream.sink.add(false);
+        }
         break;
       case 'pong':
         _pingCompleter.complete();
         break;
       case '+ok':
         //do nothing
+        if (_connectOption.verbose == true) {
+          _ackStream.sink.add(true);
+        }
         break;
     }
-  }
-
-  void _processErr(String data) {
-    close();
   }
 
   void _processMsg() {
@@ -503,7 +515,8 @@ class Client {
 
   ///publish by byte (Uint8List) return true if sucess sending or buffering
   ///return false if not connect
-  bool pub(String? subject, Uint8List data, {String? replyTo, bool? buffer}) {
+  Future<bool> pub(String? subject, Uint8List data,
+      {String? replyTo, bool? buffer}) async {
     buffer ??= defaultPubBuffer;
     if (status != Status.connected) {
       if (buffer) {
@@ -521,24 +534,31 @@ class Client {
     }
     _addByte(data);
 
+    if (_connectOption.verbose == true) {
+      var ack = await _ackStream.stream.first;
+      return ack;
+    }
     return true;
   }
 
   ///publish by string
-  bool pubString(String subject, String str,
-      {String? replyTo, bool buffer = true}) {
+  Future<bool> pubString(String subject, String str,
+      {String? replyTo, bool buffer = true}) async {
     return pub(subject, utf8.encode(str) as Uint8List,
         replyTo: replyTo, buffer: buffer);
   }
 
-  bool _pub(_Pub p) {
+  Future<bool> _pub(_Pub p) async {
     if (p.replyTo == null) {
       _add('pub ${p.subject} ${p.data.length}');
     } else {
       _add('pub ${p.subject} ${p.replyTo} ${p.data.length}');
     }
     _addByte(p.data);
-
+    if (_connectOption.verbose == true) {
+      var ack = await _ackStream.stream.first;
+      return ack;
+    }
     return true;
   }
 

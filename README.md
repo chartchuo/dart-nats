@@ -58,7 +58,7 @@ void main() async {
   var client = Client();
   client.connect(Uri.parse('nats://localhost'));
   var sub = client.sub('subject1');
-  client.pubString('subject1', 'message1');
+  await client.pubString('subject1', 'message1');
   var msg = await sub.stream.first;
 
   print(msg.string);
@@ -98,7 +98,7 @@ StreamBuilder(
 
 Publish Message
 ```dart
-      natsClient.pubString('subject','message string');
+      await natsClient.pubString('subject','message string');
 ```
 
 Request 

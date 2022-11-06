@@ -13,7 +13,7 @@ void main() {
       unawaited(
           client.connect(Uri.parse('ws://localhost:8080'), retryInterval: 1));
       var sub = client.sub('subject1');
-      client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
+      await client.pub('subject1', Uint8List.fromList('message1'.codeUnits));
       var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.byte), equals('message1'));
@@ -22,7 +22,7 @@ void main() {
       var client = Client();
       await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
-      var result = client.pub(
+      var result = await client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
           buffer: false);
       expect(result, true);
@@ -35,7 +35,7 @@ void main() {
       var client = Client();
       await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
-      var result = client.pub(
+      var result = await client.pub(
           'subject1', Uint8List.fromList('message1'.codeUnits),
           buffer: false);
       expect(result, true);
@@ -45,7 +45,8 @@ void main() {
       expect(String.fromCharCodes(msg.byte), equals('message1'));
 
       await client.connect(Uri.parse('ws://localhost:8080'));
-      result = client.pub('subject1', Uint8List.fromList('message2'.codeUnits),
+      result = await client.pub(
+          'subject1', Uint8List.fromList('message2'.codeUnits),
           buffer: false);
       expect(result, true);
       msg = await sub.stream.first;
