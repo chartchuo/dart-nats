@@ -66,7 +66,8 @@ void main() {
       await client.close();
       expect(String.fromCharCodes(msg.byte), equals(txt));
     });
-    test('message with header', () async {
+
+    test('pub with header', () async {
       var txt = 'this is text';
       var client = Client();
       await client.connect(Uri.parse('ws://localhost:8080'), retryInterval: 1);
@@ -79,7 +80,7 @@ void main() {
       var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.byte), equals(txt));
-      expect(msg.header, equals(header));
+      expect(msg.header!.headers['key1'], equals(header.headers['key1']));
     });
   });
 }

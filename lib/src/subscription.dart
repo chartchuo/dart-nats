@@ -46,6 +46,7 @@ class Subscription<T> {
       _client,
       replyTo: raw.replyTo,
       jsonDecoder: jsonDecoder,
+      header: raw.header,
     ));
   }
 

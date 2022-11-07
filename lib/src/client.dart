@@ -499,7 +499,7 @@ class Client {
     }
 
     if (_subs[sid] != null) {
-      _subs[sid]!.add(Message(subject, sid, payload, this, replyTo: replyTo));
+      _subs[sid]?.add(Message(subject, sid, payload, this, replyTo: replyTo));
     }
   }
 
@@ -529,10 +529,9 @@ class Client {
     }
 
     if (_subs[sid] != null) {
-      _subs[sid]!.add(
-        Message(subject, sid, payload, this,
-            replyTo: replyTo, header: Header.fromBytes(header)),
-      );
+      var msg = Message(subject, sid, payload, this,
+          replyTo: replyTo, header: Header.fromBytes(header));
+      _subs[sid]?.add(msg);
     }
   }
 
