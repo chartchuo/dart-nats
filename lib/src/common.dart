@@ -134,6 +134,9 @@ class ConnectOption {
   /// sever version
   String? version;
 
+  /// headers
+  bool? headers;
+
   ///protocol
   int? protocol;
 
@@ -148,9 +151,10 @@ class ConnectOption {
       this.pass,
       this.tlsRequired,
       this.name,
-      this.lang,
-      this.version,
-      this.protocol});
+      this.lang = 'dart',
+      this.version = '0.6.0',
+      this.headers = true,
+      this.protocol = 1});
 
   ///constructure from json
   ConnectOption.fromJson(Map<String, dynamic> json) {
@@ -166,6 +170,7 @@ class ConnectOption {
     name = json['name'];
     lang = json['lang'];
     version = json['version'];
+    headers = json['headers'];
     protocol = json['protocol'];
   }
 
@@ -184,6 +189,7 @@ class ConnectOption {
     data['name'] = name;
     data['lang'] = lang;
     data['version'] = version;
+    data['headers'] = headers;
     data['protocol'] = protocol;
 
     return _removeNull(data);

@@ -4,6 +4,47 @@ import 'dart:typed_data';
 
 import 'client.dart';
 
+/// Message Header
+class Header {
+  /// header version
+  final String version;
+
+  /// headers key value
+  final Map<String, String> headers;
+
+  /// constructure
+  Header(this.headers, {this.version = 'NATS/1.0'});
+
+  /// constructure from bytes
+  static Header fromBytes(Uint8List b) {
+    var str = utf8.decode(b);
+    Map<String, String> m = {};
+    var strList = str.split('\r\n');
+    var version = strList[0];
+    strList.removeAt(0);
+    for (var h in strList) {
+      var kvStr = h.split(':');
+      if (kvStr.length != 2) {
+        continue;
+      }
+      m[kvStr[0]] = kvStr[1];
+    }
+
+    return Header(m, version: version);
+  }
+
+  /// conver to bytes
+  Uint8List toBytes() {
+    var str = '${this.version}\r\n';
+
+    headers.forEach((k, v) {
+      str = str + '$k:$v\r\n';
+    });
+
+    return utf8.encode(str) as Uint8List;
+  }
+}
+
 /// Message class
 class Message<T> {
   ///subscriber id auto generate by client
@@ -12,6 +53,9 @@ class Message<T> {
   /// subject  and replyto
   final String? subject, replyTo;
   final Client _client;
+
+  /// message header
+  final Header? header;
 
   ///payload of data in byte
   final Uint8List byte;
@@ -30,7 +74,7 @@ class Message<T> {
 
   ///constructure
   Message(this.subject, this.sid, this.byte, this._client,
-      {this.replyTo, this.jsonDecoder});
+      {this.replyTo, this.jsonDecoder, this.header});
 
   ///payload in string
   String get string => utf8.decode(byte);

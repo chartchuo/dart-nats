@@ -166,8 +166,8 @@ class Client {
         var msgType = msgList[0];
         //print('... process $msgType ${_buffer.length}');
 
-        if (msgType == 'msg') {
-          var len = int.parse((msgList.length == 4 ? msgList[3] : msgList[4]));
+        if (msgType == 'msg' || msgType == 'hmsg') {
+          var len = int.parse(msgList.last);
           if (len > 0 && _buffer.length < (msgFull.length + len + 4)) {
             break; // not a full payload, go around again
           }
@@ -406,6 +406,13 @@ class Client {
         _receiveLine1 = '';
         _receiveState = _ReceiveState.idle;
         break;
+      case 'hmsg':
+        _receiveState = _ReceiveState.msg;
+        _receiveLine1 = line;
+        _processHMsg();
+        _receiveLine1 = '';
+        _receiveState = _ReceiveState.idle;
+        break;
       case 'info':
         _info = Info.fromJson(jsonDecode(data));
         if (_tlsRequired && !(_info.tlsRequired ?? false)) {
@@ -496,6 +503,39 @@ class Client {
     }
   }
 
+  void _processHMsg() {
+    var s = _receiveLine1.split(' ');
+    var subject = s[1];
+    var sid = int.parse(s[2]);
+    String? replyTo;
+    int length;
+    int headerLength;
+    if (s.length == 5) {
+      headerLength = int.parse(s[3]);
+      length = int.parse(s[4]);
+    } else {
+      replyTo = s[3];
+      headerLength = int.parse(s[4]);
+      length = int.parse(s[5]);
+    }
+    if (_buffer.length < length) return;
+    var header = Uint8List.fromList(_buffer.sublist(0, headerLength));
+    var payload = Uint8List.fromList(_buffer.sublist(headerLength, length));
+    // _buffer = _buffer.sublist(length + 2);
+    if (_buffer.length > length + 2) {
+      _buffer.removeRange(0, length + 2);
+    } else {
+      _buffer = [];
+    }
+
+    if (_subs[sid] != null) {
+      _subs[sid]!.add(
+        Message(subject, sid, payload, this,
+            replyTo: replyTo, header: Header.fromBytes(header)),
+      );
+    }
+  }
+
   /// get server max payload
   int? maxPayload() => _info.maxPayload;
 
@@ -516,7 +556,7 @@ class Client {
   ///publish by byte (Uint8List) return true if sucess sending or buffering
   ///return false if not connect
   Future<bool> pub(String? subject, Uint8List data,
-      {String? replyTo, bool? buffer}) async {
+      {String? replyTo, bool? buffer, Header? header}) async {
     buffer ??= defaultPubBuffer;
     if (status != Status.connected) {
       if (buffer) {
@@ -527,12 +567,28 @@ class Client {
       }
     }
 
-    if (replyTo == null) {
-      _add('pub $subject ${data.length}');
+    String cmd;
+    var headerByte = header?.toBytes();
+    if (header == null) {
+      cmd = 'pub';
     } else {
-      _add('pub $subject $replyTo ${data.length}');
+      cmd = 'hpub';
     }
-    _addByte(data);
+    cmd += ' $subject';
+    if (replyTo != null) {
+      cmd += ' $replyTo';
+    }
+    if (headerByte != null) {
+      cmd += ' ${headerByte.length}  ${headerByte.length + data.length}';
+      _add(cmd);
+      var dataWithHeader = headerByte.toList();
+      dataWithHeader.addAll(data.toList());
+      _addByte(dataWithHeader);
+    } else {
+      cmd += ' ${data.length}';
+      _add(cmd);
+      _addByte(data);
+    }
 
     if (_connectOption.verbose == true) {
       var ack = await _ackStream.stream.first;
@@ -543,7 +599,7 @@ class Client {
 
   ///publish by string
   Future<bool> pubString(String subject, String str,
-      {String? replyTo, bool buffer = true}) async {
+      {String? replyTo, bool buffer = true, Header? header}) async {
     return pub(subject, utf8.encode(str) as Uint8List,
         replyTo: replyTo, buffer: buffer);
   }

@@ -60,11 +60,26 @@ void main() {
       await client.connect(Uri.parse('ws://localhost:8080'), retryInterval: 1);
       var sub = client.sub('subject1');
       client.pub('subject1', Uint8List.fromList(txt.codeUnits));
-      client.pub('subject1', Uint8List.fromList(txt.codeUnits));
+      // client.pub('subject1', Uint8List.fromList(txt.codeUnits));
       var msg = await sub.stream.first;
-      msg = await sub.stream.first;
+      // msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.byte), equals(txt));
+    });
+    test('message with header', () async {
+      var txt = 'this is text';
+      var client = Client();
+      await client.connect(Uri.parse('ws://localhost:8080'), retryInterval: 1);
+      var sub = client.sub('subject1');
+      Map<String, String> headers = {};
+      headers['key1'] = 'value1';
+      headers['key2'] = 'value2';
+      var header = Header(headers);
+      client.pub('subject1', Uint8List.fromList(txt.codeUnits), header: header);
+      var msg = await sub.stream.first;
+      await client.close();
+      expect(String.fromCharCodes(msg.byte), equals(txt));
+      expect(msg.header, equals(header));
     });
   });
 }
