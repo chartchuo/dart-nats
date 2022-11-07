@@ -72,15 +72,16 @@ void main() {
       var client = Client();
       await client.connect(Uri.parse('ws://localhost:8080'), retryInterval: 1);
       var sub = client.sub('subject1');
-      Map<String, String> headers = {};
-      headers['key1'] = 'value1';
-      headers['key2'] = 'value2';
-      var header = Header(headers);
+      var header = Header();
+      header.add('key1', 'value1');
+      header.add('key2', 'value2');
+      header.add('key3', 'value3');
       client.pub('subject1', Uint8List.fromList(txt.codeUnits), header: header);
       var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.byte), equals(txt));
-      expect(msg.header!.headers['key1'], equals(header.headers['key1']));
+      expect(msg.header?.get('key1'), equals('value1'));
+      expect(msg.header?.toBytes(), equals(header.toBytes()));
     });
   });
 }

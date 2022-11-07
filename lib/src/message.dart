@@ -7,13 +7,27 @@ import 'client.dart';
 /// Message Header
 class Header {
   /// header version
-  final String version;
+  String version;
 
   /// headers key value
-  final Map<String, String> headers;
+  Map<String, String>? headers;
 
   /// constructure
-  Header(this.headers, {this.version = 'NATS/1.0'});
+  Header({this.headers, this.version = 'NATS/1.0'}) {
+    this.headers ??= {};
+  }
+
+  /// add key, value
+  Header add(String key, String value) {
+    headers![key] = value;
+    return this;
+  }
+
+  /// get valure from key
+  /// return null if notfound
+  String? get(String key) {
+    return headers![key];
+  }
 
   /// constructure from bytes
   static Header fromBytes(Uint8List b) {
@@ -30,14 +44,14 @@ class Header {
       m[kvStr[0]] = kvStr[1];
     }
 
-    return Header(m, version: version);
+    return Header(headers: m, version: version);
   }
 
   /// conver to bytes
   Uint8List toBytes() {
     var str = '${this.version}\r\n';
 
-    headers.forEach((k, v) {
+    headers?.forEach((k, v) {
       str = str + '$k:$v\r\n';
     });
 
