@@ -142,7 +142,7 @@ class ConnectOption {
 
   ///construcure
   ConnectOption(
-      {this.verbose,
+      {this.verbose = false,
       this.pedantic,
       this.authToken,
       this.jwt,

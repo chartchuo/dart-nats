@@ -90,7 +90,7 @@ class Client {
   /// Stream status for status update
   Stream<Status> get statusStream => _statusController.stream;
 
-  var _connectOption = ConnectOption(verbose: false);
+  var _connectOption = ConnectOption();
 
   Nkeys? _nkeys;
 
@@ -203,7 +203,6 @@ class Client {
     }
     _clientStatus = _ClientStatus.used;
     if (connectOption != null) _connectOption = connectOption;
-    _connectOption.verbose ??= false;
     do {
       _connectLoop(
         uri,
