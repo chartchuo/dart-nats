@@ -8,6 +8,15 @@ var port = 8084;
 
 void main() {
   group('all', () {
+    test('decode', () async {
+      var nkeys = Nkeys.fromSeed(
+          'SUAKJESHKJ5POJJINJFMCVYAASA7LQTL5ZOMMTYOWRZCM3JRZRS3OIVKZA');
+      var p = nkeys.publicKey();
+      print(p);
+      var r = Nkeys.decode(PrefixByteUser, p);
+      print(r);
+      // no exception should be OK
+    });
     test('seed', () async {
       var nkeys = Nkeys.fromSeed(
           'SUAKJESHKJ5POJJINJFMCVYAASA7LQTL5ZOMMTYOWRZCM3JRZRS3OIVKZA');

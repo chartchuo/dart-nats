@@ -1,3 +1,7 @@
+## 0.6.1
+
+* fix nkeys decode issue
+
 ## 0.6.0
 
 * Support verbos acknowledge

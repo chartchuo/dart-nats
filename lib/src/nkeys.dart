@@ -153,7 +153,7 @@ class Nkeys {
   /// throw exception if error
   static Uint8List decode(int expectPrefix, String src) {
     var res = _decode(src);
-    if (res[0] != expectPrefix) {
+    if (res[0][0] != expectPrefix) {
       throw NkeysException('encode invalid prefix');
     }
     return res[1];
