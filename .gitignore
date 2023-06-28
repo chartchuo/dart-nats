@@ -5,3 +5,5 @@ test/go.sum
 build/
 doc/api/
 *.pem
+*.iml
+*.idea/
