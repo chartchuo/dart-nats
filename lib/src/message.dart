@@ -12,7 +12,7 @@ class Header {
   /// headers key value
   Map<String, String>? headers;
 
-  /// constructure
+  /// constructor
   Header({this.headers, this.version = 'NATS/1.0'}) {
     this.headers ??= {};
   }
@@ -37,11 +37,18 @@ class Header {
     var version = strList[0];
     strList.removeAt(0);
     for (var h in strList) {
-      var kvStr = h.split(':');
-      if (kvStr.length != 2) {
+      /// values of headers can contain ':' so find the first index for the
+      /// correct split index
+      var splitIndex = h.indexOf(':');
+
+      /// if the index is <= to 0 it means there was either no ':' or its the
+      /// first character. In either case its not a valid header to split.
+      if (splitIndex <= 0) {
         continue;
       }
-      m[kvStr[0]] = kvStr[1];
+      var key = h.substring(0, splitIndex);
+      var value = h.substring(splitIndex + 1);
+      m[key] = value;
     }
 
     return Header(headers: m, version: version);
