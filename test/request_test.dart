@@ -37,7 +37,7 @@ void main() {
       await server.close();
       expect(receive.string, equals('respond'));
     });
-    test('resquest', () async {
+    test('request', () async {
       var server = Client();
       await server.connect(Uri.parse('ws://localhost:8080'));
       var service = server.sub('service');
@@ -72,7 +72,7 @@ void main() {
       await server.close();
       expect(receive.string, equals('respond'));
     });
-    test('resquest with timeout', () async {
+    test('request with timeout', () async {
       var server = Client();
       await server.connect(Uri.parse('ws://localhost:8080'));
       var service = server.sub('service');
@@ -91,7 +91,7 @@ void main() {
       await server.close();
       expect(receive.string, equals('respond'));
     });
-    test('resquest with timeout exception', () async {
+    test('request with timeout exception', () async {
       var server = Client();
       await server.connect(Uri.parse('ws://localhost:8080'));
       var service = server.sub('service');
