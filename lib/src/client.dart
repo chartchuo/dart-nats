@@ -20,7 +20,7 @@ enum _ReceiveState {
 
 ///status of the nats client
 enum Status {
-  /// discontected or not connected
+  /// disconnected or not connected
   disconnected,
 
   /// tlsHandshake
@@ -32,7 +32,7 @@ enum Status {
   ///connected to server ready
   connected,
 
-  ///alread close by close or server
+  ///already close by close or server
   closed,
 
   ///automatic reconnection to server
@@ -143,7 +143,7 @@ class Client {
     }
   }
 
-  ///NATS Client Constructure
+  ///NATS Client Constructor
   Client() {
     _steamHandle();
   }

@@ -74,7 +74,7 @@ void main() {
         throw Exception('missing data type');
       }
     });
-    test('resquest', () async {
+    test('request', () async {
       var server = Client();
       await server.connect(Uri.parse('nats://localhost:4222'));
       server.registerJsonDecoder<Student>(json2Student);
@@ -93,7 +93,7 @@ void main() {
       await server.close();
       expect(s1.score, equals(s2.score));
     });
-    test('resquest register jsonDecoder', () async {
+    test('request register jsonDecoder', () async {
       var server = Client();
       server.registerJsonDecoder<Student>(json2Student);
       await server.connect(Uri.parse('nats://localhost:4222'));
