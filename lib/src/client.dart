@@ -67,6 +67,7 @@ class Client {
   Socket? _tcpSocket;
   SecureSocket? _secureSocket;
   bool _tlsRequired = false;
+  bool _retry = false;
 
   Info _info = Info();
   late Completer _pingCompleter;
@@ -193,6 +194,7 @@ class Client {
     int retryInterval = 10,
     int retryCount = 3,
   }) async {
+    this._retry = retry;
     _connectCompleter = Completer();
     if (_clientStatus == _ClientStatus.used) {
       throw Exception(
@@ -207,7 +209,6 @@ class Client {
       _connectLoop(
         uri,
         timeout: timeout,
-        retry: retry,
         retryInterval: retryInterval,
         retryCount: retryCount,
       );
@@ -220,7 +221,7 @@ class Client {
         _clientStatus = _ClientStatus.closed;
         return;
       }
-      if (!retry || retryCount != -1) {
+      if (!this._retry || retryCount != -1) {
         return _connectCompleter.future;
       }
       await for (var s in statusStream) {
@@ -231,17 +232,16 @@ class Client {
           return;
         }
       }
-    } while (retry && retryCount == -1);
+    } while (this._retry && retryCount == -1);
     return _connectCompleter.future;
   }
 
   void _connectLoop(Uri uri,
       {int timeout = 5,
-      required bool retry,
       required int retryInterval,
       required int retryCount}) async {
     for (var count = 0;
-        count == 0 || ((count < retryCount || retryCount == -1) && retry);
+        count == 0 || ((count < retryCount || retryCount == -1) && this._retry);
         count++) {
       if (count == 0) {
         _setStatus(Status.connecting);
@@ -815,6 +815,12 @@ class Client {
   void _setStatus(Status newStatus) {
     _status = newStatus;
     _statusController.add(newStatus);
+  }
+
+  /// close connection and cancel all future retries
+  Future forceClose() async {
+    this._retry = false;
+    this.close();
   }
 
   ///close connection to NATS server unsub to server but still keep subscription list at client
