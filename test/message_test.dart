@@ -36,7 +36,7 @@ void main() {
       await service.close();
       expect(receive.string, equals('respond'));
     });
-    test('resquest', () async {
+    test('request', () async {
       var server = Client();
       await server.connect(Uri.parse('ws://localhost:8080'));
       var service = server.sub('service');
@@ -76,11 +76,13 @@ void main() {
       header.add('key1', 'value1');
       header.add('key2', 'value2');
       header.add('key3', 'value3');
+      header.add('key4', 'value:with:colon');
       client.pub('subject1', Uint8List.fromList(txt.codeUnits), header: header);
       var msg = await sub.stream.first;
       await client.close();
       expect(String.fromCharCodes(msg.byte), equals(txt));
       expect(msg.header?.get('key1'), equals('value1'));
+      expect(msg.header?.get('key4'), equals('value:with:colon'));
       expect(msg.header?.toBytes(), equals(header.toBytes()));
     });
   });

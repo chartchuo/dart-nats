@@ -1,3 +1,7 @@
+## 0.6.2
+
+* fix a bug that does not correctly parse headers containing the ':' character
+
 ## 0.6.1
 
 * fix nkeys decode issue

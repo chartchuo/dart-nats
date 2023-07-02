@@ -36,7 +36,7 @@ void main() {
       await service.close();
       expect(receive.string, equals('respond'));
     });
-    test('resquest', () async {
+    test('request', () async {
       var server = Client();
       await server.connect(Uri.parse('ws://localhost:8080'));
       var service = server.sub('service');
