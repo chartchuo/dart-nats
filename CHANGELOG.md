@@ -1,6 +1,6 @@
 ## 0.6.2
 
-* fix a bug that does not correctly parse headers containing the ':' character
+* fix a bug that does not correctly parse headers containing the ':' character. Thank https://github.com/CoryHagerman for contribution.
 
 ## 0.6.1
 
