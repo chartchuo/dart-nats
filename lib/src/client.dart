@@ -15,7 +15,6 @@ import 'subscription.dart';
 enum _ReceiveState {
   idle, //op=msg -> msg
   msg, //newline -> idle
-
 }
 
 ///status of the nats client
@@ -792,8 +791,14 @@ class Client {
     } finally {
       _mutex.release();
     }
-    var msg = Message<T>(resp.subject, resp.sid, resp.byte, this,
-        jsonDecoder: jsonDecoder);
+    var msg = Message<T>(
+      resp.subject,
+      resp.sid,
+      resp.byte,
+      this,
+      header: resp.header,
+      jsonDecoder: jsonDecoder,
+    );
     return msg;
   }
 
