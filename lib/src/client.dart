@@ -72,6 +72,11 @@ class Client {
   late Completer _pingCompleter;
   late Completer _connectCompleter;
 
+  /// Error handler for websocket errors
+  Function(dynamic) wsErrorHandler = (e) {
+    throw NatsException('listen ws error: $e');
+  };
+
   var _status = Status.disconnected;
 
   /// true if connected
@@ -300,7 +305,7 @@ class Client {
             _setStatus(Status.disconnected);
           }, onError: (e) {
             close();
-            throw NatsException('listen ws error: $e');
+            wsErrorHandler(e);
           });
           return true;
         case 'nats':
