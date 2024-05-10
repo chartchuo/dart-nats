@@ -15,7 +15,6 @@ import 'subscription.dart';
 enum _ReceiveState {
   idle, //op=msg -> msg
   msg, //newline -> idle
-
 }
 
 ///status of the nats client
@@ -92,6 +91,9 @@ class Client {
   Stream<Status> get statusStream => _statusController.stream;
 
   var _connectOption = ConnectOption();
+
+  ///SecurityContext
+  SecurityContext? securityContext;
 
   Nkeys? _nkeys;
 
@@ -193,8 +195,10 @@ class Client {
     bool retry = true,
     int retryInterval = 10,
     int retryCount = 3,
+    SecurityContext? securityContext,
   }) async {
     this._retry = retry;
+    this.securityContext = securityContext;
     _connectCompleter = Completer();
     if (_clientStatus == _ClientStatus.used) {
       throw Exception(
@@ -422,6 +426,7 @@ class Client {
           _setStatus(Status.tlsHandshake);
           var secureSocket = await SecureSocket.secure(
             _tcpSocket!,
+            context: this.securityContext,
             onBadCertificate: (certificate) {
               if (acceptBadCert) return true;
               return false;
@@ -432,6 +437,16 @@ class Client {
           secureSocket.listen((event) {
             if (_channelStream.isClosed) return;
             _channelStream.add(event);
+          }, onError: (error) {
+            print('Socket error: $error');
+            _setStatus(Status.disconnected);
+
+            if (error is TlsException) {
+              print('closing connection');
+              this._retry = false;
+              this.close();
+              throw Exception(NatsException(error.message));
+            }
           });
         }
 
