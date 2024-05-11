@@ -442,7 +442,6 @@ class Client {
             _setStatus(Status.disconnected);
 
             if (error is TlsException) {
-              print('closing connection');
               this._retry = false;
               this.close();
               throw Exception(NatsException(error.message));
