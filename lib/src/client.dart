@@ -845,7 +845,9 @@ class Client {
     _secureSocket = null;
     await _tcpSocket?.close();
     _tcpSocket = null;
-
+    await _inboxSub?.close();
+    _inboxSub = null;
+    _inboxSubPrefix = null;
     _buffer = [];
     _clientStatus = _ClientStatus.closed;
   }
