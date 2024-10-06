@@ -735,6 +735,7 @@ class Client {
       throw NatsException('inbox prefix can not change when connection in use');
     }
     _inboxPrefix = i;
+    _inboxSubPrefix = i;
   }
 
   /// set Inbox prefix default '_INBOX'
