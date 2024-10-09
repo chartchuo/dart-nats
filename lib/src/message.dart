@@ -62,7 +62,7 @@ class Header {
       str = str + '$k:$v\r\n';
     });
 
-    return utf8.encode(str) as Uint8List;
+    return utf8.encode(str);
   }
 }
 
@@ -109,6 +109,6 @@ class Message<T> {
 
   ///Respond to string message
   bool respondString(String str) {
-    return respond(utf8.encode(str) as Uint8List);
+    return respond(utf8.encode(str));
   }
 }

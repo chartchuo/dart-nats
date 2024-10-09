@@ -1,3 +1,9 @@
+## 0.6.3
+
+* fix Exposing Security Context#31.
+* Fix missing headers in request response.
+
+
 ## 0.6.2
 
 * fix a bug that does not correctly parse headers containing the ':' character. Thank https://github.com/CoryHagerman for contribution.

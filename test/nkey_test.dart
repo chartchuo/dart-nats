@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:dart_nats/dart_nats.dart';
 import 'package:test/test.dart';
@@ -63,8 +62,7 @@ void main() {
       var seed = 'SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY';
       var nkeys = Nkeys.fromSeed(seed);
 
-      var result =
-          Nkeys.verify(nkeys.publicKey(), utf8.encode(nonce) as Uint8List, sig);
+      var result = Nkeys.verify(nkeys.publicKey(), utf8.encode(nonce), sig);
       expect(result, equals(true));
     });
   });
