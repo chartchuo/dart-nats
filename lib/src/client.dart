@@ -15,7 +15,6 @@ import 'subscription.dart';
 enum _ReceiveState {
   idle, //op=msg -> msg
   msg, //newline -> idle
-
 }
 
 ///status of the nats client
@@ -72,6 +71,11 @@ class Client {
   Info _info = Info();
   late Completer _pingCompleter;
   late Completer _connectCompleter;
+
+  /// Error handler for websocket errors
+  Function(dynamic) wsErrorHandler = (e) {
+    throw NatsException('listen ws error: $e');
+  };
 
   var _status = Status.disconnected;
 
@@ -301,7 +305,7 @@ class Client {
             _setStatus(Status.disconnected);
           }, onError: (e) {
             close();
-            throw NatsException('listen ws error: $e');
+            wsErrorHandler(e);
           });
           return true;
         case 'nats':
@@ -731,6 +735,7 @@ class Client {
       throw NatsException('inbox prefix can not change when connection in use');
     }
     _inboxPrefix = i;
+    _inboxSubPrefix = null;
   }
 
   /// set Inbox prefix default '_INBOX'
@@ -792,8 +797,14 @@ class Client {
     } finally {
       _mutex.release();
     }
-    var msg = Message<T>(resp.subject, resp.sid, resp.byte, this,
-        jsonDecoder: jsonDecoder);
+    var msg = Message<T>(
+      resp.subject,
+      resp.sid,
+      resp.byte,
+      this,
+      header: resp.header,
+      jsonDecoder: jsonDecoder,
+    );
     return msg;
   }
 
@@ -834,7 +845,9 @@ class Client {
     _secureSocket = null;
     await _tcpSocket?.close();
     _tcpSocket = null;
-
+    await _inboxSub?.close();
+    _inboxSub = null;
+    _inboxSubPrefix = null;
     _buffer = [];
     _clientStatus = _ClientStatus.closed;
   }
