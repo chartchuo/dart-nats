@@ -78,7 +78,7 @@ void main() {
       await client.connect(Uri.parse('ws://localhost:8080'));
       var sub = client.sub('subject1');
       var thaiString = utf8.encode('ทดสอบ');
-      client.pub('subject1', thaiString);
+      client.pub('subject1', Uint8List.fromList(thaiString));
       var msg = await sub.stream.first;
       await client.close();
       expect(msg.byte, equals(thaiString));
