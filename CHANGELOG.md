@@ -1,3 +1,7 @@
+## 0.6.4
+
+* Fix Uint8List and List<int> inconsistency. Thank myxzlpltk for contribution.
+
 ## 0.6.3
 
 * fix Exposing Security Context#31.
