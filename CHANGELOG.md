@@ -1,3 +1,6 @@
+## 0.6.5
+* Issue resolved when app is in background. Thanks nileshsoni97 for contribution.
+
 ## 0.6.4
 
 * Fix Uint8List and List<int> inconsistency. Thank myxzlpltk for contribution.
