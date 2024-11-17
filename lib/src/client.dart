@@ -710,6 +710,9 @@ class Client {
   }
 
   void _add(String str) {
+     if (status == Status.closed || status == Status.disconnected) {
+      return;
+     }
     if (_wsChannel != null) {
       // if (_wsChannel?.closeCode == null) return;
       _wsChannel?.sink.add(utf8.encode(str + '\r\n'));
