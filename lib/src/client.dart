@@ -134,7 +134,9 @@ class Client {
   String _receiveLine1 = '';
 
   Future _sign() async {
-    if (_info.nonce != null && _connectOption.authenticator != null) {
+    if (_info.nonce != null &&
+        _connectOption.authenticator != null &&
+        _connectOption.authenticator?.isNotEmpty == true) {
       var _nkeys = Nkeys.fromSeed(_connectOption.authenticator.toString());
       var sig = _nkeys.sign(utf8.encode(_info.nonce!));
       _connectOption.sig = base64.encode(sig);
