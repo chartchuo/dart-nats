@@ -37,8 +37,6 @@ void main() {
     });
     test('jwt', () async {
       var client = Client();
-      client.seed =
-          'SUAJGSBAKQHGYI7ZVKVR6WA7Z5U52URHKGGT6ZICUJXMG4LCTC2NTLQSF4';
       await client.connect(
         Uri.parse('nats://localhost:4223'),
         retryInterval: 1,
@@ -55,13 +53,11 @@ void main() {
     });
     test('nkey', () async {
       var client = Client();
-      client.seed =
-          'SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY';
-      await client.connect(
+       await client.connect(
         Uri.parse('ws://localhost:8086'),
         retryInterval: 1,
         connectOption: ConnectOption(
-          nkey: 'UDXU4RCSJNZOIQHZNWXHXORDPRTGNJAHAHFRGZNEEJCPQTT2M7NLCNF4',
+          authenticator: 'UDXU4RCSJNZOIQHZNWXHXORDPRTGNJAHAHFRGZNEEJCPQTT2M7NLCNF4',
         ),
       );
       var sub = client.sub('subject.foo');

@@ -100,19 +100,8 @@ class Client {
   ///SecurityContext
   SecurityContext? securityContext;
 
-  Nkeys? _nkeys;
-
-  /// Nkeys seed
-  String? get seed => _nkeys?.seed;
-  set seed(String? newseed) {
-    if (newseed == null) {
-      _nkeys = null;
-      return;
-    }
-    _nkeys = Nkeys.fromSeed(newseed);
-  }
-
   final _jsonDecoder = <Type, dynamic Function(String)>{};
+
   // final _jsonEncoder = <Type, String Function(Type)>{};
 
   /// add json decoder for type <T>
@@ -143,11 +132,13 @@ class Client {
   List<int> _buffer = [];
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
-  Future _sign() async {
-    if (_info.nonce != null && _nkeys != null) {
-      var sig = _nkeys?.sign(utf8.encode(_info.nonce!));
 
-      _connectOption.sig = base64.encode(sig!);
+  Future _sign() async {
+    if (_info.nonce != null && _connectOption.authenticator != null) {
+      var _nkeys = Nkeys.fromSeed(_connectOption.authenticator.toString());
+      var sig = _nkeys.sign(utf8.encode(_info.nonce!));
+      _connectOption.sig = base64.encode(sig);
+      _connectOption.nkey = _nkeys.publicKey();
     }
   }
 
@@ -309,6 +300,7 @@ class Client {
           }, onDone: () {
             _setStatus(Status.disconnected);
           }, onError: (e) {
+            print(e);
             close();
             wsErrorHandler(e);
           });
@@ -617,7 +609,8 @@ class Client {
   ///publish by string
   Future<bool> pubString(String subject, String str,
       {String? replyTo, bool buffer = true, Header? header}) async {
-    return pub(subject, Uint8List.fromList(utf8.encode(str)), replyTo: replyTo, buffer: buffer);
+    return pub(subject, Uint8List.fromList(utf8.encode(str)),
+        replyTo: replyTo, buffer: buffer);
   }
 
   Future<bool> _pub(_Pub p) async {
@@ -710,9 +703,9 @@ class Client {
   }
 
   void _add(String str) {
-     if (status == Status.closed || status == Status.disconnected) {
+    if (status == Status.closed || status == Status.disconnected) {
       return;
-     }
+    }
     if (_wsChannel != null) {
       // if (_wsChannel?.closeCode == null) return;
       _wsChannel?.sink.add(utf8.encode(str + '\r\n'));
@@ -811,6 +804,8 @@ class Client {
       } while (resp.subject != inbox);
     } on TimeoutException {
       throw TimeoutException('request time > $timeout');
+    } catch (e) {
+      throw NatsException(e.toString());
     } finally {
       _mutex.release();
     }
