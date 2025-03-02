@@ -1,4 +1,5 @@
-## TLS, Token, User/Pass, NKey, JWT support NOW.
+# Deprecated
+
 
 
 # Dart-NATS 
