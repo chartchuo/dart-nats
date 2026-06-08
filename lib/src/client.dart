@@ -67,8 +67,22 @@ class Client {
   bool _retry = false;
 
   Info _info = Info();
-  late Completer<void> _pingCompleter;
+  final _pingCompleters = <Completer<void>>[];
   late Completer<void> _connectCompleter;
+
+  List<Uri> _serverPool = [];
+  int _currentServerIndex = 0;
+
+  /// Connection event callbacks
+  void Function()? onConnect;
+  void Function()? onDisconnect;
+  void Function(dynamic error)? onError;
+  void Function()? onReconnect;
+  void Function()? onClose;
+
+  /// User authentication callbacks
+  String Function()? userJwtHandler;
+  Uint8List Function(Uint8List nonce)? signatureHandler;
 
   /// Error handler for websocket errors
   Function(dynamic) wsErrorHandler = (e) {
@@ -140,9 +154,17 @@ class Client {
   }
 
   Future<void> _sign() async {
-    if (_info.nonce != null && _nkeys != null) {
-      final sig = _nkeys?.sign(utf8.encode(_info.nonce!));
-      _connectOption.sig = base64.encode(sig!);
+    if (userJwtHandler != null) {
+      _connectOption.jwt = userJwtHandler!();
+    }
+    if (_info.nonce != null) {
+      if (signatureHandler != null) {
+        final sig = signatureHandler!(Uint8List.fromList(utf8.encode(_info.nonce!)));
+        _connectOption.sig = base64.encode(sig);
+      } else if (_nkeys != null) {
+        final sig = _nkeys?.sign(utf8.encode(_info.nonce!));
+        _connectOption.sig = base64.encode(sig!);
+      }
     }
   }
 
@@ -173,9 +195,19 @@ class Client {
     });
   }
 
+  Uri _getNextServer() {
+    if (_serverPool.isEmpty) {
+      throw NatsException('Server pool is empty');
+    }
+    final server = _serverPool[_currentServerIndex];
+    _currentServerIndex = (_currentServerIndex + 1) % _serverPool.length;
+    return server;
+  }
+
   /// Connect to the NATS server using NATS URI schema
   Future<void> connect(
     Uri uri, {
+    List<Uri>? servers,
     ConnectOption? connectOption,
     int timeout = 5,
     bool retry = true,
@@ -186,6 +218,11 @@ class Client {
     _retry = retry;
     this.securityContext = securityContext;
     _connectCompleter = Completer<void>();
+    _serverPool = [uri];
+    if (servers != null) {
+      _serverPool.addAll(servers);
+    }
+    _currentServerIndex = 0;
 
     if (_clientStatus == _ClientStatus.used) {
       throw Exception(
@@ -202,7 +239,6 @@ class Client {
 
     do {
       _connectLoop(
-        uri,
         timeout: timeout,
         retryInterval: retryInterval,
         retryCount: retryCount,
@@ -234,46 +270,62 @@ class Client {
     return _connectCompleter.future;
   }
 
-  void _connectLoop(
-    Uri uri, {
+  void _connectLoop({
     int timeout = 5,
     required int retryInterval,
     required int retryCount,
   }) async {
-    for (var count = 0;
-        count == 0 || ((count < retryCount || retryCount == -1) && _retry);
-        count++) {
-      if (count == 0) {
+    int attempts = 0;
+    final maxAttempts = _retry ? (retryCount == -1 ? -1 : retryCount * _serverPool.length) : _serverPool.length;
+
+    while (attempts < maxAttempts || maxAttempts == -1) {
+      if (attempts == 0) {
         _setStatus(Status.connecting);
       } else {
         _setStatus(Status.reconnecting);
       }
 
+      final currentUri = _getNextServer();
       try {
         if (_channelStream.isClosed) {
           _channelStream = StreamController<dynamic>();
         }
-        final success = await _connectUri(uri, timeout: timeout);
+        final success = await _connectUri(currentUri, timeout: timeout);
         if (!success) {
-          await Future<void>.delayed(Duration(seconds: retryInterval));
-          continue;
+          attempts++;
+          if (_retry || attempts < _serverPool.length) {
+            final delay = _retry ? retryInterval : 1;
+            await Future<void>.delayed(Duration(seconds: delay));
+            continue;
+          }
+          break;
         }
 
         _buffer = [];
         return;
       } catch (err) {
         await close();
-        if (!_connectCompleter.isCompleted) {
-          _connectCompleter.completeError(err);
+        if (onError != null) {
+          onError!(err);
         }
-        _setStatus(Status.disconnected);
+        attempts++;
+        if (_retry || attempts < _serverPool.length) {
+          final delay = _retry ? retryInterval : 1;
+          await Future<void>.delayed(Duration(seconds: delay));
+        } else {
+          if (!_connectCompleter.isCompleted) {
+            _connectCompleter.completeError(err);
+          }
+          _setStatus(Status.disconnected);
+          break;
+        }
       }
     }
 
     if (!_connectCompleter.isCompleted) {
       _clientStatus = _ClientStatus.closed;
       _connectCompleter
-          .completeError(NatsException('can not connect ${uri.toString()}'));
+          .completeError(NatsException('can not connect to any servers in the pool'));
     }
   }
 
@@ -301,6 +353,9 @@ class Client {
           }, onDone: () {
             _setStatus(Status.disconnected);
           }, onError: (dynamic e) {
+            if (onError != null) {
+              onError!(e);
+            }
             close();
             wsErrorHandler(e);
           });
@@ -325,6 +380,10 @@ class Client {
               if (_channelStream.isClosed) return;
               _channelStream.add(event);
             }
+          }, onError: (dynamic e) {
+            if (onError != null) {
+              onError!(e);
+            }
           }).onDone(() {
             _setStatus(Status.disconnected);
           });
@@ -348,6 +407,10 @@ class Client {
               if (_channelStream.isClosed) return;
               _channelStream.add(event);
             }
+          }, onError: (dynamic e) {
+            if (onError != null) {
+              onError!(e);
+            }
           });
           return true;
 
@@ -355,6 +418,9 @@ class Client {
           throw Exception(NatsException('schema ${uri.scheme} not support'));
       }
     } catch (e) {
+      if (onError != null) {
+        onError!(e);
+      }
       return false;
     }
   }
@@ -435,6 +501,9 @@ class Client {
             }, onError: (dynamic error) {
               print('Socket error: $error');
               _setStatus(Status.disconnected);
+              if (onError != null) {
+                onError!(error);
+              }
 
               if (error is TlsException) {
                 _retry = false;
@@ -483,8 +552,11 @@ class Client {
         break;
 
       case 'pong':
-        if (!_pingCompleter.isCompleted) {
-          _pingCompleter.complete();
+        if (_pingCompleters.isNotEmpty) {
+          final completer = _pingCompleters.removeAt(0);
+          if (!completer.isCompleted) {
+            completer.complete();
+          }
         }
         break;
 
@@ -575,9 +647,10 @@ class Client {
 
   /// Send PING request and wait for PONG
   Future<void> ping() {
-    _pingCompleter = Completer<void>();
+    final completer = Completer<void>();
+    _pingCompleters.add(completer);
     _add('ping');
-    return _pingCompleter.future;
+    return completer.future;
   }
 
   void _addConnectOption(ConnectOption c) {
@@ -798,6 +871,7 @@ class Client {
     Uint8List data, {
     Duration timeout = const Duration(seconds: 2),
     T Function(String)? jsonDecoder,
+    Header? header,
   }) async {
     if (!connected) {
       throw NatsException('request error: client not connected');
@@ -821,7 +895,7 @@ class Client {
     final inbox = _inboxSubPrefix! + '.' + Nuid().next();
     final stream = _inboxSub!.stream;
 
-    await pub(subj, data, replyTo: inbox);
+    await pub(subj, data, replyTo: inbox, header: header);
 
     try {
       do {
@@ -850,18 +924,75 @@ class Client {
     String data, {
     Duration timeout = const Duration(seconds: 2),
     T Function(String)? jsonDecoder,
+    Header? header,
   }) {
     return request<T>(
       subj,
       Uint8List.fromList(data.codeUnits),
       timeout: timeout,
       jsonDecoder: jsonDecoder,
+      header: header,
     );
   }
 
+  /// Flush connection (perform ping/pong roundtrip)
+  Future<void> flush() => ping();
+
+  /// Gracefully drain all subscriptions and close connection
+  Future<void> drain() async {
+    final subs = List<Subscription>.from(_subs.values);
+    await Future.wait(subs.map((s) => s.drain()));
+    await close();
+  }
+
+  /// Gracefully drain a specific subscription
+  Future<void> drainSubscription(Subscription s) async {
+    final sid = s.sid;
+    if (_subs[sid] == null) return;
+
+    _unSub(sid);
+    _backendSubs.remove(sid);
+
+    await flush();
+
+    _subs.remove(sid);
+    await s.close();
+  }
+
+  /// Load NATS credentials from a credential file content
+  void loadCredentials(String content) {
+    final creds = Credentials.parse(content);
+    seed = creds.seed;
+    userJwtHandler = () => creds.jwt;
+  }
+
+  /// Load NATS credentials from a file path
+  Future<void> loadCredentialsFile(String filepath) async {
+    final file = File(filepath);
+    final content = await file.readAsString();
+    loadCredentials(content);
+  }
+
   void _setStatus(Status newStatus) {
+    final oldStatus = _status;
     _status = newStatus;
     _statusController.add(newStatus);
+
+    if (newStatus == Status.connected) {
+      if (oldStatus == Status.reconnecting && onReconnect != null) {
+        onReconnect!();
+      } else if (onConnect != null) {
+        onConnect!();
+      }
+    } else if (newStatus == Status.disconnected) {
+      if (onDisconnect != null) {
+        onDisconnect!();
+      }
+    } else if (newStatus == Status.closed) {
+      if (onClose != null) {
+        onClose!();
+      }
+    }
   }
 
   /// Close connection and prevent any future reconnect retries

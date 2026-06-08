@@ -54,4 +54,9 @@ class Subscription<T> {
   Future close() async {
     await _controller.close();
   }
+
+  /// Gracefully drain this subscription
+  Future<void> drain() async {
+    await _client.drainSubscription(this);
+  }
 }

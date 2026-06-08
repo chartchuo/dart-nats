@@ -7,3 +7,5 @@ export 'src/message.dart';
 export 'src/nkeys.dart';
 export 'src/subscription.dart';
 export 'src/jetstream.dart';
+export 'src/kv.dart';
+export 'src/object_store.dart';

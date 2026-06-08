@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'client.dart';
+import 'common.dart';
 
 /// Message Header
 class Header {
@@ -151,5 +152,36 @@ class Message<T> {
     if (replyTo == null || replyTo == '') return false;
     _client.pub(replyTo, Uint8List.fromList(utf8.encode('+WPI')));
     return true;
+  }
+
+  /// Get the JetStream sequence number directly from the reply subject metadata
+  int? get streamSequence {
+    if (replyTo == null) return null;
+    final parts = replyTo!.split('.');
+    if (parts.length < 8) return null;
+    if (parts[0] != '\$JS' || parts[1] != 'ACK') return null;
+
+    // $JS.ACK.<stream>.<consumer>.<delivered_count>.<stream_seq>...
+    if (parts.length == 8) {
+      return int.tryParse(parts[5]);
+    }
+    if (parts.length == 9) {
+      return int.tryParse(parts[5]);
+    }
+    if (parts.length == 10) {
+      return int.tryParse(parts[7]);
+    }
+    if (parts.length == 11) {
+      return int.tryParse(parts[7]);
+    }
+    return null;
+  }
+
+  /// Acknowledge the message and wait for confirmation from the JetStream server (synchronous ack)
+  Future<void> ackSync({Duration timeout = const Duration(seconds: 2)}) async {
+    if (replyTo == null || replyTo == '') {
+      throw NatsException('Cannot acknowledge message: no reply subject');
+    }
+    await _client.request(replyTo!, Uint8List.fromList(utf8.encode('+ACK')), timeout: timeout);
   }
 }

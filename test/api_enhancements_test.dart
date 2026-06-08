@@ -1,0 +1,402 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:dart_nats/dart_nats.dart';
+import 'package:test/test.dart';
+
+void main() {
+  group('Core Client & Connection Enhancements', () {
+    test('Server Pooling Failover', () async {
+      final client = Client();
+      
+      // Configure an invalid primary URI and a valid fallback URI
+      final primary = Uri.parse('nats://localhost:1234'); // Invalid
+      final fallback = Uri.parse('nats://localhost:4222'); // Valid
+      
+      await client.connect(primary, servers: [fallback], retry: false);
+      expect(client.connected, isTrue);
+      
+      await client.close();
+    });
+
+    test('Connection callbacks on state transitions', () async {
+      final client = Client();
+      bool connectCalled = false;
+      bool disconnectCalled = false;
+      bool closeCalled = false;
+
+      client.onConnect = () {
+        connectCalled = true;
+      };
+      client.onDisconnect = () {
+        disconnectCalled = true;
+      };
+      client.onClose = () {
+        closeCalled = true;
+      };
+
+      await client.connect(Uri.parse('nats://localhost:4222'), retry: false);
+      expect(connectCalled, isTrue);
+
+      await client.tcpClose(); // Force TCP closed -> triggers disconnect
+      // Allow event loop to propagate status
+      await Future.delayed(const Duration(milliseconds: 100));
+      expect(disconnectCalled, isTrue);
+
+      await client.close();
+      expect(closeCalled, isTrue);
+    });
+
+    test('Graceful Draining and Connection Flushing', () async {
+      final client = Client();
+      await client.connect(Uri.parse('nats://localhost:4222'), retry: false);
+
+      final subject = 'test.drain.subj';
+      final sub = client.sub(subject);
+      final received = <Message>[];
+      final subscription = sub.stream.listen((msg) {
+        received.add(msg);
+      });
+      
+      // Publish some messages
+      await client.pubString(subject, 'message-1');
+      await client.pubString(subject, 'message-2');
+      await client.flush();
+
+      // Drain the subscription
+      await sub.drain();
+
+      expect(received.length, equals(2));
+      expect(received[0].string, equals('message-1'));
+      expect(received[1].string, equals('message-2'));
+
+      // Validate that sub has been cleaned up from Client
+      expect(client.unSub(sub), isFalse);
+
+      await client.drain();
+      expect(client.connected, isFalse);
+      await subscription.cancel();
+    });
+
+    test('Request-Reply Headers Support', () async {
+      final client = Client();
+      await client.connect(Uri.parse('nats://localhost:4222'), retry: false);
+
+      final subject = 'test.req.headers.subj';
+      final sub = client.sub(subject);
+
+      // Respond helper that mirrors headers
+      sub.stream.listen((msg) {
+        final replyHeader = Header();
+        if (msg.header != null) {
+          msg.header!.headers?.forEach((k, v) {
+            replyHeader.add(k, v);
+          });
+        }
+        // Send custom reply directly to replyTo with headers (and do NOT call respond() to avoid duplicate message race)
+        if (msg.replyTo != null) {
+          client.pub(msg.replyTo, Uint8List.fromList(utf8.encode('reply-payload')), header: replyHeader);
+        }
+      });
+
+      final reqHeader = Header().add('X-Custom-Req-Header', 'req-val');
+      final resp = await client.request(
+        subject,
+        Uint8List.fromList(utf8.encode('req-data')),
+        header: reqHeader,
+      );
+
+      expect(resp.string, equals('reply-payload'));
+      expect(resp.header?.get('X-Custom-Req-Header'), equals('req-val'));
+
+      client.unSub(sub);
+      await client.close();
+    });
+  });
+
+  group('Credentials File Parsing & Auth Callbacks', () {
+    test('Credentials Block Parsing', () {
+      final credsContent = '''
+-----BEGIN NATS USER JWT-----
+eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ1c2VyMSJ9.signature
+------END NATS USER JWT------
+some comments here
+-----BEGIN USER NKEY SEED-----
+SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
+------END USER NKEY SEED------
+''';
+      final creds = Credentials.parse(credsContent);
+      expect(creds.jwt, equals('eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ1c2VyMSJ9.signature'));
+      expect(creds.seed, equals('SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY'));
+    });
+
+    test('Auth Handlers and loadCredentials', () async {
+      final client = Client();
+      final credsContent = '''
+-----BEGIN NATS USER JWT-----
+test-jwt
+------END NATS USER JWT------
+-----BEGIN USER NKEY SEED-----
+SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
+------END USER NKEY SEED------
+''';
+      client.loadCredentials(credsContent);
+      expect(client.seed, equals('SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY'));
+      expect(client.userJwtHandler!(), equals('test-jwt'));
+    });
+  });
+
+  group('JetStream Publish Options & Sync ACK', () {
+    late Client client;
+    late JetStream js;
+
+    setUp(() async {
+      client = Client();
+      await client.connect(Uri.parse('nats://localhost:4222'), retry: false);
+      js = client.jetStream();
+    });
+
+    tearDown(() async {
+      await client.close();
+    });
+
+    test('Exactly-Once Dedup & Expected Last Sequence', () async {
+      final streamName = 'test-pub-opts-stream';
+      await js.addStream(StreamConfig(
+        name: streamName,
+        subjects: ['pub-opts-subject.*'],
+        storage: 'memory',
+      ));
+
+      // 1. Publish first message with MsgId
+      final ack1 = await js.publishString(
+        'pub-opts-subject.test',
+        'val-1',
+        opts: PubOpts(msgId: 'msg-id-123'),
+      );
+      expect(ack1.sequence, equals(1));
+      expect(ack1.duplicate, isFalse);
+
+      // 2. Publish duplicate message with same MsgId -> should succeed but duplicate is true
+      final ack2 = await js.publishString(
+        'pub-opts-subject.test',
+        'val-1',
+        opts: PubOpts(msgId: 'msg-id-123'),
+      );
+      expect(ack2.duplicate, isTrue);
+
+      // 3. Publish asserting expected last sequence match
+      final ack3 = await js.publishString(
+        'pub-opts-subject.test',
+        'val-2',
+        opts: PubOpts(expectLastSeq: 1),
+      );
+      expect(ack3.sequence, equals(2));
+
+      // 4. Publish asserting mismatched sequence -> should fail with error
+      expect(
+        () => js.publishString(
+          'pub-opts-subject.test',
+          'val-3',
+          opts: PubOpts(expectLastSeq: 100),
+        ),
+        throwsA(isA<NatsException>()),
+      );
+
+      await js.deleteStream(streamName);
+    });
+
+    test('JetStream Stream and Consumer Management APIs', () async {
+      final streamName = 'mgmt-stream';
+      final streamConfig = StreamConfig(
+        name: streamName,
+        subjects: ['mgmt.*'],
+        storage: 'memory',
+      );
+
+      // 1. Create Stream
+      await js.addStream(streamConfig);
+      
+      // 2. Get Stream Info
+      final info = await js.getStream(streamName);
+      expect(info.config.name, equals(streamName));
+      expect(info.state.messages, equals(0));
+
+      // 3. Update Stream config
+      final updatedConfig = StreamConfig(
+        name: streamName,
+        subjects: ['mgmt.*', 'mgmt-extra.*'],
+        storage: 'memory',
+      );
+      final updateOk = await js.updateStream(updatedConfig);
+      expect(updateOk, isTrue);
+
+      final updatedInfo = await js.getStream(streamName);
+      expect(updatedInfo.config.subjects.length, equals(2));
+
+      // 4. Create Consumer
+      final consumerName = 'mgmt-consumer';
+      await js.addConsumer(streamName, ConsumerConfig(durable: consumerName));
+
+      // 5. Get Consumer Info
+      final consInfo = await js.getConsumer(streamName, consumerName);
+      expect(consInfo.name, equals(consumerName));
+
+      // 6. List consumers
+      final consumers = await js.listConsumers(streamName);
+      expect(consumers.length, equals(1));
+      expect(consumers[0].name, equals(consumerName));
+
+      // 7. List streams
+      final streamsList = await js.listStreams();
+      expect(streamsList.any((s) => s.config.name == streamName), isTrue);
+
+      // 8. Purge stream
+      await js.publishString('mgmt.test', 'purge-me');
+      final infoBeforePurge = await js.getStream(streamName);
+      expect(infoBeforePurge.state.messages, equals(1));
+
+      final purgeOk = await js.purgeStream(streamName);
+      expect(purgeOk, isTrue);
+      
+      final infoAfterPurge = await js.getStream(streamName);
+      expect(infoAfterPurge.state.messages, equals(0));
+
+      await js.deleteConsumer(streamName, consumerName);
+      await js.deleteStream(streamName);
+    });
+
+    test('Sync Acknowledgements and Metadata extraction', () async {
+      final streamName = 'sync-ack-stream';
+      final consumerName = 'sync-ack-consumer';
+      
+      await js.addStream(StreamConfig(
+        name: streamName,
+        subjects: ['sync-ack.*'],
+        storage: 'memory',
+      ));
+
+      await js.publishString('sync-ack.test', 'sync-ack-data');
+
+      await js.addConsumer(streamName, ConsumerConfig(durable: consumerName));
+
+      final messages = await js.pull(streamName, consumerName, batch: 1);
+      expect(messages.length, equals(1));
+      
+      final msg = messages[0];
+      // Verify replyTo subject format and parsed stream sequence
+      expect(msg.streamSequence, equals(1));
+
+      // Test ackSync
+      await msg.ackSync();
+
+      await js.deleteConsumer(streamName, consumerName);
+      await js.deleteStream(streamName);
+    });
+  });
+
+  group('High-Level Abstractions (KeyValue & Object Store)', () {
+    late Client client;
+    late JetStream js;
+
+    setUp(() async {
+      client = Client();
+      await client.connect(Uri.parse('nats://localhost:4222'), retry: false);
+      js = client.jetStream();
+    });
+
+    tearDown(() async {
+      await client.close();
+    });
+
+    test('KeyValue Store put/get/delete/purge/watch lifecycle', () async {
+      final bucket = 'my_test_kv_${DateTime.now().millisecondsSinceEpoch}';
+      final kv = await js.keyValue(bucket, create: true, storage: 'memory');
+      
+      // 1. Put
+      final rev1 = await kv.putString('setting1', 'value1');
+      expect(rev1, equals(1));
+
+      // 2. Get
+      final entry = await kv.get('setting1');
+      expect(entry, isNotNull);
+      expect(entry!.string, equals('value1'));
+      expect(entry.revision, equals(1));
+
+      // 3. Watch
+      final watchCompleter = Completer<KeyValueEntry?>();
+      final watchSub = kv.watch(key: 'setting1', includeHistory: true).listen((update) {
+        print('KV Watch received update: key=${update?.key}, value=${update?.string}, revision=${update?.revision}');
+        if (!watchCompleter.isCompleted) {
+          watchCompleter.complete(update);
+        }
+      });
+
+      final watchEntry = await watchCompleter.future.timeout(const Duration(seconds: 4));
+      expect(watchEntry, isNotNull);
+      expect(watchEntry!.string, equals('value1'));
+      watchSub.cancel();
+
+      // 4. Delete
+      final delOk = await kv.delete('setting1');
+      expect(delOk, isTrue);
+
+      final entryAfterDel = await kv.get('setting1');
+      expect(entryAfterDel, isNull);
+
+      // 5. Purge
+      await kv.putString('setting1', 'value2');
+      final purgeOk = await kv.purge('setting1');
+      expect(purgeOk, isTrue);
+
+      final entryAfterPurge = await kv.get('setting1');
+      expect(entryAfterPurge, isNull);
+
+      // Clean up backing stream
+      await js.deleteStream('KV_$bucket');
+    });
+
+    test('Object Store chunking, hashing, put/get/delete/list lifecycle', () async {
+      final bucket = 'my_test_obj_${DateTime.now().millisecondsSinceEpoch}';
+      final os = await js.objectStore(bucket, create: true, storage: 'memory');
+
+      // Generate random binary data larger than 128 KiB chunk size
+      final size = 150 * 1024;
+      final originalData = Uint8List(size);
+      for (var i = 0; i < size; i++) {
+        originalData[i] = i % 256;
+      }
+
+      // 1. Put
+      final info = await os.put('large-file.bin', originalData, description: 'binary data');
+      expect(info.name, equals('large-file.bin'));
+      expect(info.size, equals(size));
+      expect(info.chunks, equals(2)); // 150 KiB / 128 KiB chunking = 2 chunks
+      expect(info.deleted, isFalse);
+
+      // 2. Get & verify integrity
+      final retrievedData = await os.get('large-file.bin');
+      expect(retrievedData, isNotNull);
+      expect(retrievedData!.length, equals(size));
+      expect(retrievedData, equals(originalData));
+
+      // 3. List
+      final objects = await os.list();
+      expect(objects.length, equals(1));
+      expect(objects[0].name, equals('large-file.bin'));
+
+      // 4. Delete & Clean chunks
+      final delOk = await os.delete('large-file.bin');
+      expect(delOk, isTrue);
+
+      final infoAfterDel = await os.getInfo('large-file.bin');
+      expect(infoAfterDel!.deleted, isTrue);
+
+      final dataAfterDel = await os.get('large-file.bin');
+      expect(dataAfterDel, isNull);
+
+      // Clean up backing stream
+      await js.deleteStream('OBJ_$bucket');
+    });
+  });
+}

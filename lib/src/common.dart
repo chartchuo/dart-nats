@@ -227,3 +227,56 @@ class NkeysException implements Exception {
     return result;
   }
 }
+
+/// NATS Credentials helper class to parse user credentials files (.creds)
+class Credentials {
+  final String jwt;
+  final String seed;
+
+  Credentials({required this.jwt, required this.seed});
+
+  /// Parse a NATS credentials file content
+  factory Credentials.parse(String content) {
+    final lines = content.split(RegExp(r'\r?\n'));
+    bool inJwt = false;
+    bool inSeed = false;
+    final jwtLines = <String>[];
+    final seedLines = <String>[];
+
+    for (var line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.contains('BEGIN') && trimmed.contains('JWT')) {
+        inJwt = true;
+        continue;
+      }
+      if (trimmed.contains('END') && trimmed.contains('JWT')) {
+        inJwt = false;
+        continue;
+      }
+      if (trimmed.contains('BEGIN') && (trimmed.contains('SEED') || trimmed.contains('NKEY'))) {
+        inSeed = true;
+        continue;
+      }
+      if (trimmed.contains('END') && (trimmed.contains('SEED') || trimmed.contains('NKEY'))) {
+        inSeed = false;
+        continue;
+      }
+
+      if (inJwt) {
+        jwtLines.add(trimmed);
+      }
+      if (inSeed) {
+        seedLines.add(trimmed);
+      }
+    }
+
+    final jwt = jwtLines.join('\n').trim();
+    final seed = seedLines.join('\n').trim();
+
+    if (jwt.isEmpty || seed.isEmpty) {
+      throw NatsException('Failed to parse credentials: missing USER JWT or NKEY SEED block');
+    }
+
+    return Credentials(jwt: jwt, seed: seed);
+  }
+}
