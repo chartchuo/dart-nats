@@ -90,7 +90,9 @@ void main() {
       expect(deleteStreamResult, isTrue);
     });
 
-    test('JetStream error handling: Delete non-existent stream throws NatsException', () async {
+    test(
+        'JetStream error handling: Delete non-existent stream throws NatsException',
+        () async {
       expect(
         () => js.deleteStream('non-existent-stream-xyz'),
         throwsA(isA<NatsException>()),
