@@ -11,6 +11,7 @@ import 'inbox.dart';
 import 'message.dart';
 import 'nkeys.dart';
 import 'subscription.dart';
+import 'jetstream.dart';
 
 enum _ReceiveState {
   idle, //op=msg -> msg
@@ -591,7 +592,8 @@ class Client {
   ///publish by string
   Future<bool> pubString(String subject, String str,
       {String? replyTo, bool buffer = true, Header? header}) async {
-    return pub(subject, Uint8List.fromList(utf8.encode(str)), replyTo: replyTo, buffer: buffer);
+    return pub(subject, Uint8List.fromList(utf8.encode(str)),
+        replyTo: replyTo, buffer: buffer);
   }
 
   Future<bool> _pub(_Pub p) async {
@@ -873,4 +875,7 @@ class Client {
       }
     }
   }
+
+  /// Get a JetStream context
+  JetStream jetStream() => JetStream(this);
 }

@@ -7,7 +7,7 @@ services:
       - "8080:8080"
     volumes:
       - ./test/config:/config
-    command: "-V -D -c /config/websocket.cfg"
+    command: "-V -D -c /config/websocket.cfg -js"
 
   nats-jwt:
     image: nats

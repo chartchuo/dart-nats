@@ -64,6 +64,19 @@ class Header {
 
     return Uint8List.fromList(utf8.encode(str));
   }
+
+  /// Get status code if this is a NATS status message
+  int? get status {
+    final statusStr = get('Status');
+    if (statusStr != null) {
+      return int.tryParse(statusStr);
+    }
+    final parts = version.split(' ');
+    if (parts.length >= 2) {
+      return int.tryParse(parts[1]);
+    }
+    return null;
+  }
 }
 
 /// Message class
@@ -110,5 +123,33 @@ class Message<T> {
   ///Respond to string message
   bool respondString(String str) {
     return respond(Uint8List.fromList(utf8.encode(str)));
+  }
+
+  /// Acknowledge the message (JetStream)
+  bool ack() {
+    if (replyTo == null || replyTo == '') return false;
+    _client.pub(replyTo, Uint8List.fromList(utf8.encode('+ACK')));
+    return true;
+  }
+
+  /// Negatively acknowledge the message (JetStream)
+  bool nak() {
+    if (replyTo == null || replyTo == '') return false;
+    _client.pub(replyTo, Uint8List.fromList(utf8.encode('-NAK')));
+    return true;
+  }
+
+  /// Terminate the message, preventing redelivery (JetStream)
+  bool term() {
+    if (replyTo == null || replyTo == '') return false;
+    _client.pub(replyTo, Uint8List.fromList(utf8.encode('+TERM')));
+    return true;
+  }
+
+  /// Indicate message processing is still in progress (JetStream)
+  bool inProgress() {
+    if (replyTo == null || replyTo == '') return false;
+    _client.pub(replyTo, Uint8List.fromList(utf8.encode('+WPI')));
+    return true;
   }
 }

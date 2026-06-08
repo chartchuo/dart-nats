@@ -125,7 +125,7 @@ class ConnectOption {
   /// password
   String? pass;
 
-  ///server name
+  /// client connection name / app name
   String? name;
 
   /// lang??
