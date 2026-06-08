@@ -36,6 +36,9 @@ class KeyValueConfig {
       maxBytes: maxBytes,
       allowRollup: true,
       discard: 'new',
+      allowDirect: true,
+      denyDelete: true,
+      maxMsgsPerSubject: history,
     );
   }
 }

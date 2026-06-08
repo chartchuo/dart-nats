@@ -100,7 +100,7 @@ class ObjectStore {
 
     // Compute digest and create metadata
     final hash = sha256.convert(data);
-    final digest = 'SHA-256=${base64.encode(hash.bytes)}';
+    final digest = 'SHA-256=${base64Url.encode(hash.bytes)}';
     
     final info = ObjectInfo(
       name: name,
@@ -114,7 +114,7 @@ class ObjectStore {
     );
 
     // Save metadata
-    final encodedName = base64Url.encode(utf8.encode(name)).replaceAll('=', '');
+    final encodedName = base64Url.encode(utf8.encode(name));
     final metadataSubject = '\$O.$bucket.M.$encodedName';
     final payload = utf8.encode(jsonEncode(info.toJson()));
     
@@ -129,7 +129,7 @@ class ObjectStore {
 
   /// Retrieve the ObjectInfo metadata for a given name
   Future<ObjectInfo?> getInfo(String name) async {
-    final encodedName = base64Url.encode(utf8.encode(name)).replaceAll('=', '');
+    final encodedName = base64Url.encode(utf8.encode(name));
     final apiSubject = '\$JS.API.STREAM.MSG.GET.$streamName';
     final payload = utf8.encode(jsonEncode({
       'last_by_subj': '\$O.$bucket.M.$encodedName',
@@ -202,7 +202,7 @@ class ObjectStore {
         
         // Digest verification
         final hash = sha256.convert(fullData);
-        final computedDigest = 'SHA-256=${base64.encode(hash.bytes)}';
+        final computedDigest = 'SHA-256=${base64Url.encode(hash.bytes)}';
         if (computedDigest != info.digest) {
           if (!completer.isCompleted) {
             completer.completeError(NatsException('SHA-256 digest verification failed.'));
@@ -244,7 +244,7 @@ class ObjectStore {
     final info = await getInfo(name);
     if (info == null) return false;
 
-    final encodedName = base64Url.encode(utf8.encode(name)).replaceAll('=', '');
+    final encodedName = base64Url.encode(utf8.encode(name));
     final metadataSubject = '\$O.$bucket.M.$encodedName';
 
     final deletedInfo = ObjectInfo(

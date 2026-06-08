@@ -71,6 +71,15 @@ class StreamConfig {
   /// Discard policy: 'old', 'new'
   final String? discard;
 
+  /// Allow direct message gets
+  final bool? allowDirect;
+
+  /// Max messages per subject
+  final int? maxMsgsPerSubject;
+
+  /// Max message size
+  final int? maxMsgSize;
+
   /// Constructor for StreamConfig
   StreamConfig({
     required this.name,
@@ -83,6 +92,9 @@ class StreamConfig {
     this.denyDelete,
     this.denyPurge,
     this.discard,
+    this.allowDirect,
+    this.maxMsgsPerSubject,
+    this.maxMsgSize,
   });
 
   /// Export configuration to JSON map
@@ -106,6 +118,15 @@ class StreamConfig {
     }
     if (discard != null) {
       map['discard'] = discard;
+    }
+    if (allowDirect != null) {
+      map['allow_direct'] = allowDirect;
+    }
+    if (maxMsgsPerSubject != null) {
+      map['max_msgs_per_subject'] = maxMsgsPerSubject;
+    }
+    if (maxMsgSize != null) {
+      map['max_msg_size'] = maxMsgSize;
     }
     return map;
   }
@@ -557,6 +578,8 @@ class JetStream {
         name: streamName,
         subjects: ['\$O.$bucket.>'],
         storage: storage ?? 'file',
+        allowRollup: true,
+        discard: 'new',
       );
       await addStream(config);
     }

@@ -62,6 +62,7 @@ class Header {
     headers?.forEach((k, v) {
       str = str + '$k:$v\r\n';
     });
+    str += '\r\n';
 
     return Uint8List.fromList(utf8.encode(str));
   }
