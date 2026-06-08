@@ -5,414 +5,531 @@
 
 A lightweight, high-performance Dart client library for the [NATS](https://nats.io) messaging system. Designed specifically for use with **Dart** and **Flutter** applications.
 
----
-
-## Features
-
-- [x] **Publish & Subscribe:** Support for standard pub/sub operations.
-- [x] **Platform Versatility:** Run on Web (WebSockets) and native mobile/desktop/server (TCP Socket and WebSockets).
-- [x] **Reconnection & Retry:** Automatic retry/reconnection in the background with customizable retry limits.
-- [x] **Message Buffering:** Buffers published messages during brief reconnection attempts.
-- [x] **Inbox & NUID:** Built-in unique ID and transient inbox generation.
-- [x] **Request-Response:** Synchronous or asynchronous request/respond patterns, including request timeout and unsubscribe-after-N capabilities.
-- [x] **Queue Groups:** Support for shared subscriptions (Queue subscribe).
-- [x] **Robust Authentication:** Built-in support for token, username/password, NKEY, and JWT authentication (compatible with NATS 2.0+).
-- [x] **TLS/SSL Security:** Secure connections for native TCP sockets and WebSockets.
-- [x] **JetStream Support:** Create, update, purge, delete, and list Streams and Consumers, publish/subscribe, and pull messages with manual Ack/Nak/Term control.
-- [x] **Key-Value Store:** High-level wrapper to put, get, delete, purge, and watch real-time keys in a KV bucket.
-- [x] **Object Store:** Convenient object/file storage featuring automatic chunking (128 KiB chunks) and end-to-end SHA-256 digest validation.
+> [!NOTE]
+> **Good news—this repository is active and maintained again!** To help us move fast and keep maintenance overhead light, we're using AI assistants to help write code, document features, and write tests. Currently, we're building out exciting new features like NATS JetStream, Key-Value, and Object Stores, and keeping updated with the latest Dart SDK.
 
 ---
 
-## Getting Started
+## 📖 Introduction & Core Concepts
 
-Add the dependency to your `pubspec.yaml`:
+NATS is a simple, secure, and high-performance publish-subscribe messaging system. This client library allows Dart and Flutter applications to communicate seamlessly with NATS servers.
+
+### Async Model: Streams and Futures
+The library is designed around standard Dart asynchronous paradigms:
+* **Futures**: Used for one-shot operations, such as establishing connections, sending requests, publishing messages, or performing administrative tasks (like creating streams or KV buckets).
+* **Streams**: Used for subscribing to message topics, listening to connection status changes, or watching live mutations in a Key-Value bucket.
+
+---
+
+## 🚀 Getting Started
+
+### 1. Add Dependency
+Add `dart_nats` to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
   dart_nats: ^0.7.0
 ```
 
----
-
-## Connection Setup
-
-### Flutter Web Support (via WebSockets)
-```dart
-final client = Client();
-client.connect(Uri.parse('ws://localhost:80'));
-// or secure
-client.connect(Uri.parse('wss://localhost:443'));
-```
-
-### Native Platforms (via TCP Socket and WebSockets)
-```dart
-final client = Client();
-client.connect(Uri.parse('nats://localhost:4222'));
-client.connect(Uri.parse('tls://localhost:4222'));
-client.connect(Uri.parse('ws://localhost:80'));
-client.connect(Uri.parse('wss://localhost:443'));
-```
-
----
-
-## Connection Management
-
-### Background Retry
-To handle network drops gracefully, you can enable background retries and listen to connection state changes:
-
-```dart
-// Connect in background without awaiting blocks
-client.connect(
-  Uri.parse('nats://localhost:4222'), 
-  retry: true, 
-  retryCount: -1, // -1 means infinite retries
-);
-
-// If needed, await for the initial connection to establish
-await client.wait4Connected();
-
-// Listen to the connection status stream
-client.statusStream.listen((status) {
-  print('Connection status changed to: $status');
-});
-```
-
-### Disable Retry and Catch Exceptions
-```dart
-try {
-  await client.connect(Uri.parse('nats://localhost:1234'), retry: false);
-} on NatsException catch (e) {
-  print('Connection failed: $e');
-}
-```
-
----
-
-## Dart Usage Example
+### 2. Import the Package
+Import the client library into your Dart code:
 
 ```dart
 import 'package:dart_nats/dart_nats.dart';
+```
 
-void main() async {
-  final client = Client();
-  
-  // Establish connection
-  await client.connect(Uri.parse('nats://localhost:4222'));
-  
-  // Subscribe to a subject
-  final sub = client.sub('subject1');
-  
-  // Publish a message
-  await client.pubString('subject1', 'hello world');
-  
-  // Wait for the first message on subscription
-  final msg = await sub.stream.first;
+---
+
+## 🔌 Connection Setup & Lifecycle
+
+The client supports standard TCP socket connections (for native platforms) and WebSocket connections (for Flutter Web and platforms requiring HTTP-friendly transports).
+
+### 1. Protocols & URI Schemes
+Depending on the platform and transport, connect using the appropriate URI scheme:
+
+```dart
+final client = Client();
+
+// 1. Native TCP connection (highly recommended for server, mobile, and desktop)
+await client.connect(Uri.parse('nats://localhost:4222'));
+
+// 2. Native TLS (secure TCP socket connection)
+await client.connect(Uri.parse('tls://localhost:4222'));
+
+// 3. WebSocket connection (required for Flutter Web)
+await client.connect(Uri.parse('ws://localhost:8080'));
+
+// 4. Secure WebSocket connection (WSS)
+await client.connect(Uri.parse('wss://localhost:8443'));
+```
+
+### 2. Connection Management & Background Retry
+You can configure retry behavior, handle connection states, and track connection health:
+
+```dart
+// Connect in the background without blocking execution
+client.connect(
+  Uri.parse('nats://localhost:4222'),
+  retry: true,           // Enable automatic background reconnects
+  retryCount: -1,        // -1 means retry infinitely; otherwise set max attempts
+  retryInterval: 5,      // Delay in seconds between connection retries
+  timeout: 5,            // Connection timeout in seconds
+);
+
+// Wait until the client successfully establishes a connection
+await client.wait4Connected(); // Or client.waitUntilConnected();
+```
+
+### 3. Monitoring Connection Status
+You can listen to connection status changes through the `statusStream`. This is ideal for updating Flutter UI overlays when the network drops:
+
+```dart
+client.statusStream.listen((status) {
+  switch (status) {
+    case Status.connecting:
+      print('Connecting to NATS...');
+      break;
+    case Status.connected:
+      print('Connected successfully!');
+      break;
+    case Status.disconnected:
+      print('Disconnected from server.');
+      break;
+    case Status.reconnecting:
+      print('Network dropped. Reconnecting in background...');
+      break;
+    case Status.closed:
+      print('Connection explicitly closed.');
+      break;
+    default:
+      break;
+  }
+});
+```
+
+### 4. Connection State Callbacks
+Alternatively, you can register connection lifecycle callbacks:
+
+```dart
+client.onConnect = () => print('Connected');
+client.onDisconnect = () => print('Disconnected');
+client.onReconnect = () => print('Reconnected');
+client.onClose = () => print('Connection Closed');
+```
+
+### 5. Disconnection & Draining
+* `close()`: Immediately shuts down the connection and cleans up memory.
+* `forceClose()`: Closes the active connection and ensures no background reconnect retries are attempted.
+* `drain()`: Subscriptions are drained (processed) completely before the connection is closed.
+
+```dart
+// Gracefully drain all subscriptions and close connection
+await client.drain();
+```
+
+---
+
+## ✉️ Publish & Subscribe (Core Pub/Sub)
+
+Pub/Sub is the foundation of NATS. Subscribers register interest in subjects, and publishers send payloads to those subjects.
+
+### 1. Publishing Payloads
+You can publish raw binary bytes (`Uint8List`) or string helper payloads:
+
+```dart
+// Publish a raw binary payload
+await client.pub('sensors.temperature', Uint8List.fromList([22, 10, 44]));
+
+// Publish a string payload
+await client.pubString('sensors.temperature', '22.4 C');
+```
+
+### 2. Subscribing to Topics
+Subscribing returns a `Subscription` containing a Dart `Stream<Message>`. The client automatically restores these subscriptions when a background reconnection occurs:
+
+```dart
+// Subscribe to a topic
+final sub = client.sub('sensors.temperature');
+
+// Listen to the message stream
+final streamSubscription = sub.stream.listen((Message msg) {
   print('Received payload: ${msg.string}');
   
-  // Clean up
-  client.unSub(sub);
-  client.close();
-}
+  // Respond directly if the publisher requested a reply
+  if (msg.replyTo != null) {
+    msg.respondString('Acknowledgment');
+  }
+});
+
+// To stop listening and clean up subscription:
+client.unSub(sub); // Or await sub.close();
+```
+
+### 3. Wildcard Subscriptions
+NATS supports path-based wildcards:
+* `*` (asterisk) matches a single token path segment. E.g., `sensors.*` matches `sensors.temperature` and `sensors.humidity`.
+* `>` (greater-than) matches any trailing tokens recursively. E.g., `sensors.>` matches `sensors.us.west.temperature`.
+
+```dart
+final sub = client.sub('sensors.>');
+```
+
+### 4. Queue Groups (Load Balancing)
+If you run multiple instances of a service and want to distribute messages among them (instead of having all instances receive every message), use queue groups:
+
+```dart
+// NATS will load-balance messages on 'orders.created' among all instances in 'billing-group'
+final sub = client.sub('orders.created', queueGroup: 'billing-group');
 ```
 
 ---
 
-## Flutter Integration Example
+## 📱 Flutter Integration
 
-### 1. Declare and Initialize the Client
+Integrating NATS into Flutter is straightforward because subscriptions expose standard Dart streams. You can consume message streams directly in your UI using a `StreamBuilder`.
+
 ```dart
+import 'package:flutter/material.dart';
 import 'package:dart_nats/dart_nats.dart' as nats;
 
-nats.Client natsClient;
-nats.Subscription fooSub, barSub;
+class TemperatureMonitor extends StatefulWidget {
+  const TemperatureMonitor({Key? key}) : super(key: key);
 
-void connect() {
-  natsClient = nats.Client();
-  natsClient.connect(Uri.parse('nats://hostname:4222'));
-  fooSub = natsClient.sub('foo');
-  barSub = natsClient.sub('bar');
+  @override
+  _TemperatureMonitorState createState() => _TemperatureMonitorState();
 }
-```
 
-### 2. Stream Data to UI (StreamBuilder)
-```dart
-StreamBuilder<nats.Message>(
-  stream: fooSub.stream,
-  builder: (context, snapshot) {
-    if (snapshot.hasData) {
-      return Text('Message: ${snapshot.data?.string}');
-    }
-    return const Text('Waiting for messages...');
-  },
-)
-```
+class _TemperatureMonitorState extends State<TemperatureMonitor> {
+  late nats.Client _natsClient;
+  late nats.Subscription _sub;
 
-### 3. Publish Message
-```dart
-await natsClient.pubString('subject', 'message string');
-```
+  @override
+  void initState() {
+    super.initState();
+    _natsClient = nats.Client();
+    _natsClient.connect(Uri.parse('nats://localhost:4222'), retry: true);
+    
+    // Subscribe to subject
+    _sub = _natsClient.sub('sensors.temperature');
+  }
 
-### 4. Dispose Client on Widget Destruction
-```dart
-@override
-void dispose() {
-  natsClient.close();
-  super.dispose();
-}
-```
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('NATS Monitor')),
+      body: Center(
+        child: StreamBuilder<nats.Message>(
+          stream: _sub.stream,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Text('Error: ${snapshot.error}');
+            }
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const CircularProgressIndicator();
+            }
+            if (!snapshot.hasData) {
+              return const Text('Waiting for temperature readings...');
+            }
+            return Text(
+              'Temperature: ${snapshot.data?.string}',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            );
+          },
+        ),
+      ),
+    );
+  }
 
----
-
-## Request & Response Pattern
-
-### Standard Binary Request
-```dart
-final client = Client();
-client.inboxPrefix = '_INBOX.test_test';
-await client.connect(Uri.parse('nats://localhost:4222'));
-
-final response = await client.request(
-  'service', 
-  Uint8List.fromList('request'.codeUnits),
-);
-print('Response: ${response.string}');
-```
-
-### Structured Data (JSON) Decoding
-Register a decoder to automatically deserialize response payloads into strongly typed Dart objects:
-
-```dart
-final client = Client();
-await client.connect(Uri.parse('nats://localhost:4222'));
-
-// Register the JSON decoder mapping a JSON string to a Student object
-client.registerJsonDecoder<Student>(json2Student);
-
-final response = await client.requestString<Student>('service', '');
-final Student student = response.data;
-
-Student json2Student(String json) {
-  return Student.fromJson(jsonDecode(json));
+  @override
+  void dispose() {
+    // Gracefully unsubscribe and close client on disposal
+    _natsClient.unSub(_sub);
+    _natsClient.close();
+    super.dispose();
+  }
 }
 ```
 
 ---
 
-## Authentication Modes
+## 🔁 Request-Reply Pattern
 
-### Token Authentication
+The Request-Reply pattern is useful for client-server APIs. NATS automatically handles temporary inbox creation so replies map back to the correct request.
+
+### 1. Simple Request
 ```dart
-final client = Client();
+try {
+  final Message response = await client.request(
+    'users.get',
+    Uint8List.fromList('user-123'.codeUnits),
+    timeout: const Duration(seconds: 3),
+  );
+  print('User details: ${response.string}');
+} on TimeoutException {
+  print('Request timed out!');
+}
+```
+
+### 2. Structured JSON Decoding
+You can register custom type decoders. This avoids manual JSON parsing in your application code:
+
+```dart
+// 1. Define your data class
+class User {
+  final String id;
+  final String name;
+  User({required this.id, required this.name});
+
+  factory User.fromJson(Map<String, dynamic> json) {
+    return User(id: json['id'], name: json['name']);
+  }
+}
+
+// 2. Define the JSON parser function
+User jsonToUser(String jsonStr) {
+  return User.fromJson(jsonDecode(jsonStr));
+}
+
+// 3. Register the decoder with the client
+client.registerJsonDecoder<User>(jsonToUser);
+
+// 4. Request the object directly -> response.data is automatically parsed as User
+final response = await client.requestString<User>('users.get', 'user-123');
+final User user = response.data;
+print('User: ${user.name}');
+```
+
+---
+
+## 🔐 Authentication Modes
+
+NATS supports multiple authentication schemes depending on your security requirements.
+
+### 1. Token Auth
+```dart
 client.connect(
-  Uri.parse('nats://localhost'),
-  connectOption: ConnectOption(authToken: 'mytoken'),
+  Uri.parse('nats://localhost:4222'),
+  connectOption: ConnectOption(authToken: 'my-secret-token'),
 );
 ```
 
-### Username & Password Authentication
+### 2. Username & Password Auth
 ```dart
-final client = Client();
 client.connect(
-  Uri.parse('nats://localhost'),
-  connectOption: ConnectOption(user: 'foo', pass: 'bar'),
+  Uri.parse('nats://localhost:4222'),
+  connectOption: ConnectOption(user: 'admin', pass: 'strongpassword'),
 );
 ```
 
-### NKEY Authentication
+### 3. NKEY Auth
+NKEY uses public-key cryptography. You set the private seed locally, and provide the public key to NATS:
+
 ```dart
-final client = Client();
 client.seed = 'SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY';
 client.connect(
-  Uri.parse('nats://localhost'),
+  Uri.parse('nats://localhost:4222'),
   connectOption: ConnectOption(
     nkey: 'UDXU4RCSJNZOIQHZNWXHXORDPRTGNJAHAHFRGZNEEJCPQTT2M7NLCNF4',
   ),
 );
 ```
 
-### JWT Authentication
+### 4. JWT & User Credentials (.creds) Auth
+JWT authentication maps credentials securely. You can easily load NATS `.creds` files directly:
+
 ```dart
-final client = Client();
-client.seed = 'SUAJGSBAKQHGYI7ZVKVR6WA7Z5U52URHKGGT6ZICUJXMG4LCTC2NTLQSF4';
-client.connect(
-  Uri.parse('nats://localhost'),
-  connectOption: ConnectOption(
-    jwt: 'YOUR_JWT_STRING',
-  ),
-);
+// Load from a raw credentials file string
+client.loadCredentials(myCredsFileContent);
+
+// Or load directly from a file path (Native Dart platforms)
+await client.loadCredentialsFile('/path/to/user.creds');
+
+// Connect to the server
+await client.connect(Uri.parse('nats://localhost:4222'));
 ```
 
 ---
 
-## JetStream Support
+## ⚡ JetStream Support (Persistence)
 
-NATS JetStream provides persistence, at-least-once delivery, and consumer management.
+JetStream provides message persistence, at-least-once delivery guarantees, and support for message replay.
 
-### Initialize JetStream Context
+### 1. Initialize JetStream
+Create a JetStream context from your connected client:
+
 ```dart
-final client = Client();
-await client.connect(Uri.parse('nats://localhost:4222'));
-
 final js = client.jetStream();
 ```
 
-### Stream Management
+### 2. Stream Management
+Streams ingest messages published to specific subjects and store them:
+
 ```dart
-// Define stream configuration
+// 1. Configure the stream
 final streamConfig = StreamConfig(
-  name: 'orders-stream',
-  subjects: ['orders.*'],
-  storage: 'memory', // Or 'file' (default)
+  name: 'events-stream',
+  subjects: ['events.>'],
+  storage: 'file', // 'file' for persistent disk storage, 'memory' for ephemeral testing
 );
 
-// Create the stream
+// 2. Create the stream
 await js.addStream(streamConfig);
 
-// Retrieve stream information
-final info = await js.getStream('orders-stream');
-print('Active messages: ${info.state.messages}');
+// 3. Get stream info (e.g. sequence numbers, message counts)
+final StreamInfo info = await js.getStream('events-stream');
+print('Stored messages: ${info.state.messages}');
 
-// Purge a stream (keep config, delete messages)
-await js.purgeStream('orders-stream');
+// 4. Purge stream messages
+await js.purgeStream('events-stream');
 
-// Delete a stream entirely
-await js.deleteStream('orders-stream');
+// 5. Delete stream
+await js.deleteStream('events-stream');
 ```
 
-### Publish to a Stream
-JetStream publishes wait for a publish acknowledgement (`PubAck`) from the server to guarantee persistence:
+### 3. Publishing to JetStream
+JetStream publishing awaits a publish acknowledgment (`PubAck`) from the server to guarantee persistence:
+
 ```dart
-final pubAck = await js.publishString('orders.created', 'Order Data');
-print('Published to stream ${pubAck.stream} at sequence ${pubAck.sequence}');
+// Publish with optimistic concurrency checks (optional)
+final pubAck = await js.publishString(
+  'events.clicks',
+  'click-data',
+  opts: PubOpts(msgId: 'unique-msg-id'), // Prevent duplicate publishes
+);
+print('Message persisted at sequence: ${pubAck.sequence}');
 ```
 
-### Pull Consumer Lifecycle
-Pull consumers allow you to pull batches of messages on demand:
+### 4. Pull Consumer Lifecycle
+Pull Consumers fetch batches of messages on-demand. This pattern is ideal for workers and high-throughput background processing:
+
 ```dart
+// 1. Define consumer configuration
 final consumerConfig = ConsumerConfig(
-  durable: 'billing-service', // Required for pull mode durability
+  durable: 'worker-consumer', // Required for pull mode state tracking
   ackPolicy: 'explicit',
   deliverPolicy: 'all',
 );
 
-// Create the consumer
-await js.addConsumer('orders-stream', consumerConfig);
+// 2. Add the consumer to the stream
+await js.addConsumer('events-stream', consumerConfig);
 
-// Pull a batch of messages
-final messages = await js.pull(
-  'orders-stream',
-  'billing-service',
-  batch: 5,
-  timeout: const Duration(seconds: 2),
+// 3. Pull a batch of messages on-demand
+final List<Message> batch = await js.pull(
+  'events-stream',
+  'worker-consumer',
+  batch: 10,
+  timeout: const Duration(seconds: 3),
 );
 
-for (final msg in messages) {
-  print('Pulled: ${msg.string}');
+for (final Message msg in batch) {
+  print('Process message: ${msg.string}');
   
-  // Acknowledge the message (standard)
+  // Acknowledge the message (removes it from delivery queue)
   msg.ack();
   
-  // Or sync ack (waits for confirmation)
-  // await msg.ackSync();
-  
-  // Or Nak (triggers immediate redelivery)
-  // msg.nak();
-  
-  // Or Term (term/terminate to prevent any redelivery)
-  // msg.term();
+  // Or:
+  // await msg.ackSync(); // Wait for server to confirm acknowledgment
+  // msg.nak();          // Negative ack: triggers redelivery
+  // msg.term();         // Terminate: prevents any future redeliveries of this message
 }
+
+// Clean up when done
+await js.deleteConsumer('events-stream', 'worker-consumer');
 ```
 
 ---
 
-## Key-Value Store
+## 🗄️ Key-Value (KV) Store
 
-The Key-Value (KV) Store is built on top of JetStream. It allows you to store, retrieve, delete, and watch keys in a bucket.
+The KV Store provides a lightweight, schemaless key-value database built on top of NATS JetStream.
 
-### Create or Bind to a Bucket
+### 1. Create or Bind to a KV Bucket
 ```dart
-// Create a KV store instance (setting create: true will provision the backing stream)
-final kv = await js.keyValue('my_bucket', create: true, storage: 'memory');
+// Provision or bind to the bucket. Setting create: true creates the backing JetStream stream.
+final KeyValue kv = await js.keyValue('app_settings', create: true, storage: 'memory');
 ```
 
-### Write and Read Keys
+### 2. Put & Get Values
 ```dart
-// Put a string or binary value
-await kv.putString('user:123', 'John Doe');
+// Save keys (strings or raw binary bytes)
+await kv.putString('theme', 'dark');
+await kv.put('port', Uint8List.fromList([80, 80]));
 
-// Get the latest entry
-final entry = await kv.get('user:123');
+// Fetch key entry
+final KeyValueEntry? entry = await kv.get('theme');
 if (entry != null) {
+  print('Key: ${entry.key}');
   print('Value: ${entry.string}');
-  print('Revision: ${entry.revision}');
-  print('Created: ${entry.created}');
+  print('Revision (Sequence): ${entry.revision}');
+  print('Timestamp: ${entry.created}');
 }
 ```
 
-### Delete and Purge Keys
-- `delete`: Inserts a tombstone, keeping the historical record but marking the key as deleted.
-- `purge`: Permanently removes the key and all its historical values.
-```dart
-// Delete key
-await kv.delete('user:123');
+### 3. Deleting vs Purging
+* `delete()`: Places a tombstone message on the key. The key will appear as deleted, but previous histories are kept.
+* `purge()`: Permanently deletes the key and purges all of its historical values.
 
-// Purge key history
-await kv.purge('user:123');
+```dart
+await kv.delete('theme');
+await kv.purge('port');
 ```
 
-### Real-Time Watcher
-Listen for modifications to keys in real-time. You can watch a specific key or all keys using wildcards:
+### 4. Watch for Real-Time Changes
+Listen for live updates to keys. You can watch specific keys, or use wildcards (e.g. `>` to watch everything):
+
 ```dart
-final subscription = kv.watch(key: 'user.*', includeHistory: true).listen((entry) {
+final Stream<KeyValueEntry?> watcher = kv.watch(key: 'user.>', includeHistory: false);
+
+final streamSub = watcher.listen((KeyValueEntry? entry) {
   if (entry == null) {
-    print('Key was deleted/purged');
+    print('Watched key was deleted/purged.');
   } else {
-    print('Key: ${entry.key}, Value: ${entry.string}');
+    print('Live Update - Key: ${entry.key}, Value: ${entry.string}');
   }
 });
 
-// To stop watching
-await subscription.cancel();
+// Cancel when finished
+await streamSub.cancel();
 ```
 
 ---
 
-## Object Store
+## 📦 Object Store
 
-The Object Store offers a way to store files or large payloads. Under the hood, it chunks files into 128 KiB blocks and runs end-to-end SHA-256 digest validation to ensure data integrity during uploads and downloads.
+The Object Store is built on top of JetStream. It is designed to store files and large payloads. Under the hood, the client splits large objects into 128 KiB chunks and performs end-to-end SHA-256 digest validation to ensure file transfer integrity.
 
-### Create or Bind to an Object Store Bucket
+### 1. Bind or Create a Bucket
 ```dart
-final os = await js.objectStore('my_files', create: true, storage: 'memory');
+final ObjectStore os = await js.objectStore('attachments', create: true, storage: 'memory');
 ```
 
-### Put and Get Objects
+### 2. Put & Get Large Payloads
 ```dart
-// Upload an object
-final content = 'Hello NATS Object Store! ' * 5000; // Large payload
-final info = await os.putString('notes.txt', content, description: 'User notes');
-print('Uploaded object chunks: ${info.chunks}');
+final largeData = Uint8List(500 * 1024); // 500 KiB data payload
 
-// Download and verify integrity
-final retrieved = await os.getString('notes.txt');
-print('Downloaded content: $retrieved');
+// Upload the object (will split into 4 chunks of 128 KiB under the hood)
+final ObjectInfo info = await os.put('report.pdf', largeData, description: 'Q3 financial report');
+print('Uploaded chunks count: ${info.chunks}');
+
+// Download object (downloads chunks and verifies SHA-256 integrity automatically)
+final Uint8List? fileData = await os.get('report.pdf');
+print('Downloaded file size: ${fileData?.length} bytes');
 ```
 
-### List and Delete Objects
+### 3. List and Delete Objects
 ```dart
-// List active objects in bucket
-final list = await os.list();
-for (final obj in list) {
-  print('Object: ${obj.name}, Size: ${obj.size} bytes');
+// List all active objects
+final List<ObjectInfo> files = await os.list();
+for (final file in files) {
+  print('Filename: ${file.name}, Chunks: ${file.chunks}, Size: ${file.size}');
 }
 
-// Delete object and reclaim NATS storage space
-await os.delete('notes.txt');
+// Delete object chunks and reclaim space
+await os.delete('report.pdf');
 ```
 
 ---
 
-## Development & Testing
+## 🧪 Development & Testing
 
-For detailed instructions on setting up your local environment, managing NATS Docker containers, and running tests, please refer to the [DEVELOPMENT.md](file:///Users/chartchuo/workspace/dart-nats/DEVELOPMENT.md) guide.
+For instructions on running containerized NATS servers locally, generating certificates, and executing the test suites, check the [DEVELOPMENT.md](file:///Users/chartchuo/workspace/dart-nats/DEVELOPMENT.md) guide.
