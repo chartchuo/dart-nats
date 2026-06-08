@@ -1,6 +1,6 @@
 name: dart_nats
 description: A Dart client for the NATS messaging system. Design to use with Dart and flutter.
-version: 0.6.5
+version: 0.7.0
 homepage: https://github.com/chartchuo
 repository: https://github.com/chartchuo/dart-nats
 
@@ -10,7 +10,7 @@ environment:
 # dependencies:
 
 dev_dependencies:
-  lints: ^2.0.1
+  lints: ^6.1.0
   test: ^1.9.4
   # pedantic: ^1.11.0
 dependencies: 
@@ -19,4 +19,4 @@ dependencies:
   crypto: ^3.0.7
   ed25519_edwards: ^0.3.1
   mutex: ^3.0.0
-  web_socket_channel: ^2.2.0
+  web_socket_channel: ^3.0.3

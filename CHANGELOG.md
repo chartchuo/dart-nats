@@ -1,3 +1,9 @@
+## 0.7.0
+
+* Add NATS JetStream Support (Stream/Consumer management, Publish/Subscribe, Pull mode with Ack/Nak/Term)
+* Add NATS Key-Value (KV) Store (Put, Get, Delete, Purge, Watch)
+* Add NATS Object Store (128 KiB chunking, automatic SHA-256 validation)
+
 ## 0.6.5
 * Issue resolved when app is in background. Thanks nileshsoni97 for contribution.
 

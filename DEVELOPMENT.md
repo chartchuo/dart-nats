@@ -56,7 +56,7 @@ docker-compose up -d
 ```
 
 This starts the following containerized NATS services:
-* **`nats`** (Port `4222`): Standard connection (TCP) & WebSockets.
+* **`nats`** (Port `4222`): Standard connection (TCP) & WebSockets with JetStream enabled (`-js`).
 * **`nats-jwt`** (Port `4223`): NATS JWT Authentication.
 * **`nats-token`** (Port `4224`): Token Authentication.
 * **`nats-user`** (Port `4225`): Username/Password Authentication.

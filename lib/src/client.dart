@@ -974,6 +974,9 @@ class Client {
   }
 
   void _setStatus(Status newStatus) {
+    if (_status == Status.closed && newStatus != Status.connecting) {
+      return;
+    }
     final oldStatus = _status;
     _status = newStatus;
     _statusController.add(newStatus);
