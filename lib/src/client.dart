@@ -113,7 +113,6 @@ class Client {
   }
 
   final _jsonDecoder = <Type, dynamic Function(String)>{};
-  // final _jsonEncoder = <Type, String Function(Type)>{};
 
   /// add json decoder for type <T>
   void registerJsonDecoder<T>(T Function(String) f) {
@@ -122,14 +121,6 @@ class Client {
     }
     _jsonDecoder[T] = f;
   }
-
-  /// add json encoder for type <T>
-  // void registerJsonEncoder<T>(String Function(T) f) {
-  //   if (T == dynamic) {
-  //     NatsException('can not register dyname type');
-  //   }
-  //   _jsonEncoder[T] = f as String Function(Type);
-  // }
 
   ///server info
   Info? get info => _info;
@@ -159,20 +150,14 @@ class Client {
   void _steamHandle() {
     _channelStream.stream.listen((d) {
       _buffer.addAll(d);
-      // org code
-      // while (
-      //     _receiveState == _ReceiveState.idle && _buffer.contains(13)) {
-      //   _processOp();
-      // }
 
-      //Thank aktxyz for contribution
+      // Thank aktxyz for contribution
       while (_receiveState == _ReceiveState.idle && _buffer.contains(13)) {
         var n13 = _buffer.indexOf(13);
         var msgFull =
             String.fromCharCodes(_buffer.take(n13)).toLowerCase().trim();
         var msgList = msgFull.split(' ');
         var msgType = msgList[0];
-        //print('... process $msgType ${_buffer.length}');
 
         if (msgType == 'msg' || msgType == 'hmsg') {
           var len = int.parse(msgList.last);
@@ -183,12 +168,6 @@ class Client {
 
         _processOp();
       }
-      // }, onDone: () {
-      //   _setStatus(Status.disconnected);
-      //   close();
-      // }, onError: (err) {
-      //   _setStatus(Status.disconnected);
-      //   close();
     });
   }
 
@@ -366,7 +345,6 @@ class Client {
     _backendSubs.clear();
     _subs.forEach((sid, s) async {
       _sub(s.subject, sid, queueGroup: s.queueGroup);
-      // s.backendSubscription = true;
       _backendSubs[sid] = true;
     });
   }
@@ -478,7 +456,6 @@ class Client {
         }
         break;
       case '-err':
-        // _processErr(data);
         if (_connectOption.verbose == true) {
           _ackStream.sink.add(false);
         }
@@ -487,7 +464,6 @@ class Client {
         _pingCompleter.complete();
         break;
       case '+ok':
-        //do nothing
         if (_connectOption.verbose == true) {
           _ackStream.sink.add(true);
         }
@@ -509,7 +485,6 @@ class Client {
     }
     if (_buffer.length < length) return;
     var payload = Uint8List.fromList(_buffer.sublist(0, length));
-    // _buffer = _buffer.sublist(length + 2);
     if (_buffer.length > length + 2) {
       _buffer.removeRange(0, length + 2);
     } else {
@@ -539,7 +514,6 @@ class Client {
     if (_buffer.length < length) return;
     var header = Uint8List.fromList(_buffer.sublist(0, headerLength));
     var payload = Uint8List.fromList(_buffer.sublist(headerLength, length));
-    // _buffer = _buffer.sublist(length + 2);
     if (_buffer.length > length + 2) {
       _buffer.removeRange(0, length + 2);
     } else {
@@ -642,14 +616,6 @@ class Client {
     return c as T Function(String);
   }
 
-  // String Function(dynamic) _getJsonEncoder(Type T) {
-  //   var c = _jsonDecoder[T];
-  //   if (c == null) {
-  //     throw NatsException('no encoder for type $T');
-  //   }
-  //   return c as String Function(dynamic);
-  // }
-
   ///subscribe to subject option with queuegroup
   Subscription<T> sub<T>(
     String subject, {
@@ -710,11 +676,10 @@ class Client {
   }
 
   void _add(String str) {
-     if (status == Status.closed || status == Status.disconnected) {
+    if (status == Status.closed || status == Status.disconnected) {
       return;
-     }
+    }
     if (_wsChannel != null) {
-      // if (_wsChannel?.closeCode == null) return;
       _wsChannel?.sink.add(utf8.encode(str + '\r\n'));
       return;
     } else if (_secureSocket != null) {
