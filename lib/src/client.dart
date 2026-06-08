@@ -145,6 +145,7 @@ class Client {
   int _ssid = 0;
 
   List<int> _buffer = [];
+  int _bufferOffset = 0;
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
 
@@ -176,21 +177,31 @@ class Client {
         _buffer.addAll(utf8.encode(d));
       }
 
-      while (_receiveState == _ReceiveState.idle && _buffer.contains(13)) {
-        final n13 = _buffer.indexOf(13);
+      while (_receiveState == _ReceiveState.idle) {
+        final n13 = _buffer.indexOf(13, _bufferOffset);
+        if (n13 == -1) break;
+
         final msgFull =
-            String.fromCharCodes(_buffer.take(n13)).toLowerCase().trim();
+            String.fromCharCodes(_buffer.sublist(_bufferOffset, n13)).toLowerCase().trim();
         final msgList = msgFull.split(' ');
         final msgType = msgList[0];
 
         if (msgType == 'msg' || msgType == 'hmsg') {
           final len = int.parse(msgList.last);
-          if (len > 0 && _buffer.length < (msgFull.length + len + 4)) {
+          if (len > 0 && (_buffer.length - _bufferOffset) < (n13 - _bufferOffset + len + 4)) {
             break;
           }
         }
 
         _processOp();
+      }
+
+      if (_buffer.length == _bufferOffset) {
+        _buffer = [];
+        _bufferOffset = 0;
+      } else if (_bufferOffset > 65536) {
+        _buffer = _buffer.sublist(_bufferOffset);
+        _bufferOffset = 0;
       }
     });
   }
@@ -302,6 +313,7 @@ class Client {
         }
 
         _buffer = [];
+        _bufferOffset = 0;
         return;
       } catch (err) {
         await close();
@@ -335,12 +347,16 @@ class Client {
         throw Exception(NatsException('No scheme in uri'));
       }
 
+      _tlsRequired = uri.scheme == 'tls';
+
       switch (uri.scheme) {
         case 'wss':
         case 'ws':
           try {
             _wsChannel = WebSocketChannel.connect(uri);
+            await _wsChannel!.ready;
           } catch (e) {
+            _wsChannel = null;
             return false;
           }
           if (_wsChannel == null) {
@@ -390,7 +406,6 @@ class Client {
           return true;
 
         case 'tls':
-          _tlsRequired = true;
           var port = uri.port;
           if (port == 0) {
             port = 4443;
@@ -440,15 +455,11 @@ class Client {
   }
 
   void _processOp() async {
-    final nextLineIndex = _buffer.indexWhere((c) => c == 13);
+    final nextLineIndex = _buffer.indexOf(13, _bufferOffset);
     if (nextLineIndex == -1) return;
 
-    final line = String.fromCharCodes(_buffer.sublist(0, nextLineIndex));
-    if (_buffer.length > nextLineIndex + 2) {
-      _buffer.removeRange(0, nextLineIndex + 2);
-    } else {
-      _buffer = [];
-    }
+    final line = String.fromCharCodes(_buffer.sublist(_bufferOffset, nextLineIndex));
+    _bufferOffset = nextLineIndex + 2;
 
     final splitIndex = line.indexOf(' ');
     String op, data;
@@ -478,64 +489,69 @@ class Client {
         break;
 
       case 'info':
-        _info = Info.fromJson(jsonDecode(data) as Map<String, dynamic>);
-        if (_tlsRequired && !(_info.tlsRequired ?? false)) {
-          throw Exception(NatsException('require TLS but server not required'));
-        }
+        try {
+          _info = Info.fromJson(jsonDecode(data) as Map<String, dynamic>);
 
-        if ((_info.tlsRequired ?? false) && _tcpSocket != null) {
-          _setStatus(Status.tlsHandshake);
-          try {
-            final secureSocket = await SecureSocket.secure(
-              _tcpSocket!,
-              context: securityContext,
-              onBadCertificate: (certificate) {
-                return acceptBadCert;
-              },
-            );
+          if ((_tlsRequired || (_info.tlsRequired ?? false)) && _tcpSocket != null) {
+            _setStatus(Status.tlsHandshake);
+            try {
+              final secureSocket = await SecureSocket.secure(
+                _tcpSocket!,
+                context: securityContext,
+                onBadCertificate: (certificate) {
+                  return acceptBadCert;
+                },
+              );
 
-            _secureSocket = secureSocket;
-            secureSocket.listen((event) {
-              if (_channelStream.isClosed) return;
-              _channelStream.add(event);
-            }, onError: (dynamic error) {
-              print('Socket error: $error');
+              _secureSocket = secureSocket;
+              secureSocket.listen((event) {
+                if (_channelStream.isClosed) return;
+                _channelStream.add(event);
+              }, onError: (dynamic error) {
+                print('Socket error: $error');
+                _setStatus(Status.disconnected);
+                if (onError != null) {
+                  onError!(error);
+                }
+
+                if (error is TlsException) {
+                  _retry = false;
+                  close();
+                  throw Exception(NatsException(error.message));
+                }
+              });
+            } catch (e) {
               _setStatus(Status.disconnected);
-              if (onError != null) {
-                onError!(error);
-              }
+              rethrow;
+            }
+          }
 
-              if (error is TlsException) {
-                _retry = false;
-                close();
-                throw Exception(NatsException(error.message));
-              }
-            });
-          } catch (e) {
-            _setStatus(Status.disconnected);
+          await _sign();
+          _addConnectOption(_connectOption);
+
+          if (_connectOption.verbose == true) {
+            final ack = await _ackStream.stream.first;
+            if (ack) {
+              _setStatus(Status.connected);
+            } else {
+              _setStatus(Status.disconnected);
+            }
+          } else {
+            _setStatus(Status.connected);
+          }
+
+          _backendSubscriptAll();
+          _flushPubBuffer();
+
+          if (!_connectCompleter.isCompleted) {
+            _connectCompleter.complete();
+          }
+        } catch (e) {
+          if (!_connectCompleter.isCompleted) {
+            _connectCompleter.completeError(e);
+          } else {
             rethrow;
           }
-        }
-
-        await _sign();
-        _addConnectOption(_connectOption);
-
-        if (_connectOption.verbose == true) {
-          final ack = await _ackStream.stream.first;
-          if (ack) {
-            _setStatus(Status.connected);
-          } else {
-            _setStatus(Status.disconnected);
-          }
-        } else {
-          _setStatus(Status.connected);
-        }
-
-        _backendSubscriptAll();
-        _flushPubBuffer();
-
-        if (!_connectCompleter.isCompleted) {
-          _connectCompleter.complete();
         }
         break;
 
@@ -582,14 +598,10 @@ class Client {
       length = int.parse(s[4]);
     }
 
-    if (_buffer.length < length) return;
-    final payload = Uint8List.fromList(_buffer.sublist(0, length));
+    if ((_buffer.length - _bufferOffset) < length) return;
+    final payload = Uint8List.fromList(_buffer.sublist(_bufferOffset, _bufferOffset + length));
 
-    if (_buffer.length > length + 2) {
-      _buffer.removeRange(0, length + 2);
-    } else {
-      _buffer = [];
-    }
+    _bufferOffset += length + 2; // Move past payload and trailing \r\n
 
     if (_subs[sid] != null) {
       _subs[sid]?.add(Message<dynamic>(
@@ -619,15 +631,11 @@ class Client {
       length = int.parse(s[5]);
     }
 
-    if (_buffer.length < length) return;
-    final header = Uint8List.fromList(_buffer.sublist(0, headerLength));
-    final payload = Uint8List.fromList(_buffer.sublist(headerLength, length));
+    if ((_buffer.length - _bufferOffset) < length) return;
+    final header = Uint8List.fromList(_buffer.sublist(_bufferOffset, _bufferOffset + headerLength));
+    final payload = Uint8List.fromList(_buffer.sublist(_bufferOffset + headerLength, _bufferOffset + length));
 
-    if (_buffer.length > length + 2) {
-      _buffer.removeRange(0, length + 2);
-    } else {
-      _buffer = [];
-    }
+    _bufferOffset += length + 2; // Move past payload and trailing \r\n
 
     if (_subs[sid] != null) {
       final msg = Message<dynamic>(
@@ -1019,6 +1027,7 @@ class Client {
     _inboxSub = null;
     _inboxSubPrefix = null;
     _buffer = [];
+    _bufferOffset = 0;
     _clientStatus = _ClientStatus.closed;
   }
 
