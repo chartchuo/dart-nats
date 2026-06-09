@@ -12,7 +12,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'NATS Flutter Web Dashboard',
+      title: 'NATS Flutter Demo Dashboard',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(useMaterial3: true).copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F172A),
@@ -81,9 +81,9 @@ class _DashboardPageState extends State<DashboardPage> {
   final TextEditingController _urlController =
       TextEditingController(text: 'ws://localhost:8080');
   final TextEditingController _subSubjectController =
-      TextEditingController(text: 'demo.web');
+      TextEditingController(text: 'demo.flutter');
   final TextEditingController _pubSubjectController =
-      TextEditingController(text: 'demo.web');
+      TextEditingController(text: 'demo.flutter');
   final TextEditingController _payloadController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -135,7 +135,7 @@ class _DashboardPageState extends State<DashboardPage> {
   void dispose() {
     _statusSubscription?.cancel();
     _kvWatchSubscription?.cancel();
-    _client.close();
+    _client.close().catchError((_) {});
     _urlController.dispose();
     _subSubjectController.dispose();
     _pubSubjectController.dispose();
@@ -206,7 +206,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
     try {
       try {
-        _client.close();
+        await _client.close();
       } catch (_) {}
 
       _client = nats.Client();
@@ -220,7 +220,7 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (e) {
       _addLog('Failed to connect: $e', 'error');
       try {
-        _client.close();
+        await _client.close();
       } catch (_) {}
       setState(() {
         _isConnecting = false;
@@ -230,7 +230,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   void _disconnect() {
     _addLog('Closing NATS connection...', 'info');
-    _client.close();
+    _client.close().catchError((_) {});
   }
 
   // --- Key-Value Store Operations ---
@@ -537,7 +537,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 colors: [Colors.white, Color(0xFFA855F7), Color(0xFF6366F1)],
                               ).createShader(bounds),
                               child: const Text(
-                                'NATS Flutter Web Dashboard',
+                                'NATS Flutter Demo Dashboard',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 36,
@@ -549,7 +549,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                             const SizedBox(height: 8),
                             const Text(
-                              'A full-featured NATS Client running over WebSocket connections supporting JetStream.',
+                              'A full-featured NATS Client running over WebSocket or TCP connections supporting JetStream.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 16,
@@ -568,7 +568,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ),
                               ),
                               child: const Text(
-                                'Flutter Web Live Demo',
+                                'Flutter Multi-Platform Live Demo',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFF818CF8),
@@ -855,7 +855,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: TextField(
                   controller: _subSubjectController,
                   enabled: isConnected,
-                  decoration: _buildInputDecoration('e.g. demo.web'),
+                  decoration: _buildInputDecoration('e.g. demo.flutter'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -914,7 +914,7 @@ class _DashboardPageState extends State<DashboardPage> {
           TextField(
             controller: _pubSubjectController,
             enabled: isConnected,
-            decoration: _buildInputDecoration('e.g. demo.web'),
+            decoration: _buildInputDecoration('e.g. demo.flutter'),
           ),
           const SizedBox(height: 12),
           const Text(

@@ -572,9 +572,9 @@ To run the examples:
    # Run the JetStream Object Store example
    dart run example/jetstream_object_store.dart
 
-   # Run the Flutter Web Dashboard example
-   cd example/flutter_web
-   flutter run -d chrome
+   # Run the Flutter Multi-Platform Dashboard demo
+   cd example/demo
+   flutter run
    ```
 
 ---

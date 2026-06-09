@@ -1,5 +1,5 @@
-name: nats_flutter_web_example
-description: "A Flutter Web dashboard example for the dart_nats package."
+name: nats_flutter_demo
+description: "A Flutter multi-platform dashboard demo for the dart_nats package."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
