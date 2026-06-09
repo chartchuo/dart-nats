@@ -167,6 +167,7 @@ class KeyValue {
     client.jetStream().addConsumer(streamName, consumerConfig).catchError((dynamic err) {
       controller.addError(err);
       controller.close();
+      throw err;
     });
 
     controller.onCancel = () {

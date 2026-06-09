@@ -73,11 +73,15 @@ class Client {
   List<Uri> _serverPool = [];
   int _currentServerIndex = 0;
 
-  /// Connection event callbacks
+  /// Callback when the client connects to the server
   void Function()? onConnect;
+  /// Callback when the client disconnects from the server
   void Function()? onDisconnect;
+  /// Callback when an error occurs
   void Function(dynamic error)? onError;
+  /// Callback when the client reconnects to the server
   void Function()? onReconnect;
+  /// Callback when the client is closed
   void Function()? onClose;
 
   /// User authentication callbacks
@@ -85,9 +89,7 @@ class Client {
   Uint8List Function(Uint8List nonce)? signatureHandler;
 
   /// Error handler for websocket errors
-  Function(dynamic) wsErrorHandler = (e) {
-    throw NatsException('listen ws error: $e');
-  };
+  Function(dynamic) wsErrorHandler = (e) {};
 
   var _status = Status.disconnected;
 
@@ -327,8 +329,8 @@ class Client {
         _buffer = [];
         _bufferOffset = 0;
         return;
-      } catch (err) {
-        await close();
+      } catch (err, st) {
+        await _cleanUpSockets();
         if (onError != null) {
           onError!(err);
         }
@@ -338,7 +340,10 @@ class Client {
           await Future<void>.delayed(Duration(seconds: delay));
         } else {
           if (!_connectCompleter.isCompleted) {
-            _connectCompleter.completeError(err);
+            _connectCompleter.completeError(
+              NatsException('can not connect to any servers in the pool: $err'),
+              st,
+            );
           }
           _setStatus(Status.disconnected);
           break;
@@ -370,10 +375,7 @@ class Client {
             await _wsChannel!.ready;
           } catch (e) {
             _wsChannel = null;
-            return false;
-          }
-          if (_wsChannel == null) {
-            return false;
+            rethrow;
           }
           _setStatus(Status.infoHandshake);
           final connId = _connectionId;
@@ -460,10 +462,7 @@ class Client {
           throw Exception(NatsException('schema ${uri.scheme} not support'));
       }
     } catch (e) {
-      if (onError != null) {
-        onError!(e);
-      }
-      return false;
+      rethrow;
     }
   }
 
@@ -1089,6 +1088,20 @@ class Client {
         onClose!();
       }
     }
+  }
+
+  Future<void> _cleanUpSockets() async {
+    final ws = _wsChannel;
+    _wsChannel = null;
+    await ws?.sink.close();
+    
+    final secure = _secureSocket;
+    _secureSocket = null;
+    await secure?.close();
+    
+    final tcp = _tcpSocket;
+    _tcpSocket = null;
+    await tcp?.close();
   }
 
   /// Close connection and prevent any future reconnect retries

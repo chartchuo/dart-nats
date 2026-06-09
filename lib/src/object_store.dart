@@ -6,7 +6,6 @@ import 'package:crypto/crypto.dart';
 
 import 'client.dart';
 import 'common.dart';
-import 'message.dart';
 import 'jetstream.dart';
 import 'inbox.dart';
 
@@ -65,11 +64,16 @@ class ObjectInfo {
 
 /// NATS Object Store implementation
 class ObjectStore {
+  /// The NATS Client instance
   final Client client;
+  /// The Object Store bucket name
   final String bucket;
+  /// The JetStream stream name backing this Object Store
   final String streamName;
+  /// The default chunk size (128 KiB)
   static const int defaultChunkSize = 128 * 1024; // 128 KiB
 
+  /// Create a new ObjectStore instance
   ObjectStore(this.client, this.bucket) : streamName = 'OBJ_$bucket';
 
   /// Store an object in the bucket
