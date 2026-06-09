@@ -8,6 +8,36 @@ import 'client.dart';
 import 'common.dart';
 import 'jetstream.dart';
 import 'inbox.dart';
+/// Represents a link to another object or bucket in the Object Store.
+class ObjectLink {
+  /// The bucket name the link points to
+  final String bucket;
+
+  /// The object name (null if linking to the entire bucket)
+  final String? name;
+
+  /// Constructor
+  ObjectLink({required this.bucket, this.name});
+
+  /// Factory from JSON map
+  factory ObjectLink.fromJson(Map<String, dynamic> json) {
+    return ObjectLink(
+      bucket: json['bucket'] as String? ?? '',
+      name: json['name'] as String?,
+    );
+  }
+
+  /// Export to JSON map
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{
+      'bucket': bucket,
+    };
+    if (name != null && name!.isNotEmpty) {
+      map['name'] = name;
+    }
+    return map;
+  }
+}
 
 /// Object Store Metadata Information
 class ObjectInfo {
@@ -20,6 +50,7 @@ class ObjectInfo {
   final int chunks;
   final String digest;
   final bool deleted;
+  final ObjectLink? link;
 
   ObjectInfo({
     required this.name,
@@ -31,9 +62,16 @@ class ObjectInfo {
     required this.chunks,
     required this.digest,
     this.deleted = false,
+    this.link,
   });
 
   factory ObjectInfo.fromJson(Map<String, dynamic> json) {
+    final opts = json['options'] as Map<String, dynamic>?;
+    ObjectLink? link;
+    if (opts != null && opts['link'] != null) {
+      link = ObjectLink.fromJson(opts['link'] as Map<String, dynamic>);
+    }
+
     return ObjectInfo(
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
@@ -45,11 +83,12 @@ class ObjectInfo {
       chunks: json['chunks'] as int? ?? 0,
       digest: json['digest'] as String? ?? '',
       deleted: json['deleted'] as bool? ?? false,
+      link: link,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final map = <String, dynamic>{
       'name': name,
       'description': description,
       'bucket': bucket,
@@ -60,9 +99,17 @@ class ObjectInfo {
       'digest': digest,
       'deleted': deleted,
     };
+    if (link != null) {
+      map['options'] = {
+        'link': link!.toJson(),
+      };
+    }
+    return map;
   }
 }
 
+/// EXPERIMENTAL: Object Store APIs are experimental and subject to change in future releases.
+///
 /// NATS Object Store implementation
 class ObjectStore {
   /// The NATS Client instance
@@ -140,6 +187,70 @@ class ObjectStore {
         description: description);
   }
 
+  /// Create a link to another object in the same or different bucket.
+  Future<ObjectInfo> putLink(String name, ObjectInfo target,
+      {String description = ''}) async {
+    final nuid = Nuid().next();
+
+    final link = ObjectLink(
+      bucket: target.bucket,
+      name: target.name,
+    );
+
+    final info = ObjectInfo(
+      name: name,
+      description: description,
+      bucket: bucket,
+      nuid: nuid,
+      size: 0,
+      mtime: DateTime.now(),
+      chunks: 0,
+      digest: '',
+      link: link,
+    );
+
+    final encodedName = base64Url.encode(utf8.encode(name));
+    final metadataSubject = '\$O.$bucket.M.$encodedName';
+    final payload = utf8.encode(jsonEncode(info.toJson()));
+
+    await client
+        .jetStream()
+        .publish(metadataSubject, Uint8List.fromList(payload));
+    return info;
+  }
+
+  /// Create a link to an entire bucket.
+  Future<ObjectInfo> putBucketLink(String name, String targetBucket,
+      {String description = ''}) async {
+    final nuid = Nuid().next();
+
+    final link = ObjectLink(
+      bucket: targetBucket,
+      name: null,
+    );
+
+    final info = ObjectInfo(
+      name: name,
+      description: description,
+      bucket: bucket,
+      nuid: nuid,
+      size: 0,
+      mtime: DateTime.now(),
+      chunks: 0,
+      digest: '',
+      link: link,
+    );
+
+    final encodedName = base64Url.encode(utf8.encode(name));
+    final metadataSubject = '\$O.$bucket.M.$encodedName';
+    final payload = utf8.encode(jsonEncode(info.toJson()));
+
+    await client
+        .jetStream()
+        .publish(metadataSubject, Uint8List.fromList(payload));
+    return info;
+  }
+
   /// Retrieve the ObjectInfo metadata for a given name
   Future<ObjectInfo?> getInfo(String name) async {
     final encodedName = base64Url.encode(utf8.encode(name));
@@ -170,10 +281,22 @@ class ObjectStore {
     }
   }
 
-  /// Retrieve full byte data of the object and verify integrity
-  Future<Uint8List?> get(String name) async {
+  /// Retrieve full byte data of the object and verify integrity.
+  /// Resolves object links recursively up to 5 jumps.
+  Future<Uint8List?> get(String name, {int depth = 0}) async {
+    if (depth > 5) {
+      throw NatsException('Circular link dependency detected.');
+    }
     final info = await getInfo(name);
     if (info == null || info.deleted) return null;
+
+    if (info.link != null) {
+      if (info.link!.name == null) {
+        throw NatsException('Cannot get data from a bucket link.');
+      }
+      final targetStore = ObjectStore(client, info.link!.bucket);
+      return targetStore.get(info.link!.name!, depth: depth + 1);
+    }
 
     final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
     final sub = client.sub(deliverSubject);

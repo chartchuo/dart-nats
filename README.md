@@ -370,6 +370,9 @@ await client.connect(Uri.parse('nats://localhost:4222'));
 
 ## ⚡ JetStream Support (Persistence)
 
+> [!WARNING]
+> JetStream, Key-Value (KV) Store, and Object Store APIs are currently **experimental** and may undergo breaking changes in future releases as the library matures.
+
 JetStream provides message persistence, at-least-once delivery guarantees, and support for message replay.
 
 ### 1. Initialize JetStream

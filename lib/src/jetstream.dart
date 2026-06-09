@@ -7,6 +7,7 @@ import 'inbox.dart';
 import 'message.dart';
 import 'kv.dart';
 import 'object_store.dart';
+import 'subscription.dart';
 
 /// Publish acknowledgment returned by JetStream server
 class PubAck {
@@ -133,7 +134,6 @@ class StreamConfig {
     return map;
   }
 }
-
 /// JetStream Consumer Configuration
 class ConsumerConfig {
   /// Durable consumer name (required for Pull Mode durability)
@@ -151,6 +151,15 @@ class ConsumerConfig {
   /// Delivery policy: 'all', 'last', 'new'
   final String deliverPolicy;
 
+  /// Optional start sequence
+  final int? optStartSeq;
+
+  /// Flow control enabled
+  final bool? flowControl;
+
+  /// Idle heartbeat duration
+  final Duration? idleHeartbeat;
+
   /// Constructor for ConsumerConfig
   ConsumerConfig({
     this.durable,
@@ -158,6 +167,9 @@ class ConsumerConfig {
     this.filterSubject,
     this.ackPolicy = 'explicit',
     this.deliverPolicy = 'all',
+    this.optStartSeq,
+    this.flowControl,
+    this.idleHeartbeat,
   });
 
   /// Export configuration to JSON map
@@ -169,10 +181,14 @@ class ConsumerConfig {
     if (durable != null) map['durable_name'] = durable;
     if (deliverSubject != null) map['deliver_subject'] = deliverSubject;
     if (filterSubject != null) map['filter_subject'] = filterSubject;
+    if (optStartSeq != null) map['opt_start_seq'] = optStartSeq;
+    if (flowControl != null) map['flow_control'] = flowControl;
+    if (idleHeartbeat != null) {
+      map['idle_heartbeat'] = idleHeartbeat!.inMicroseconds * 1000; // in nanoseconds
+    }
     return map;
   }
 }
-
 /// Publish options for JetStream de-duplication and optimistic concurrency control
 class PubOpts {
   final String? msgId;
@@ -301,6 +317,8 @@ class ConsumerInfo {
   }
 }
 
+/// EXPERIMENTAL: JetStream APIs are experimental and subject to change in future releases.
+///
 /// NATS JetStream Context
 class JetStream {
   /// NATS core client instance
@@ -604,5 +622,258 @@ class JetStream {
       await addStream(config);
     }
     return ObjectStore(client, bucket);
+  }
+
+  /// Get a specific message from a stream by its sequence number
+  Future<Message> getMsg(String stream, int seq, {Duration timeout = const Duration(seconds: 2)}) async {
+    final apiSubject = '\$JS.API.STREAM.MSG.GET.$stream';
+    final payload = utf8.encode(jsonEncode({
+      'seq': seq,
+    }));
+    final response = await client.request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
+    final map = jsonDecode(response.string);
+    if (map['error'] != null) {
+      throw NatsException(map['error']['description'] as String);
+    }
+    return _parseRawStreamMsg(stream, map['message'] as Map<String, dynamic>);
+  }
+
+  /// Get the last message in a stream for a specific subject
+  Future<Message> getLastMsg(String stream, String subject, {Duration timeout = const Duration(seconds: 2)}) async {
+    final apiSubject = '\$JS.API.STREAM.MSG.GET.$stream';
+    final payload = utf8.encode(jsonEncode({
+      'last_by_subj': subject,
+    }));
+    final response = await client.request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
+    final map = jsonDecode(response.string);
+    if (map['error'] != null) {
+      throw NatsException(map['error']['description'] as String);
+    }
+    return _parseRawStreamMsg(stream, map['message'] as Map<String, dynamic>);
+  }
+
+  Message _parseRawStreamMsg(String stream, Map<String, dynamic> jsonMsg) {
+    final subject = jsonMsg['subject'] as String;
+    final seq = jsonMsg['seq'] as int;
+    final dataStr = jsonMsg['data'] as String? ?? '';
+    final value = base64.decode(dataStr);
+
+    Header? header;
+    final hdrs = jsonMsg['hdrs'] as String?;
+    if (hdrs != null && hdrs.isNotEmpty) {
+      final decodedHdrs = base64.decode(hdrs);
+      header = Header.fromBytes(decodedHdrs);
+    }
+
+    // Embed the sequence info into a dummy replyTo subject to support msg.streamSequence and msg.consumerSequence
+    final dummyReply = '\$JS.ACK.$stream.dummy.1.$seq.$seq.0.0';
+
+    return Message(subject, 0, value, client,
+        replyTo: dummyReply, header: header);
+  }
+
+  /// Subscribe to a JetStream subject using a push consumer.
+  /// If [durable] is provided, a durable consumer is used.
+  /// Automatically configures the push consumer and returns a [Subscription] of messages.
+  Future<Subscription> subscribe(
+    String subject, {
+    String? stream,
+    String? durable,
+    String? queueGroup,
+    bool manualAck = false,
+    String deliverPolicy = 'all',
+  }) async {
+    String? targetStream = stream;
+    if (targetStream == null) {
+      final streams = await listStreams();
+      for (final s in streams) {
+        if (s.config.subjects.contains(subject)) {
+          targetStream = s.config.name;
+          break;
+        }
+      }
+    }
+    if (targetStream == null) {
+      throw NatsException('Could not find a stream for subject: $subject');
+    }
+
+    final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
+
+    final consumerConfig = ConsumerConfig(
+      durable: durable,
+      deliverSubject: deliverSubject,
+      filterSubject: subject,
+      ackPolicy: manualAck ? 'explicit' : 'none',
+      deliverPolicy: deliverPolicy,
+    );
+
+    await addConsumer(targetStream, consumerConfig);
+
+    return client.sub(deliverSubject, queueGroup: queueGroup);
+  }
+
+  /// Create an Ordered Consumer on a stream.
+  OrderedConsumer orderedConsumer(String stream, OrderedConsumerConfig config) {
+    return OrderedConsumer(this, stream, config);
+  }
+}
+
+/// Configuration options for an Ordered Consumer.
+class OrderedConsumerConfig {
+  /// Subject to filter messages from the stream
+  final String? filterSubject;
+
+  /// Starting point for message delivery: 'all', 'last', 'new', 'by_start_sequence', etc.
+  final String deliverPolicy;
+
+  /// Starting sequence number (used if deliverPolicy is 'by_start_sequence')
+  final int? optStartSeq;
+
+  /// Starting time (used if deliverPolicy is 'by_start_time')
+  final DateTime? optStartTime;
+
+  /// Constructor
+  OrderedConsumerConfig({
+    this.filterSubject,
+    this.deliverPolicy = 'all',
+    this.optStartSeq,
+    this.optStartTime,
+  });
+}
+
+/// Managed pull/push consumer providing ordered delivery guarantees.
+class OrderedConsumer {
+  /// The JetStream context
+  final JetStream js;
+
+  /// The Stream name
+  final String stream;
+
+  /// The configuration options
+  final OrderedConsumerConfig config;
+
+  int _lastSeq = 0;
+  String? _currentConsumerName;
+  StreamController<Message>? _controller;
+  StreamSubscription? _sub;
+  bool _active = true;
+
+  /// Constructor for OrderedConsumer
+  OrderedConsumer(this.js, this.stream, this.config) {
+    if (config.deliverPolicy == 'by_start_sequence' && config.optStartSeq != null) {
+      _lastSeq = config.optStartSeq! - 1;
+    }
+  }
+
+  /// Get a Stream of ordered messages.
+  Stream<Message> messages() {
+    _controller = StreamController<Message>(
+      onCancel: () {
+        stop();
+      },
+    );
+    _start();
+    return _controller!.stream;
+  }
+
+  /// Stop the Ordered Consumer and release NATS resources.
+  void stop() {
+    _active = false;
+    _cleanup();
+    if (_controller != null && !_controller!.isClosed) {
+      _controller!.close();
+    }
+  }
+
+  void _cleanup() {
+    _sub?.cancel();
+    if (_currentConsumerName != null) {
+      final name = _currentConsumerName!;
+      js.deleteConsumer(stream, name).catchError((_) => false);
+      _currentConsumerName = null;
+    }
+  }
+
+  Future<void> _start() async {
+    int expectedConsumerSeq = 1;
+
+    while (_active) {
+      try {
+        final name = 'OC_${Nuid().next()}';
+        _currentConsumerName = name;
+
+        final deliverSubject = js.client.inboxPrefix + '.' + Nuid().next();
+        final coreSub = js.client.sub(deliverSubject);
+
+        // Build consumer configuration
+        final consumerConfig = ConsumerConfig(
+          durable: null, // Ephemeral
+          deliverSubject: deliverSubject,
+          filterSubject: config.filterSubject,
+          ackPolicy: 'none',
+          deliverPolicy: _lastSeq == 0 ? config.deliverPolicy : 'by_start_sequence',
+          optStartSeq: _lastSeq == 0 ? config.optStartSeq : _lastSeq + 1,
+          flowControl: true,
+          idleHeartbeat: const Duration(seconds: 5),
+        );
+
+        await js.addConsumer(stream, consumerConfig);
+
+        expectedConsumerSeq = 1;
+        final completer = Completer<void>();
+
+        _sub = coreSub.stream.listen(
+          (msg) {
+            // Check for heartbeats (Status header >= 100)
+            final status = msg.header?.status;
+            if (status != null && status >= 100 && status < 300) {
+              // Idle heartbeat or flow control
+              // Under flow control, respond if replyTo is present
+              if (msg.replyTo != null && msg.replyTo!.isNotEmpty) {
+                js.client.pub(msg.replyTo!, Uint8List(0));
+              }
+              return;
+            }
+
+            final seq = msg.streamSequence;
+            final consSeq = msg.consumerSequence;
+
+            if (seq == null || consSeq == null) return;
+
+            // Check if there is a gap in the consumer sequence
+            if (consSeq != expectedConsumerSeq) {
+              // Sequence gap detected! Reset consumer.
+              _sub?.cancel();
+              js.deleteConsumer(stream, name).catchError((_) => false);
+              completer.complete();
+              return;
+            }
+
+            _lastSeq = seq;
+            expectedConsumerSeq++;
+
+            if (_controller != null && !_controller!.isClosed) {
+              _controller!.add(msg);
+            }
+          },
+          onError: (err) {
+            _sub?.cancel();
+            js.deleteConsumer(stream, name).catchError((_) => false);
+            if (!completer.isCompleted) completer.complete();
+          },
+          onDone: () {
+            _sub?.cancel();
+            js.deleteConsumer(stream, name).catchError((_) => false);
+            if (!completer.isCompleted) completer.complete();
+          },
+        );
+
+        // Wait until consumer resets or closes
+        await completer.future;
+      } catch (e) {
+        // Wait before retrying
+        await Future.delayed(const Duration(seconds: 1));
+      }
+    }
   }
 }
