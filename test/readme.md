@@ -1,7 +1,7 @@
 # Running Tests
 
 > [!TIP]
-> For a comprehensive guide on environment requirements, local development setup, and troubleshooting, please refer to the [DEVELOPMENT.md](file:///Users/chartchuo/workspace/dart-nats/DEVELOPMENT.md) at the root of the project.
+> For a comprehensive guide on environment requirements, local development setup, and troubleshooting, please refer to the [DEVELOPMENT.md](../DEVELOPMENT.md) at the root of the project.
 
 The test suite requires several NATS server instances running locally with different configurations (token authentication, username/password, NKEYs, JWTs, and TLS/WSS).
 
