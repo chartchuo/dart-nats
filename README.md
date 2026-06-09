@@ -127,6 +127,28 @@ client.onClose = () => print('Connection Closed');
 await client.drain();
 ```
 
+### 6. TLS Connection with Custom Certificates (mTLS)
+If your NATS server requires a custom Certificate Authority (CA) or client certificates for mutual TLS (mTLS), you can supply a custom `SecurityContext` (from `dart:io`):
+
+```dart
+import 'dart:io';
+
+final context = SecurityContext(withTrustedRoots: true);
+
+// 1. Trust custom CA certificate
+context.setTrustedCertificates('path/to/ca-cert.pem');
+
+// 2. Load client certificate and private key for mutual TLS (mTLS)
+context.useCertificateChain('path/to/client-cert.pem');
+context.usePrivateKey('path/to/client-key.pem', password: 'key-password');
+
+// 3. Connect to the server with the security context
+await client.connect(
+  Uri.parse('tls://localhost:4443'),
+  securityContext: context,
+);
+```
+
 ---
 
 ## ✉️ Publish & Subscribe (Core Pub/Sub)

@@ -143,6 +143,8 @@ class Client {
   final _pubBuffer = <_Pub>[];
 
   int _ssid = 0;
+  int _connectionId = 0;
+  bool _connectOptionSent = false;
 
   List<int> _buffer = [];
   int _bufferOffset = 0;
@@ -170,7 +172,16 @@ class Client {
   }
 
   void _streamHandle() {
-    _channelStream.stream.listen((dynamic d) {
+    _channelStream.stream.listen((dynamic dataPacket) {
+      if (dataPacket is! List || dataPacket.length != 2) return;
+      final connId = dataPacket[0] as int;
+      final d = dataPacket[1];
+      if (connId != _connectionId) {
+        return;
+      }
+      if (status == Status.disconnected || status == Status.closed) {
+        return;
+      }
       if (d is List<int>) {
         _buffer.addAll(d);
       } else if (d is String) {
@@ -301,6 +312,7 @@ class Client {
         if (_channelStream.isClosed) {
           _channelStream = StreamController<dynamic>();
         }
+        _connectionId++;
         final success = await _connectUri(currentUri, timeout: timeout);
         if (!success) {
           attempts++;
@@ -342,6 +354,7 @@ class Client {
   }
 
   Future<bool> _connectUri(Uri uri, {int timeout = 5}) async {
+    _connectOptionSent = false;
     try {
       if (uri.scheme == '') {
         throw Exception(NatsException('No scheme in uri'));
@@ -363,12 +376,17 @@ class Client {
             return false;
           }
           _setStatus(Status.infoHandshake);
+          final connId = _connectionId;
+          final currentWs = _wsChannel;
           _wsChannel?.stream.listen((dynamic event) {
+            if (currentWs != _wsChannel) return;
             if (_channelStream.isClosed) return;
-            _channelStream.add(event);
+            _channelStream.add([connId, event]);
           }, onDone: () {
+            if (currentWs != _wsChannel) return;
             _setStatus(Status.disconnected);
           }, onError: (dynamic e) {
+            if (currentWs != _wsChannel) return;
             if (onError != null) {
               onError!(e);
             }
@@ -391,16 +409,21 @@ class Client {
             return false;
           }
           _setStatus(Status.infoHandshake);
+          final connId = _connectionId;
+          final currentSocket = _tcpSocket;
           _tcpSocket!.listen((event) {
+            if (currentSocket != _tcpSocket) return;
             if (_secureSocket == null) {
               if (_channelStream.isClosed) return;
-              _channelStream.add(event);
+              _channelStream.add([connId, event]);
             }
           }, onError: (dynamic e) {
+            if (currentSocket != _tcpSocket) return;
             if (onError != null) {
               onError!(e);
             }
           }).onDone(() {
+            if (currentSocket != _tcpSocket) return;
             _setStatus(Status.disconnected);
           });
           return true;
@@ -417,12 +440,16 @@ class Client {
           );
           if (_tcpSocket == null) return false;
           _setStatus(Status.infoHandshake);
+          final connId = _connectionId;
+          final currentSocket = _tcpSocket;
           _tcpSocket!.listen((event) {
+            if (currentSocket != _tcpSocket) return;
             if (_secureSocket == null) {
               if (_channelStream.isClosed) return;
-              _channelStream.add(event);
+              _channelStream.add([connId, event]);
             }
           }, onError: (dynamic e) {
+            if (currentSocket != _tcpSocket) return;
             if (onError != null) {
               onError!(e);
             }
@@ -492,6 +519,11 @@ class Client {
         try {
           _info = Info.fromJson(jsonDecode(data) as Map<String, dynamic>);
 
+          if (_connectOptionSent) {
+            break;
+          }
+          _connectOptionSent = true;
+
           if ((_tlsRequired || (_info.tlsRequired ?? false)) && _tcpSocket != null) {
             _setStatus(Status.tlsHandshake);
             try {
@@ -504,10 +536,13 @@ class Client {
               );
 
               _secureSocket = secureSocket;
+              final connId = _connectionId;
               secureSocket.listen((event) {
+                if (secureSocket != _secureSocket) return;
                 if (_channelStream.isClosed) return;
-                _channelStream.add(event);
+                _channelStream.add([connId, event]);
               }, onError: (dynamic error) {
+                if (secureSocket != _secureSocket) return;
                 print('Socket error: $error');
                 _setStatus(Status.disconnected);
                 if (onError != null) {
@@ -519,6 +554,9 @@ class Client {
                   close();
                   throw Exception(NatsException(error.message));
                 }
+              }, onDone: () {
+                if (secureSocket != _secureSocket) return;
+                _setStatus(Status.disconnected);
               });
             } catch (e) {
               _setStatus(Status.disconnected);
@@ -535,8 +573,10 @@ class Client {
               _setStatus(Status.connected);
             } else {
               _setStatus(Status.disconnected);
+              throw NatsException('Verbose connection failed');
             }
           } else {
+            await ping();
             _setStatus(Status.connected);
           }
 
@@ -549,8 +589,6 @@ class Client {
         } catch (e) {
           if (!_connectCompleter.isCompleted) {
             _connectCompleter.completeError(e);
-          } else {
-            rethrow;
           }
         }
         break;
@@ -564,6 +602,24 @@ class Client {
       case '-err':
         if (_connectOption.verbose == true) {
           _ackStream.sink.add(false);
+        }
+        final exception = NatsException(data);
+        if (onError != null) {
+          onError!(exception);
+        }
+        if (!_connectCompleter.isCompleted) {
+          _connectCompleter.completeError(exception);
+        }
+        while (_pingCompleters.isNotEmpty) {
+          final completer = _pingCompleters.removeAt(0);
+          if (!completer.isCompleted) {
+            completer.completeError(exception);
+          }
+        }
+        if (data.toLowerCase().contains('authorization violation') ||
+            data.toLowerCase().contains('authentication')) {
+          _retry = false;
+          close();
         }
         break;
 
@@ -824,34 +880,51 @@ class Client {
     if (status == Status.closed || status == Status.disconnected) {
       return;
     }
-    if (_wsChannel != null) {
-      _wsChannel?.sink.add(utf8.encode(str + '\r\n'));
-      return;
-    } else if (_secureSocket != null) {
-      _secureSocket!.add(utf8.encode(str + '\r\n'));
-      return;
-    } else if (_tcpSocket != null) {
-      _tcpSocket!.add(utf8.encode(str + '\r\n'));
-      return;
+    try {
+      if (_wsChannel != null) {
+        _wsChannel?.sink.add(utf8.encode(str + '\r\n'));
+        return;
+      } else if (_secureSocket != null) {
+        _secureSocket!.add(utf8.encode(str + '\r\n'));
+        return;
+      } else if (_tcpSocket != null) {
+        _tcpSocket!.add(utf8.encode(str + '\r\n'));
+        return;
+      }
+      throw Exception(NatsException('no connection'));
+    } catch (e) {
+      _setStatus(Status.disconnected);
+      if (onError != null) {
+        onError!(e);
+      }
     }
-    throw Exception(NatsException('no connection'));
   }
 
   void _addByte(List<int> msg) {
-    if (_wsChannel != null) {
-      _wsChannel?.sink.add(msg);
-      _wsChannel?.sink.add(utf8.encode('\r\n'));
-      return;
-    } else if (_secureSocket != null) {
-      _secureSocket?.add(msg);
-      _secureSocket?.add(utf8.encode('\r\n'));
-      return;
-    } else if (_tcpSocket != null) {
-      _tcpSocket?.add(msg);
-      _tcpSocket?.add(utf8.encode('\r\n'));
+    if (status == Status.closed || status == Status.disconnected) {
       return;
     }
-    throw Exception(NatsException('no connection'));
+    try {
+      if (_wsChannel != null) {
+        _wsChannel?.sink.add(msg);
+        _wsChannel?.sink.add(utf8.encode('\r\n'));
+        return;
+      } else if (_secureSocket != null) {
+        _secureSocket?.add(msg);
+        _secureSocket?.add(utf8.encode('\r\n'));
+        return;
+      } else if (_tcpSocket != null) {
+        _tcpSocket?.add(msg);
+        _tcpSocket?.add(utf8.encode('\r\n'));
+        return;
+      }
+      throw Exception(NatsException('no connection'));
+    } catch (e) {
+      _setStatus(Status.disconnected);
+      if (onError != null) {
+        onError!(e);
+      }
+    }
   }
 
   var _inboxPrefix = '_INBOX';
@@ -985,6 +1058,18 @@ class Client {
     if (_status == Status.closed && newStatus != Status.connecting) {
       return;
     }
+    if (newStatus == Status.disconnected || newStatus == Status.closed) {
+      final exception = NatsException('Connection closed or disconnected');
+      if (!_connectCompleter.isCompleted) {
+        _connectCompleter.completeError(exception);
+      }
+      while (_pingCompleters.isNotEmpty) {
+        final completer = _pingCompleters.removeAt(0);
+        if (!completer.isCompleted) {
+          completer.completeError(exception);
+        }
+      }
+    }
     final oldStatus = _status;
     _status = newStatus;
     _statusController.add(newStatus);
@@ -1017,17 +1102,25 @@ class Client {
     _setStatus(Status.closed);
     _backendSubs.forEach((k, v) => _backendSubs[k] = false);
     _inboxs.clear();
-    await _wsChannel?.sink.close();
+    
+    final ws = _wsChannel;
     _wsChannel = null;
-    await _secureSocket?.close();
+    await ws?.sink.close();
+    
+    final secure = _secureSocket;
     _secureSocket = null;
-    await _tcpSocket?.close();
+    await secure?.close();
+    
+    final tcp = _tcpSocket;
     _tcpSocket = null;
+    await tcp?.close();
+    
     await _inboxSub?.close();
     _inboxSub = null;
     _inboxSubPrefix = null;
     _buffer = [];
     _bufferOffset = 0;
+    _receiveState = _ReceiveState.idle;
     _clientStatus = _ClientStatus.closed;
   }
 
