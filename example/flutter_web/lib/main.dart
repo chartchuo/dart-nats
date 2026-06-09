@@ -81,9 +81,9 @@ class _DashboardPageState extends State<DashboardPage> {
   final TextEditingController _urlController =
       TextEditingController(text: 'ws://localhost:8080');
   final TextEditingController _subSubjectController =
-      TextEditingController(text: 'demo.wasm');
+      TextEditingController(text: 'demo.web');
   final TextEditingController _pubSubjectController =
-      TextEditingController(text: 'demo.wasm');
+      TextEditingController(text: 'demo.web');
   final TextEditingController _payloadController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -855,7 +855,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: TextField(
                   controller: _subSubjectController,
                   enabled: isConnected,
-                  decoration: _buildInputDecoration('e.g. demo.wasm'),
+                  decoration: _buildInputDecoration('e.g. demo.web'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -914,7 +914,7 @@ class _DashboardPageState extends State<DashboardPage> {
           TextField(
             controller: _pubSubjectController,
             enabled: isConnected,
-            decoration: _buildInputDecoration('e.g. demo.wasm'),
+            decoration: _buildInputDecoration('e.g. demo.web'),
           ),
           const SizedBox(height: 12),
           const Text(
