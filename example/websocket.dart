@@ -19,7 +19,7 @@ void main() async {
       Uri.parse('ws://localhost:8080'),
       retry: true,
       retryCount: 3,
-    );``
+    );
     print('Connected successfully via WebSocket!');
   } catch (e) {
     print('Failed to connect via WebSocket: $e');

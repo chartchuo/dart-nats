@@ -246,7 +246,8 @@ void main() {
       final exitCode =
           await process.exitCode.timeout(const Duration(seconds: 5));
       expect(exitCode == 0 || exitCode == 1, isTrue,
-          reason: 'CLI responder failed to exit cleanly (exit code: $exitCode)');
+          reason:
+              'CLI responder failed to exit cleanly (exit code: $exitCode)');
     });
   });
 }
