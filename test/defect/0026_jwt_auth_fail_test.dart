@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:dart_nats/dart_nats.dart';
 import 'package:test/test.dart';
 
@@ -6,8 +5,9 @@ void main() {
   group('JWT/Auth fail handling', () {
     test('0026 Connect with invalid JWT throws exception', () async {
       final client = Client();
-      client.seed = 'SUAJGSBAKQHGYI7ZVKVR6WA7Z5U52URHKGGT6ZICUJXMG4LCTC2NTLQSF4';
-      
+      client.seed =
+          'SUAJGSBAKQHGYI7ZVKVR6WA7Z5U52URHKGGT6ZICUJXMG4LCTC2NTLQSF4';
+
       var threwException = false;
       try {
         await client.connect(

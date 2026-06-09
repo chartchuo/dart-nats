@@ -61,6 +61,8 @@ class KeyValueEntry {
   String get string => utf8.decode(value);
 }
 
+/// EXPERIMENTAL: Key-Value Store APIs are experimental and subject to change in future releases.
+///
 /// NATS Key-Value Store implementation
 class KeyValue {
   final Client client;
@@ -89,7 +91,8 @@ class KeyValue {
     }));
 
     try {
-      final response = await client.request(apiSubject, Uint8List.fromList(payload));
+      final response =
+          await client.request(apiSubject, Uint8List.fromList(payload));
       final map = jsonDecode(response.string);
       if (map['error'] != null) {
         if (map['error']['code'] == 404) {
@@ -110,22 +113,24 @@ class KeyValue {
   Future<bool> delete(String key) async {
     final subject = '\$KV.$bucket.$key';
     final header = Header().add('KV-Operation', 'DEL');
-    final ack = await client.jetStream().publish(subject, Uint8List(0), header: header);
+    final ack =
+        await client.jetStream().publish(subject, Uint8List(0), header: header);
     return ack.sequence > 0;
   }
 
   /// Purge the key (deletes all historical versions for this key)
   Future<bool> purge(String key) async {
     final subject = '\$KV.$bucket.$key';
-    final header = Header()
-        .add('KV-Operation', 'PURGE')
-        .add('Nats-Rollup', 'sub');
-    final ack = await client.jetStream().publish(subject, Uint8List(0), header: header);
+    final header =
+        Header().add('KV-Operation', 'PURGE').add('Nats-Rollup', 'sub');
+    final ack =
+        await client.jetStream().publish(subject, Uint8List(0), header: header);
     return ack.sequence > 0;
   }
 
   /// Watch for real-time key modifications. Can watch a single key or a wildcard (e.g. ">").
-  Stream<KeyValueEntry?> watch({String key = '>', bool includeHistory = false}) {
+  Stream<KeyValueEntry?> watch(
+      {String key = '>', bool includeHistory = false}) {
     final controller = StreamController<KeyValueEntry?>();
     final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
     final sub = client.sub(deliverSubject);
@@ -164,7 +169,10 @@ class KeyValue {
       ackPolicy: 'none',
     );
 
-    client.jetStream().addConsumer(streamName, consumerConfig).catchError((dynamic err) {
+    client
+        .jetStream()
+        .addConsumer(streamName, consumerConfig)
+        .catchError((dynamic err) {
       controller.addError(err);
       controller.close();
       throw err;
@@ -207,4 +215,193 @@ class KeyValue {
       created: created,
     );
   }
+
+  /// List all active keys in this bucket (excluding deleted/purged ones).
+  Future<List<String>> keys({Duration timeout = const Duration(seconds: 5)}) async {
+    final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
+    final sub = client.sub(deliverSubject);
+
+    final consumerConfig = ConsumerConfig(
+      deliverSubject: deliverSubject,
+      filterSubject: '\$KV.$bucket.>',
+      deliverPolicy: 'all',
+      ackPolicy: 'none',
+    );
+
+    final activeKeys = <String, bool>{}; // key -> is_active
+    final completer = Completer<List<String>>();
+    StreamSubscription? streamSub;
+    Timer? timeoutTimer;
+
+    void cleanup() {
+      timeoutTimer?.cancel();
+      streamSub?.cancel();
+      client.unSub(sub);
+    }
+
+    timeoutTimer = Timer(timeout, () {
+      cleanup();
+      if (!completer.isCompleted) {
+        completer.complete(activeKeys.entries.where((e) => e.value).map((e) => e.key).toList());
+      }
+    });
+
+    streamSub = sub.stream.listen((msg) {
+      try {
+        final parts = msg.subject!.split('.');
+        if (parts.length >= 3) {
+          final keyName = parts.sublist(2).join('.');
+          final op = msg.header?.get('KV-Operation');
+          if (op == 'DEL' || op == 'PURGE') {
+            activeKeys[keyName] = false;
+          } else {
+            activeKeys[keyName] = true;
+          }
+        }
+      } catch (_) {}
+
+      final reply = msg.replyTo;
+      if (reply != null) {
+        final parts = reply.split('.');
+        int? pending;
+        if (parts.length == 9) {
+          pending = int.tryParse(parts[8]);
+        } else if (parts.length == 11) {
+          pending = int.tryParse(parts[10]);
+        }
+        if (pending == 0) {
+          cleanup();
+          if (!completer.isCompleted) {
+            completer.complete(activeKeys.entries.where((e) => e.value).map((e) => e.key).toList());
+          }
+        }
+      }
+    }, onError: (err) {
+      cleanup();
+      if (!completer.isCompleted) {
+        completer.completeError(err);
+      }
+    }, onDone: () {
+      cleanup();
+      if (!completer.isCompleted) {
+        completer.complete(activeKeys.entries.where((e) => e.value).map((e) => e.key).toList());
+      }
+    });
+
+    try {
+      await client.jetStream().addConsumer(streamName, consumerConfig);
+    } catch (e) {
+      cleanup();
+      if (!completer.isCompleted) {
+        completer.complete([]);
+      }
+    }
+
+    return completer.future;
+  }
+
+  /// Get a stream of all revisions (history) for a specific key.
+  /// The stream will yield historical entries and automatically close when the existing history is fully read.
+  Stream<KeyValueEntry> history(String key, {Duration timeout = const Duration(seconds: 5)}) {
+    final controller = StreamController<KeyValueEntry>();
+    final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
+    final sub = client.sub(deliverSubject);
+
+    StreamSubscription? streamSub;
+    Timer? timeoutTimer;
+
+    void cleanup() {
+      timeoutTimer?.cancel();
+      streamSub?.cancel();
+      client.unSub(sub);
+      if (!controller.isClosed) {
+        controller.close();
+      }
+    }
+
+    timeoutTimer = Timer(timeout, () {
+      cleanup();
+    });
+
+    streamSub = sub.stream.listen((msg) {
+      try {
+        final parts = msg.subject!.split('.');
+        if (parts.length >= 3) {
+          final keyName = parts.sublist(2).join('.');
+          final seq = msg.streamSequence ?? 0;
+          
+          controller.add(KeyValueEntry(
+            key: keyName,
+            value: msg.byte,
+            revision: seq,
+            created: DateTime.now(),
+          ));
+        }
+      } catch (e) {
+        controller.addError(e);
+      }
+
+      final reply = msg.replyTo;
+      if (reply != null) {
+        final parts = reply.split('.');
+        int? pending;
+        if (parts.length == 9) {
+          pending = int.tryParse(parts[8]);
+        } else if (parts.length == 11) {
+          pending = int.tryParse(parts[10]);
+        }
+        if (pending == 0) {
+          cleanup();
+        }
+      }
+    }, onError: (err) {
+      controller.addError(err);
+      cleanup();
+    }, onDone: () {
+      cleanup();
+    });
+
+    client.jetStream().addConsumer(streamName, ConsumerConfig(
+      deliverSubject: deliverSubject,
+      filterSubject: '\$KV.$bucket.$key',
+      deliverPolicy: 'all',
+      ackPolicy: 'none',
+    )).catchError((dynamic err) {
+      controller.addError(err);
+      cleanup();
+      return false;
+    });
+
+    return controller.stream;
+  }
+
+  /// Get status details for this Key-Value bucket.
+  Future<KeyValueStatus> status() async {
+    final info = await client.jetStream().getStream(streamName);
+    return KeyValueStatus(bucket, info);
+  }
+}
+
+/// Represents status and statistics of a Key-Value bucket.
+class KeyValueStatus {
+  /// The bucket name
+  final String bucket;
+
+  /// The backing stream information
+  final StreamInfo info;
+
+  /// Constructor
+  KeyValueStatus(this.bucket, this.info);
+
+  /// Storage type: 'file' or 'memory'
+  String get storage => info.config.storage;
+
+  /// The history depth configuration (max messages per subject)
+  int get history => info.config.maxMsgsPerSubject ?? 1;
+
+  /// Total number of stored bytes (compressed/raw size in NATS)
+  int get size => info.state.bytes;
+
+  /// Total count of operations/messages currently in the backing stream
+  int get values => info.state.messages;
 }

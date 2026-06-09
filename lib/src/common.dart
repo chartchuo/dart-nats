@@ -253,11 +253,13 @@ class Credentials {
         inJwt = false;
         continue;
       }
-      if (trimmed.contains('BEGIN') && (trimmed.contains('SEED') || trimmed.contains('NKEY'))) {
+      if (trimmed.contains('BEGIN') &&
+          (trimmed.contains('SEED') || trimmed.contains('NKEY'))) {
         inSeed = true;
         continue;
       }
-      if (trimmed.contains('END') && (trimmed.contains('SEED') || trimmed.contains('NKEY'))) {
+      if (trimmed.contains('END') &&
+          (trimmed.contains('SEED') || trimmed.contains('NKEY'))) {
         inSeed = false;
         continue;
       }
@@ -274,7 +276,8 @@ class Credentials {
     final seed = seedLines.join('\n').trim();
 
     if (jwt.isEmpty || seed.isEmpty) {
-      throw NatsException('Failed to parse credentials: missing USER JWT or NKEY SEED block');
+      throw NatsException(
+          'Failed to parse credentials: missing USER JWT or NKEY SEED block');
     }
 
     return Credentials(jwt: jwt, seed: seed);

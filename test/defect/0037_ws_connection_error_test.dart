@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:dart_nats/dart_nats.dart';
 import 'package:test/test.dart';
 
@@ -7,7 +6,9 @@ import 'package:test/test.dart';
 
 void main() {
   group('WS Connection Error (Issue #37)', () {
-    test('0037 WS connection failure is handled gracefully without unhandled exceptions', () async {
+    test(
+        '0037 WS connection failure is handled gracefully without unhandled exceptions',
+        () async {
       final client = Client();
       var threwExpectedException = false;
 
@@ -30,7 +31,8 @@ void main() {
       expect(threwExpectedException, isTrue);
     });
 
-    test('0037 WS connection retry exhausted throws NatsException gracefully', () async {
+    test('0037 WS connection retry exhausted throws NatsException gracefully',
+        () async {
       final client = Client();
       final statusHistory = <Status>[];
       client.statusStream.listen((s) {
@@ -59,7 +61,8 @@ void main() {
       expect(statusHistory, contains(Status.closed));
     });
 
-    test('0037 WS server pooling failover handles offline servers gracefully', () async {
+    test('0037 WS server pooling failover handles offline servers gracefully',
+        () async {
       final client = Client();
       var threwExpectedException = false;
       try {

@@ -24,7 +24,7 @@ Add `dart_nats` to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  dart_nats: ^0.7.0
+  dart_nats: ^1.0.0
 ```
 
 ### 2. Import the Package
@@ -370,6 +370,9 @@ await client.connect(Uri.parse('nats://localhost:4222'));
 
 ## ⚡ JetStream Support (Persistence)
 
+> [!WARNING]
+> JetStream, Key-Value (KV) Store, and Object Store APIs are currently **experimental** and may undergo breaking changes in future releases as the library matures.
+
 JetStream provides message persistence, at-least-once delivery guarantees, and support for message replay.
 
 ### 1. Initialize JetStream
@@ -571,10 +574,14 @@ To run the examples:
 
    # Run the JetStream Object Store example
    dart run example/jetstream_object_store.dart
+
+   # Run the Flutter Multi-Platform Dashboard demo
+   cd example/demo
+   flutter run
    ```
 
 ---
 
 ## 🧪 Development & Testing
 
-For instructions on running containerized NATS servers locally, generating certificates, and executing the test suites, check the [DEVELOPMENT.md](file:///Users/chartchuo/workspace/dart-nats/DEVELOPMENT.md) guide.
+For instructions on running containerized NATS servers locally, generating certificates, and executing the test suites, check the [DEVELOPMENT.md](DEVELOPMENT.md) guide.

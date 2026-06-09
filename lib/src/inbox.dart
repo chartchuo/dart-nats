@@ -41,7 +41,7 @@ class Nuid {
   }
 
   /// get instance
-  static getInstance() {
+  static Nuid getInstance() {
     return _nuid;
   }
 

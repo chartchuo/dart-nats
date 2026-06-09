@@ -174,5 +174,77 @@ void main() {
       expect(statusHistory[2], equals(Status.reconnecting));
       expect(statusHistory[3], equals(Status.closed));
     });
+
+    test('observe client.status getter during connection lifecycle', () async {
+      var client = Client();
+      expect(client.status, equals(Status.disconnected));
+
+      final connectFuture = client.connect(Uri.parse('nats://localhost:4222'));
+      expect(client.status, equals(Status.connecting));
+
+      await connectFuture;
+      expect(client.status, equals(Status.connected));
+
+      await client.close();
+      expect(client.status, equals(Status.closed));
+    });
+
+    test('ensure no connection socket leak after close', () async {
+      // Test for TCP connection
+      var clientTcp = Client();
+      expect(clientTcp.isClosedAndCleaned, isTrue);
+
+      await clientTcp.connect(Uri.parse('nats://localhost:4222'));
+      expect(clientTcp.isClosedAndCleaned, isFalse);
+
+      await clientTcp.close();
+      expect(clientTcp.isClosedAndCleaned, isTrue);
+
+      // Test for WebSocket connection
+      var clientWs = Client();
+      expect(clientWs.isClosedAndCleaned, isTrue);
+
+      await clientWs.connect(Uri.parse('ws://localhost:8080'));
+      expect(clientWs.isClosedAndCleaned, isFalse);
+
+      await clientWs.close();
+      expect(clientWs.isClosedAndCleaned, isTrue);
+    });
+
+    test('reconnect to valid server after connection failure to invalid server', () async {
+      var client = Client();
+
+      // 1. Attempt connection to a non-existent WebSocket NATS server
+      try {
+        await client.connect(
+          Uri.parse('ws://localhost:54321'), // invalid port
+          retry: true,
+          retryCount: 2,
+          retryInterval: 1,
+          timeout: 1,
+        );
+      } catch (e) {
+        // Expect to fail
+      }
+
+      // 2. Call close() to reset/clean up the client's internal status from used/failed state
+      await client.close();
+
+      // 3. Reconnect to the valid local NATS server (port 8080)
+      await client.connect(
+        Uri.parse('ws://localhost:8080'),
+        retry: false,
+      );
+
+      expect(client.status, equals(Status.connected));
+
+      // 4. Verify that publish/subscribe works after reconnecting
+      var sub = client.sub('reconnect_test_subject');
+      await client.pub('reconnect_test_subject', Uint8List.fromList('test_data'.codeUnits));
+      var msg = await sub.stream.first;
+      expect(String.fromCharCodes(msg.byte), equals('test_data'));
+
+      await client.close();
+    });
   });
 }

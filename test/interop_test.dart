@@ -38,7 +38,7 @@ void main() {
     test('Standard Pub/Sub Interop: CLI Pub to Dart Sub', () async {
       final subject = 'interop.pubsub.${DateTime.now().millisecondsSinceEpoch}';
       final sub = client.sub(subject);
-      
+
       final completer = Completer<Message>();
       final streamSub = sub.stream.listen((msg) {
         if (!completer.isCompleted) {
@@ -63,7 +63,8 @@ void main() {
       client.unSub(sub);
     });
 
-    test('KeyValue Store Interop: Dart Put -> CLI Get -> CLI Put -> Dart Get', () async {
+    test('KeyValue Store Interop: Dart Put -> CLI Get -> CLI Put -> Dart Get',
+        () async {
       final bucket = 'interop_kv_${DateTime.now().millisecondsSinceEpoch}';
       final kv = await js.keyValue(bucket, create: true, storage: 'memory');
 
@@ -80,7 +81,8 @@ void main() {
         '-s',
         'nats://localhost:4222',
       ]);
-      expect(resGet.exitCode, equals(0), reason: 'CLI kv get failed: ${resGet.stderr}');
+      expect(resGet.exitCode, equals(0),
+          reason: 'CLI kv get failed: ${resGet.stderr}');
       expect(resGet.stdout.toString().trim(), equals('dart-value'));
 
       // 3. CLI Put
@@ -93,7 +95,8 @@ void main() {
         '-s',
         'nats://localhost:4222',
       ]);
-      expect(resPut.exitCode, equals(0), reason: 'CLI kv put failed: ${resPut.stderr}');
+      expect(resPut.exitCode, equals(0),
+          reason: 'CLI kv put failed: ${resPut.stderr}');
 
       // 4. Dart Get
       final entry = await kv.get('mykey');
@@ -104,14 +107,16 @@ void main() {
       await js.deleteStream('KV_$bucket');
     });
 
-    test('Object Store Interop: CLI Put -> Dart Get -> Dart Put -> CLI Get', () async {
+    test('Object Store Interop: CLI Put -> Dart Get -> Dart Put -> CLI Get',
+        () async {
       final bucket = 'interop_obj_${DateTime.now().millisecondsSinceEpoch}';
       final os = await js.objectStore(bucket, create: true, storage: 'memory');
 
       // Create a temporary file with unique content
       final tempDir = Directory.systemTemp.createTempSync('nats_interop');
       final tempFile = File('${tempDir.path}/test.txt');
-      final uniqueContent = 'Unique content for interop object store: ${DateTime.now().toIso8601String()}';
+      final uniqueContent =
+          'Unique content for interop object store: ${DateTime.now().toIso8601String()}';
       tempFile.writeAsStringSync(uniqueContent);
 
       // 1. CLI Put
@@ -125,14 +130,16 @@ void main() {
         '-s',
         'nats://localhost:4222',
       ]);
-      expect(resPut.exitCode, equals(0), reason: 'CLI object put failed: ${resPut.stderr}');
+      expect(resPut.exitCode, equals(0),
+          reason: 'CLI object put failed: ${resPut.stderr}');
 
       // 2. Dart Get
       final retrievedData = await os.getString('cli-file');
       expect(retrievedData, equals(uniqueContent));
 
       // 3. Dart Put
-      final dartContent = 'Hello from Dart Object Store! ' * 1000; // ~30KB to ensure chunking is tested a bit
+      final dartContent = 'Hello from Dart Object Store! ' *
+          1000; // ~30KB to ensure chunking is tested a bit
       await os.putString('dart-file', dartContent);
 
       // 4. CLI Get
@@ -148,12 +155,99 @@ void main() {
         '-s',
         'nats://localhost:4222',
       ]);
-      expect(resGet.exitCode, equals(0), reason: 'CLI object get failed: ${resGet.stderr}');
+      expect(resGet.exitCode, equals(0),
+          reason: 'CLI object get failed: ${resGet.stderr}');
       expect(destFile.readAsStringSync(), equals(dartContent));
 
       // Cleanup files and bucket
       tempDir.deleteSync(recursive: true);
       await js.deleteStream('OBJ_$bucket');
+    });
+
+    test('Standard Pub/Sub Interop: Dart Pub to CLI Sub', () async {
+      final subject =
+          'interop.pubsub.dart2cli.${DateTime.now().millisecondsSinceEpoch}';
+
+      // Start CLI subscriber that quits after receiving 1 message
+      final process = await Process.start(natsExec, [
+        'sub',
+        subject,
+        '--count=1',
+        '--raw',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+
+      // Give CLI time to subscribe
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Publish from Dart client
+      await client.pubString(subject, 'hello-from-dart');
+
+      // Wait for process to exit
+      final exitCode =
+          await process.exitCode.timeout(const Duration(seconds: 5));
+      expect(exitCode, equals(0), reason: 'CLI sub failed');
+
+      final output = await process.stdout.transform(utf8.decoder).join();
+      expect(output.trim(), equals('hello-from-dart'));
+    });
+
+    test('Request/Reply Interop: CLI Request to Dart Reply', () async {
+      final subject =
+          'interop.reqrep.cli2dart.${DateTime.now().millisecondsSinceEpoch}';
+      final sub = client.sub(subject);
+
+      final streamSub = sub.stream.listen((msg) {
+        msg.respondString('reply-from-dart');
+      });
+
+      // Run CLI request
+      final res = await Process.run(natsExec, [
+        'request',
+        subject,
+        'hello-from-cli',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+      expect(res.exitCode, equals(0),
+          reason: 'CLI request failed: ${res.stderr}');
+      expect(res.stdout.toString(), contains('reply-from-dart'));
+
+      await streamSub.cancel();
+      client.unSub(sub);
+    });
+
+    test('Request/Reply Interop: Dart Request to CLI Reply', () async {
+      final subject =
+          'interop.reqrep.dart2cli.${DateTime.now().millisecondsSinceEpoch}';
+
+      // Start CLI responder that responds and exits after 1 request
+      final process = await Process.start(natsExec, [
+        'reply',
+        subject,
+        'reply-from-cli: {{Request}}',
+        '--count=1',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+
+      // Give CLI time to start the responder
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Request from Dart
+      final response = await client.request(
+        subject,
+        Uint8List.fromList(utf8.encode('hello-from-dart')),
+        timeout: const Duration(seconds: 5),
+      );
+      expect(response.string, equals('reply-from-cli: hello-from-dart'));
+
+      final exitCode =
+          await process.exitCode.timeout(const Duration(seconds: 5));
+      expect(exitCode == 0 || exitCode == 1, isTrue,
+          reason:
+              'CLI responder failed to exit cleanly (exit code: $exitCode)');
     });
   });
 }

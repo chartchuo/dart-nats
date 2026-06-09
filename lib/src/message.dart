@@ -1,4 +1,4 @@
-///message model sending from NATS server
+// message model sending from NATS server
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -178,11 +178,28 @@ class Message<T> {
     return null;
   }
 
+  /// Get the JetStream consumer sequence number directly from the reply subject metadata
+  int? get consumerSequence {
+    if (replyTo == null) return null;
+    final parts = replyTo!.split('.');
+    if (parts.length < 8) return null;
+    if (parts[0] != '\$JS' || parts[1] != 'ACK') return null;
+
+    if (parts.length == 8 || parts.length == 9) {
+      return int.tryParse(parts[6]);
+    }
+    if (parts.length == 10 || parts.length == 11) {
+      return int.tryParse(parts[8]);
+    }
+    return null;
+  }
+
   /// Acknowledge the message and wait for confirmation from the JetStream server (synchronous ack)
   Future<void> ackSync({Duration timeout = const Duration(seconds: 2)}) async {
     if (replyTo == null || replyTo == '') {
       throw NatsException('Cannot acknowledge message: no reply subject');
     }
-    await _client.request(replyTo!, Uint8List.fromList(utf8.encode('+ACK')), timeout: timeout);
+    await _client.request(replyTo!, Uint8List.fromList(utf8.encode('+ACK')),
+        timeout: timeout);
   }
 }

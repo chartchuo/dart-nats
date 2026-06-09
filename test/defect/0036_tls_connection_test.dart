@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:dart_nats/dart_nats.dart';
 import 'package:test/test.dart';
 
@@ -38,7 +37,8 @@ void main() {
       }
     });
 
-    test('0036 Connecting using tls:// to a non-TLS server fails cleanly', () async {
+    test('0036 Connecting using tls:// to a non-TLS server fails cleanly',
+        () async {
       final client = Client();
       var threwExpectedException = false;
       try {
