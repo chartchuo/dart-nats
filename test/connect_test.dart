@@ -210,5 +210,41 @@ void main() {
       await clientWs.close();
       expect(clientWs.isClosedAndCleaned, isTrue);
     });
+
+    test('reconnect to valid server after connection failure to invalid server', () async {
+      var client = Client();
+
+      // 1. Attempt connection to a non-existent WebSocket NATS server
+      try {
+        await client.connect(
+          Uri.parse('ws://localhost:54321'), // invalid port
+          retry: true,
+          retryCount: 2,
+          retryInterval: 1,
+          timeout: 1,
+        );
+      } catch (e) {
+        // Expect to fail
+      }
+
+      // 2. Call close() to reset/clean up the client's internal status from used/failed state
+      await client.close();
+
+      // 3. Reconnect to the valid local NATS server (port 8080)
+      await client.connect(
+        Uri.parse('ws://localhost:8080'),
+        retry: false,
+      );
+
+      expect(client.status, equals(Status.connected));
+
+      // 4. Verify that publish/subscribe works after reconnecting
+      var sub = client.sub('reconnect_test_subject');
+      await client.pub('reconnect_test_subject', Uint8List.fromList('test_data'.codeUnits));
+      var msg = await sub.stream.first;
+      expect(String.fromCharCodes(msg.byte), equals('test_data'));
+
+      await client.close();
+    });
   });
 }

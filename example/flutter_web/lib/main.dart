@@ -47,6 +47,31 @@ class _DashboardPageState extends State<DashboardPage> {
   nats.Status _currentStatus = nats.Status.disconnected;
   StreamSubscription<nats.Status>? _statusSubscription;
 
+  // JetStream context
+  nats.JetStream? _js;
+
+  // Key-Value Store states
+  nats.KeyValue? _kv;
+  bool _kvInitialized = false;
+  StreamSubscription<nats.KeyValueEntry?>? _kvWatchSubscription;
+  final TextEditingController _kvBucketController =
+      TextEditingController(text: 'example_settings');
+  final TextEditingController _kvKeyController =
+      TextEditingController(text: 'config.theme');
+  final TextEditingController _kvValueController =
+      TextEditingController(text: 'dark-mode');
+
+  // Object Store states
+  nats.ObjectStore? _os;
+  bool _osInitialized = false;
+  List<nats.ObjectInfo> _osFiles = [];
+  final TextEditingController _osBucketController =
+      TextEditingController(text: 'example_files');
+  final TextEditingController _osFilenameController =
+      TextEditingController(text: 'hello.txt');
+  final TextEditingController _osPayloadController =
+      TextEditingController(text: 'Hello from Flutter Object Store!');
+
   final Map<String, nats.Subscription> _activeSubs = {};
   final Map<String, StreamSubscription> _activeStreams = {};
   final List<LogEntry> _logs = [
@@ -73,7 +98,7 @@ class _DashboardPageState extends State<DashboardPage> {
             status == nats.Status.reconnecting ||
             status == nats.Status.tlsHandshake ||
             status == nats.Status.infoHandshake;
-        
+
         _addLog(
           'NATS status: ${status.name.toUpperCase()}',
           _getStatusLogType(status),
@@ -85,6 +110,16 @@ class _DashboardPageState extends State<DashboardPage> {
             stream.cancel();
           }
           _activeStreams.clear();
+
+          // Reset JetStream objects
+          _js = null;
+          _kv = null;
+          _kvInitialized = false;
+          _kvWatchSubscription?.cancel();
+          _kvWatchSubscription = null;
+          _os = null;
+          _osInitialized = false;
+          _osFiles.clear();
         }
       });
     });
@@ -99,11 +134,18 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void dispose() {
     _statusSubscription?.cancel();
+    _kvWatchSubscription?.cancel();
     _client.close();
     _urlController.dispose();
     _subSubjectController.dispose();
     _pubSubjectController.dispose();
     _payloadController.dispose();
+    _kvBucketController.dispose();
+    _kvKeyController.dispose();
+    _kvValueController.dispose();
+    _osBucketController.dispose();
+    _osFilenameController.dispose();
+    _osPayloadController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -163,20 +205,18 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     try {
-      // 1. Clean up the previous client cleanly
       try {
         _client.close();
-      } catch (_) {
-        // Ignore initialization error
-      }
+      } catch (_) {}
 
-      // 2. Instantiate a fresh client
       _client = nats.Client();
       _setupStatusSubscription();
 
       final uri = Uri.parse(url);
       _addLog('Attempting to connect to NATS WebSocket Gateway: $uri', 'info');
       await _client.connect(uri, retry: true, retryCount: 3);
+
+      _js = _client.jetStream();
     } catch (e) {
       _addLog('Failed to connect: $e', 'error');
       try {
@@ -193,6 +233,196 @@ class _DashboardPageState extends State<DashboardPage> {
     _client.close();
   }
 
+  // --- Key-Value Store Operations ---
+  Future<void> _initKv() async {
+    if (_js == null) return;
+    final bucket = _kvBucketController.text.trim();
+    if (bucket.isEmpty) {
+      _addLog('Error: KV Bucket name cannot be empty.', 'error');
+      return;
+    }
+    _addLog('Initializing Key-Value bucket "$bucket"...', 'info');
+    try {
+      _kv = await _js!.keyValue(bucket, create: true, storage: 'memory');
+      setState(() {
+        _kvInitialized = true;
+      });
+      _addLog('Key-Value bucket "$bucket" active.', 'success');
+    } catch (e) {
+      _addLog('Failed to initialize KV bucket: $e', 'error');
+    }
+  }
+
+  Future<void> _putKv() async {
+    if (_kv == null) return;
+    final key = _kvKeyController.text.trim();
+    final value = _kvValueController.text;
+    if (key.isEmpty) {
+      _addLog('Error: KV Key cannot be empty.', 'error');
+      return;
+    }
+    try {
+      final revision = await _kv!.putString(key, value);
+      _addLog('Put "$key" -> value: "$value" (Revision: $revision)', 'success');
+    } catch (e) {
+      _addLog('KV Put failed: $e', 'error');
+    }
+  }
+
+  Future<void> _getKv() async {
+    if (_kv == null) return;
+    final key = _kvKeyController.text.trim();
+    if (key.isEmpty) {
+      _addLog('Error: KV Key cannot be empty.', 'error');
+      return;
+    }
+    try {
+      final entry = await _kv!.get(key);
+      if (entry != null) {
+        _addLog('Get "$key" -> value: "${entry.string}" (Revision: ${entry.revision})', 'success');
+      } else {
+        _addLog('Get "$key" -> Key not found', 'info');
+      }
+    } catch (e) {
+      _addLog('KV Get failed: $e', 'error');
+    }
+  }
+
+  Future<void> _deleteKv() async {
+    if (_kv == null) return;
+    final key = _kvKeyController.text.trim();
+    if (key.isEmpty) {
+      _addLog('Error: KV Key cannot be empty.', 'error');
+      return;
+    }
+    try {
+      final ok = await _kv!.delete(key);
+      _addLog('Delete "$key" -> Success: $ok', 'success');
+    } catch (e) {
+      _addLog('KV Delete failed: $e', 'error');
+    }
+  }
+
+  Future<void> _purgeKv() async {
+    if (_kv == null) return;
+    final key = _kvKeyController.text.trim();
+    if (key.isEmpty) {
+      _addLog('Error: KV Key cannot be empty.', 'error');
+      return;
+    }
+    try {
+      final ok = await _kv!.purge(key);
+      _addLog('Purge "$key" -> Success: $ok', 'success');
+    } catch (e) {
+      _addLog('KV Purge failed: $e', 'error');
+    }
+  }
+
+  void _watchKv() {
+    if (_kv == null) return;
+    final key = _kvKeyController.text.trim();
+    if (key.isEmpty) {
+      _addLog('Error: KV Key to watch cannot be empty.', 'error');
+      return;
+    }
+    _addLog('Watching Key pattern: "$key"', 'info');
+    _kvWatchSubscription?.cancel();
+    try {
+      final watchStream = _kv!.watch(key: key, includeHistory: true);
+      _kvWatchSubscription = watchStream.listen((entry) {
+        if (entry != null) {
+          _addLog('Watch Update -> key: ${entry.key}, value: "${entry.string}", revision: ${entry.revision}', 'received');
+        } else {
+          _addLog('Watch Update -> key: "$key" was DELETED or PURGED.', 'info');
+        }
+      });
+    } catch (e) {
+      _addLog('KV Watch failed: $e', 'error');
+    }
+  }
+
+  // --- Object Store Operations ---
+  Future<void> _initOs() async {
+    if (_js == null) return;
+    final bucket = _osBucketController.text.trim();
+    if (bucket.isEmpty) {
+      _addLog('Error: Object Store Bucket name cannot be empty.', 'error');
+      return;
+    }
+    _addLog('Initializing Object Store bucket "$bucket"...', 'info');
+    try {
+      _os = await _js!.objectStore(bucket, create: true, storage: 'memory');
+      setState(() {
+        _osInitialized = true;
+      });
+      _addLog('Object Store bucket "$bucket" active.', 'success');
+      await _refreshOsFiles();
+    } catch (e) {
+      _addLog('Failed to initialize Object Store bucket: $e', 'error');
+    }
+  }
+
+  Future<void> _putOsFile() async {
+    if (_os == null) return;
+    final name = _osFilenameController.text.trim();
+    final content = _osPayloadController.text;
+    if (name.isEmpty) {
+      _addLog('Error: Filename cannot be empty.', 'error');
+      return;
+    }
+    try {
+      final info = await _os!.putString(name, content, description: 'Uploaded via Dashboard');
+      _addLog('Stored "$name" (${info.size} bytes, ${info.chunks} chunks, digest: ${info.digest})', 'success');
+      await _refreshOsFiles();
+    } catch (e) {
+      _addLog('Object Store upload failed: $e', 'error');
+    }
+  }
+
+  Future<void> _getOsFile() async {
+    if (_os == null) return;
+    final name = _osFilenameController.text.trim();
+    if (name.isEmpty) {
+      _addLog('Error: Filename cannot be empty.', 'error');
+      return;
+    }
+    try {
+      final content = await _os!.getString(name);
+      if (content != null) {
+        _addLog('Downloaded "$name" content:\n$content', 'success');
+      } else {
+        _addLog('Downloaded "$name" -> Content is null or file not found', 'info');
+      }
+    } catch (e) {
+      _addLog('Object Store download failed: $e', 'error');
+    }
+  }
+
+  Future<void> _deleteOsFile(String name) async {
+    if (_os == null) return;
+    try {
+      final ok = await _os!.delete(name);
+      _addLog('Deleted file "$name" -> Success: $ok', 'success');
+      await _refreshOsFiles();
+    } catch (e) {
+      _addLog('Object Store file deletion failed: $e', 'error');
+    }
+  }
+
+  Future<void> _refreshOsFiles() async {
+    if (_os == null) return;
+    try {
+      final list = await _os!.list();
+      setState(() {
+        _osFiles = list;
+      });
+      _addLog('Listed ${list.length} file(s) in Object Store.', 'info');
+    } catch (e) {
+      _addLog('Listing Object Store files failed: $e', 'error');
+    }
+  }
+
+  // --- Pub/Sub Operations ---
   void _subscribe() {
     final subject = _subSubjectController.text.trim();
     if (subject.isEmpty) {
@@ -319,7 +549,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                             const SizedBox(height: 8),
                             const Text(
-                              'A full-featured NATS Client running over WebSocket connections.',
+                              'A full-featured NATS Client running over WebSocket connections supporting JetStream.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 16,
@@ -357,20 +587,18 @@ class _DashboardPageState extends State<DashboardPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              flex: 4,
+                              flex: 5,
                               child: Column(
                                 children: [
                                   _buildConnectionCard(isConnected),
                                   const SizedBox(height: 20),
-                                  _buildSubscriptionCard(isConnected),
-                                  const SizedBox(height: 20),
-                                  _buildPublisherCard(isConnected),
+                                  _buildTabsCard(isConnected),
                                 ],
                               ),
                             ),
                             const SizedBox(width: 24),
                             Expanded(
-                              flex: 5,
+                              flex: 4,
                               child: _buildConsoleCard(),
                             ),
                           ],
@@ -380,9 +608,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           children: [
                             _buildConnectionCard(isConnected),
                             const SizedBox(height: 20),
-                            _buildSubscriptionCard(isConnected),
-                            const SizedBox(height: 20),
-                            _buildPublisherCard(isConnected),
+                            _buildTabsCard(isConnected),
                             const SizedBox(height: 20),
                             _buildConsoleCard(),
                           ],
@@ -402,7 +628,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildGlassCard({required Widget child}) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0x3B1E293B), // Glassmorphism container
+        color: const Color(0x3B1E293B),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0x1Fffffff), width: 1.5),
         boxShadow: [
@@ -561,25 +787,66 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // --- Subscription Manager ---
-  Widget _buildSubscriptionCard(bool isConnected) {
+  // --- Tabbed Area for Pub/Sub, KV, and Object Store ---
+  Widget _buildTabsCard(bool isConnected) {
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          TabBar(
+            indicatorColor: const Color(0xFF6366F1),
+            labelColor: const Color(0xFF818CF8),
+            unselectedLabelColor: const Color(0xFF94A3B8),
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+            tabs: const [
+              Tab(text: 'Pub / Sub'),
+              Tab(text: 'Key-Value'),
+              Tab(text: 'Object Store'),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 720,
+            child: TabBarView(
+              physics: const NeverScrollableScrollPhysics(), // Prevent swipe to make text input smooth
+              children: [
+                _buildPubSubTab(isConnected),
+                _buildKeyValueTab(isConnected),
+                _buildObjectStoreTab(isConnected),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Tab 1: Pub/Sub ---
+  Widget _buildPubSubTab(bool isConnected) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildSubscriptionSubCard(isConnected),
+          const SizedBox(height: 16),
+          _buildPublisherSubCard(isConnected),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionSubCard(bool isConnected) {
     return _buildGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'Subscription Manager',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
-          const Divider(height: 32, color: Color(0x1AFFFFFF)),
+          const Divider(height: 24, color: Color(0x1AFFFFFF)),
           const Text(
             'SUBJECT TO SUBSCRIBE',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-              color: Color(0xFF94A3B8),
-            ),
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
           ),
           const SizedBox(height: 8),
           Row(
@@ -588,65 +855,27 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: TextField(
                   controller: _subSubjectController,
                   enabled: isConnected,
-                  decoration: InputDecoration(
-                    hintText: 'demo.wasm',
-                    fillColor: const Color(0xFF0F172A).withOpacity(0.6),
-                    filled: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0x1Fffffff)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0x1Fffffff)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
-                    ),
-                  ),
+                  decoration: _buildInputDecoration('e.g. demo.wasm'),
                 ),
               ),
               const SizedBox(width: 12),
               ElevatedButton(
                 onPressed: isConnected ? _subscribe : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0x1Affffff),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFF475569).withOpacity(0.2),
-                  disabledForegroundColor: const Color(0xFF94A3B8).withOpacity(0.5),
-                  side: BorderSide(
-                    color: isConnected ? const Color(0x1Fffffff) : Colors.transparent,
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Subscribe', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: _buildSubButtonStyle(isConnected),
+                child: const Text('Subscribe'),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           const Text(
             'ACTIVE SUBSCRIPTIONS',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-              color: Color(0xFF94A3B8),
-            ),
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
           ),
           const SizedBox(height: 8),
           if (_activeSubs.isEmpty)
             const Text(
               'No active subscriptions.',
-              style: TextStyle(
-                fontSize: 13,
-                fontStyle: FontStyle.italic,
-                color: Color(0xFF64748B),
-              ),
+              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF64748B)),
             )
           else
             Wrap(
@@ -657,9 +886,6 @@ class _DashboardPageState extends State<DashboardPage> {
                   label: Text(sub),
                   backgroundColor: const Color(0x1Affffff),
                   side: const BorderSide(color: Color(0x1Fffffff)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
                   onDeleted: () => _unsubscribe(sub),
                   deleteIconColor: const Color(0xFFEF4444),
                 );
@@ -670,103 +896,449 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // --- Publisher ---
-  Widget _buildPublisherCard(bool isConnected) {
+  Widget _buildPublisherSubCard(bool isConnected) {
     return _buildGlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'Publisher',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
-          const Divider(height: 32, color: Color(0x1AFFFFFF)),
+          const Divider(height: 24, color: Color(0x1AFFFFFF)),
           const Text(
             'PUBLISH SUBJECT',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-              color: Color(0xFF94A3B8),
-            ),
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _pubSubjectController,
             enabled: isConnected,
-            decoration: InputDecoration(
-              hintText: 'demo.wasm',
-              fillColor: const Color(0xFF0F172A).withOpacity(0.6),
-              filled: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0x1Fffffff)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0x1Fffffff)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
-              ),
-            ),
+            decoration: _buildInputDecoration('e.g. demo.wasm'),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           const Text(
             'MESSAGE PAYLOAD',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-              color: Color(0xFF94A3B8),
-            ),
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _payloadController,
             enabled: isConnected,
             maxLines: 3,
-            decoration: InputDecoration(
-              hintText: 'Enter message text...',
-              fillColor: const Color(0xFF0F172A).withOpacity(0.6),
-              filled: true,
-              contentPadding: const EdgeInsets.all(16),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0x1Fffffff)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0x1Fffffff)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
-              ),
-            ),
+            decoration: _buildInputDecoration('Enter message text...'),
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: isConnected ? _publish : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6366F1),
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: const Color(0xFF475569),
-                disabledForegroundColor: const Color(0xFF94A3B8),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text('Publish Message', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: _buildPrimaryButtonStyle(),
+              child: const Text('Publish Message'),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // --- Tab 2: Key-Value Store ---
+  Widget _buildKeyValueTab(bool isConnected) {
+    final isKvActive = isConnected && _kvInitialized;
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Bucket Bind Card
+          _buildGlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'KV Bucket Configuration',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isKvActive ? const Color(0xFF10B981).withOpacity(0.15) : const Color(0xFFEF4444).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        isKvActive ? 'ACTIVE' : 'NOT INITIALIZED',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isKvActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24, color: Color(0x1AFFFFFF)),
+                const Text(
+                  'KV BUCKET NAME',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _kvBucketController,
+                        enabled: isConnected,
+                        decoration: _buildInputDecoration('e.g. app_settings'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: isConnected ? _initKv : null,
+                      style: _buildSubButtonStyle(isConnected),
+                      child: const Text('Create/Bind'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Operations Card
+          _buildGlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Key-Value Actions',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const Divider(height: 24, color: Color(0x1AFFFFFF)),
+                const Text(
+                  'KEY',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _kvKeyController,
+                  enabled: isKvActive,
+                  decoration: _buildInputDecoration('config.theme'),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'VALUE',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _kvValueController,
+                  enabled: isKvActive,
+                  decoration: _buildInputDecoration('dark-mode'),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    ElevatedButton(
+                      onPressed: isKvActive ? _putKv : null,
+                      style: _buildActionButtonStyle(const Color(0xFF6366F1)),
+                      child: const Text('Put Value'),
+                    ),
+                    ElevatedButton(
+                      onPressed: isKvActive ? _getKv : null,
+                      style: _buildActionButtonStyle(const Color(0xFF10B981)),
+                      child: const Text('Get Value'),
+                    ),
+                    ElevatedButton(
+                      onPressed: isKvActive ? _deleteKv : null,
+                      style: _buildActionButtonStyle(const Color(0xFFFBBF24)),
+                      child: const Text('Delete'),
+                    ),
+                    ElevatedButton(
+                      onPressed: isKvActive ? _purgeKv : null,
+                      style: _buildActionButtonStyle(const Color(0xFFEF4444)),
+                      child: const Text('Purge'),
+                    ),
+                    ElevatedButton(
+                      onPressed: isKvActive ? _watchKv : null,
+                      style: _buildActionButtonStyle(const Color(0xFFA855F7)),
+                      child: const Text('Watch Key'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Tab 3: Object Store ---
+  Widget _buildObjectStoreTab(bool isConnected) {
+    final isOsActive = isConnected && _osInitialized;
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Bucket Bind Card
+          _buildGlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Object Store Configuration',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isOsActive ? const Color(0xFF10B981).withOpacity(0.15) : const Color(0xFFEF4444).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        isOsActive ? 'ACTIVE' : 'NOT INITIALIZED',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isOsActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24, color: Color(0x1AFFFFFF)),
+                const Text(
+                  'OBJECT BUCKET NAME',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _osBucketController,
+                        enabled: isConnected,
+                        decoration: _buildInputDecoration('e.g. app_files'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: isConnected ? _initOs : null,
+                      style: _buildSubButtonStyle(isConnected),
+                      child: const Text('Create/Bind'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // File uploads
+          _buildGlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Upload / Download Files',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const Divider(height: 24, color: Color(0x1AFFFFFF)),
+                const Text(
+                  'FILENAME',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _osFilenameController,
+                  enabled: isOsActive,
+                  decoration: _buildInputDecoration('hello.txt'),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'FILE CONTENT',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _osPayloadController,
+                  enabled: isOsActive,
+                  maxLines: 2,
+                  decoration: _buildInputDecoration('file content...'),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isOsActive ? _putOsFile : null,
+                        style: _buildActionButtonStyle(const Color(0xFF6366F1)),
+                        child: const Text('Upload String File'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isOsActive ? _getOsFile : null,
+                        style: _buildActionButtonStyle(const Color(0xFF10B981)),
+                        child: const Text('Download/Print File'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // File list display
+          _buildGlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Bucket Files',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, size: 18),
+                      onPressed: isOsActive ? _refreshOsFiles : null,
+                      color: const Color(0xFF818CF8),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24, color: Color(0x1AFFFFFF)),
+                if (!isOsActive)
+                  const Text(
+                    'Bind Object Store bucket to list files.',
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF64748B)),
+                  )
+                else if (_osFiles.isEmpty)
+                  const Text(
+                    'No files in bucket.',
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF64748B)),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _osFiles.length,
+                    itemBuilder: (context, index) {
+                      final file = _osFiles[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0x1Affffff),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0x0Fffffff)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  file.name,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Size: ${file.size}B | Chunks: ${file.chunks}',
+                                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              color: const Color(0xFFEF4444),
+                              onPressed: () => _deleteOsFile(file.name),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Input styling helper ---
+  InputDecoration _buildInputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      fillColor: const Color(0xFF0F172A).withOpacity(0.6),
+      filled: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0x1Fffffff)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0x1Fffffff)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+      ),
+    );
+  }
+
+  // --- Buttons Style Helpers ---
+  ButtonStyle _buildSubButtonStyle(bool isConnected) {
+    return ElevatedButton.styleFrom(
+      backgroundColor: const Color(0x1Affffff),
+      foregroundColor: Colors.white,
+      disabledBackgroundColor: const Color(0xFF475569).withOpacity(0.2),
+      disabledForegroundColor: const Color(0xFF94A3B8).withOpacity(0.5),
+      side: BorderSide(
+        color: isConnected ? const Color(0x1Fffffff) : Colors.transparent,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    );
+  }
+
+  ButtonStyle _buildPrimaryButtonStyle() {
+    return ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFF6366F1),
+      foregroundColor: Colors.white,
+      disabledBackgroundColor: const Color(0xFF475569),
+      disabledForegroundColor: const Color(0xFF94A3B8),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    );
+  }
+
+  ButtonStyle _buildActionButtonStyle(Color color) {
+    return ElevatedButton.styleFrom(
+      backgroundColor: color.withOpacity(0.15),
+      foregroundColor: color,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      side: BorderSide(color: color.withOpacity(0.3)),
     );
   }
 
@@ -786,7 +1358,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ],
       ),
       padding: const EdgeInsets.all(24),
-      height: 680,
+      height: 820,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
