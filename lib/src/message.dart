@@ -183,6 +183,7 @@ class Message<T> {
     if (replyTo == null || replyTo == '') {
       throw NatsException('Cannot acknowledge message: no reply subject');
     }
-    await _client.request(replyTo!, Uint8List.fromList(utf8.encode('+ACK')), timeout: timeout);
+    await _client.request(replyTo!, Uint8List.fromList(utf8.encode('+ACK')),
+        timeout: timeout);
   }
 }

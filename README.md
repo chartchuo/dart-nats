@@ -577,4 +577,4 @@ To run the examples:
 
 ## 🧪 Development & Testing
 
-For instructions on running containerized NATS servers locally, generating certificates, and executing the test suites, check the [DEVELOPMENT.md](file:///Users/chartchuo/workspace/dart-nats/DEVELOPMENT.md) guide.
+For instructions on running containerized NATS servers locally, generating certificates, and executing the test suites, check the [DEVELOPMENT.md](DEVELOPMENT.md) guide.

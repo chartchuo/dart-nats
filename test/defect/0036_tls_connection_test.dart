@@ -38,7 +38,8 @@ void main() {
       }
     });
 
-    test('0036 Connecting using tls:// to a non-TLS server fails cleanly', () async {
+    test('0036 Connecting using tls:// to a non-TLS server fails cleanly',
+        () async {
       final client = Client();
       var threwExpectedException = false;
       try {

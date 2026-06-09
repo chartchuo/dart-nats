@@ -40,7 +40,8 @@ class ObjectInfo {
       bucket: json['bucket'] as String? ?? '',
       nuid: json['nuid'] as String? ?? '',
       size: json['size'] as int? ?? 0,
-      mtime: DateTime.tryParse(json['mtime'] as String? ?? '') ?? DateTime.now(),
+      mtime:
+          DateTime.tryParse(json['mtime'] as String? ?? '') ?? DateTime.now(),
       chunks: json['chunks'] as int? ?? 0,
       digest: json['digest'] as String? ?? '',
       deleted: json['deleted'] as bool? ?? false,
@@ -66,10 +67,13 @@ class ObjectInfo {
 class ObjectStore {
   /// The NATS Client instance
   final Client client;
+
   /// The Object Store bucket name
   final String bucket;
+
   /// The JetStream stream name backing this Object Store
   final String streamName;
+
   /// The default chunk size (128 KiB)
   static const int defaultChunkSize = 128 * 1024; // 128 KiB
 
@@ -77,10 +81,11 @@ class ObjectStore {
   ObjectStore(this.client, this.bucket) : streamName = 'OBJ_$bucket';
 
   /// Store an object in the bucket
-  Future<ObjectInfo> put(String name, Uint8List data, {String description = ''}) async {
+  Future<ObjectInfo> put(String name, Uint8List data,
+      {String description = ''}) async {
     final nuid = Nuid().next();
     final totalSize = data.length;
-    
+
     // Chunking the data
     final chunks = <Uint8List>[];
     var offset = 0;
@@ -98,14 +103,14 @@ class ObjectStore {
       final chunkSubject = '\$O.$bucket.C.$nuid';
       await client.pub(chunkSubject, chunks[i]);
     }
-    
+
     // Ensure all chunks are flushed to the server
     await client.flush();
 
     // Compute digest and create metadata
     final hash = sha256.convert(data);
     final digest = 'SHA-256=${base64Url.encode(hash.bytes)}';
-    
+
     final info = ObjectInfo(
       name: name,
       description: description,
@@ -121,14 +126,18 @@ class ObjectStore {
     final encodedName = base64Url.encode(utf8.encode(name));
     final metadataSubject = '\$O.$bucket.M.$encodedName';
     final payload = utf8.encode(jsonEncode(info.toJson()));
-    
-    await client.jetStream().publish(metadataSubject, Uint8List.fromList(payload));
+
+    await client
+        .jetStream()
+        .publish(metadataSubject, Uint8List.fromList(payload));
     return info;
   }
 
   /// Store a string payload as an object
-  Future<ObjectInfo> putString(String name, String value, {String description = ''}) {
-    return put(name, Uint8List.fromList(utf8.encode(value)), description: description);
+  Future<ObjectInfo> putString(String name, String value,
+      {String description = ''}) {
+    return put(name, Uint8List.fromList(utf8.encode(value)),
+        description: description);
   }
 
   /// Retrieve the ObjectInfo metadata for a given name
@@ -140,7 +149,8 @@ class ObjectStore {
     }));
 
     try {
-      final response = await client.request(apiSubject, Uint8List.fromList(payload));
+      final response =
+          await client.request(apiSubject, Uint8List.fromList(payload));
       final map = jsonDecode(response.string);
       if (map['error'] != null) {
         if (map['error']['code'] == 404) {
@@ -197,19 +207,20 @@ class ObjectStore {
       chunksData.add(msg.byte);
       if (chunksData.length >= info.chunks) {
         cleanup();
-        
+
         final builder = BytesBuilder();
         for (final chunk in chunksData) {
           builder.add(chunk);
         }
         final fullData = builder.takeBytes();
-        
+
         // Digest verification
         final hash = sha256.convert(fullData);
         final computedDigest = 'SHA-256=${base64Url.encode(hash.bytes)}';
         if (computedDigest != info.digest) {
           if (!completer.isCompleted) {
-            completer.completeError(NatsException('SHA-256 digest verification failed.'));
+            completer.completeError(
+                NatsException('SHA-256 digest verification failed.'));
           }
         } else {
           if (!completer.isCompleted) {
@@ -265,7 +276,9 @@ class ObjectStore {
 
     // Update metadata to deleted=true
     final payload = utf8.encode(jsonEncode(deletedInfo.toJson()));
-    await client.jetStream().publish(metadataSubject, Uint8List.fromList(payload));
+    await client
+        .jetStream()
+        .publish(metadataSubject, Uint8List.fromList(payload));
 
     // Purge the chunks subject to reclaim NATS space
     final purgeSubject = '\$JS.API.STREAM.PURGE.OBJ_$bucket';

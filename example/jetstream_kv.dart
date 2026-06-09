@@ -46,7 +46,8 @@ void main() async {
     final watchStream = kv.watch(key: 'config.theme', includeHistory: true);
     final subscription = watchStream.listen((update) {
       if (update != null) {
-        print('Watch Update -> key: ${update.key}, value: "${update.string}", Revision: ${update.revision}');
+        print(
+            'Watch Update -> key: ${update.key}, value: "${update.string}", Revision: ${update.revision}');
       } else {
         print('Watch Update -> key: config.theme was DELETED or PURGED.');
       }
@@ -74,7 +75,8 @@ void main() async {
 
     // Attempting to get a deleted key returns null
     final deletedEntry = await kv.get('config.theme');
-    print('Getting deleted "config.theme" -> entry is null: ${deletedEntry == null}');
+    print(
+        'Getting deleted "config.theme" -> entry is null: ${deletedEntry == null}');
 
     // Clean up the watcher subscription
     await subscription.cancel();
@@ -87,8 +89,8 @@ void main() async {
     print('Purge successful: $purgeOk');
 
     final purgedEntry = await kv.get('config.volume');
-    print('Getting purged "config.volume" -> entry is null: ${purgedEntry == null}');
-
+    print(
+        'Getting purged "config.volume" -> entry is null: ${purgedEntry == null}');
   } catch (e) {
     print('Error: $e');
   } finally {

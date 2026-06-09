@@ -23,7 +23,8 @@ void main() async {
       storage: 'memory', // Use memory storage for transient example data
     );
 
-    print('Creating stream "$streamName" for subjects matching "$subjectFilter"...');
+    print(
+        'Creating stream "$streamName" for subjects matching "$subjectFilter"...');
     final streamAdded = await js.addStream(streamConfig);
     if (streamAdded) {
       print('Stream created successfully.');
@@ -31,10 +32,12 @@ void main() async {
 
     // 4. Publish messages to the stream
     print('Publishing messages...');
-    
+
     // Normal publish
-    final ack1 = await js.publishString('example-subject.news', 'NATS JetStream is awesome!');
-    print('Published message 1. Stream: ${ack1.stream}, Sequence: ${ack1.sequence}');
+    final ack1 = await js.publishString(
+        'example-subject.news', 'NATS JetStream is awesome!');
+    print(
+        'Published message 1. Stream: ${ack1.stream}, Sequence: ${ack1.sequence}');
 
     // Publish with Deduplication using Msg-ID (exactly-once delivery semantics)
     final ack2 = await js.publishString(
@@ -42,7 +45,8 @@ void main() async {
       'Alert: CPU usage high',
       opts: PubOpts(msgId: 'alert-unique-id-101'),
     );
-    print('Published message 2 (with Msg-ID). Stream: ${ack2.stream}, Sequence: ${ack2.sequence}, Duplicate: ${ack2.duplicate}');
+    print(
+        'Published message 2 (with Msg-ID). Stream: ${ack2.stream}, Sequence: ${ack2.sequence}, Duplicate: ${ack2.duplicate}');
 
     // Publishing again with the SAME Msg-ID is recognized as duplicate by the server
     final ack3 = await js.publishString(
@@ -50,7 +54,8 @@ void main() async {
       'Alert: CPU usage high',
       opts: PubOpts(msgId: 'alert-unique-id-101'),
     );
-    print('Published duplicate message. Stream: ${ack3.stream}, Sequence: ${ack3.sequence}, Duplicate: ${ack3.duplicate}');
+    print(
+        'Published duplicate message. Stream: ${ack3.stream}, Sequence: ${ack3.sequence}, Duplicate: ${ack3.duplicate}');
 
     // 5. Create a Pull Consumer
     final consumerConfig = ConsumerConfig(
@@ -77,7 +82,8 @@ void main() async {
     print('Pulled ${messages.length} message(s):');
     for (var i = 0; i < messages.length; i++) {
       final msg = messages[i];
-      print('  [$i] Subject: ${msg.subject}, Data: "${msg.string}", Stream Seq: ${msg.streamSequence}');
+      print(
+          '  [$i] Subject: ${msg.subject}, Data: "${msg.string}", Stream Seq: ${msg.streamSequence}');
 
       // 7. Acknowledge messages
       if (i == 0) {
@@ -103,7 +109,6 @@ void main() async {
       timeout: const Duration(milliseconds: 500),
     );
     print('Remaining messages to pull: ${remaining.length}');
-
   } catch (e) {
     print('Error occurred: $e');
   } finally {

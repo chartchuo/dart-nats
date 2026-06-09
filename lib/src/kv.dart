@@ -89,7 +89,8 @@ class KeyValue {
     }));
 
     try {
-      final response = await client.request(apiSubject, Uint8List.fromList(payload));
+      final response =
+          await client.request(apiSubject, Uint8List.fromList(payload));
       final map = jsonDecode(response.string);
       if (map['error'] != null) {
         if (map['error']['code'] == 404) {
@@ -110,22 +111,24 @@ class KeyValue {
   Future<bool> delete(String key) async {
     final subject = '\$KV.$bucket.$key';
     final header = Header().add('KV-Operation', 'DEL');
-    final ack = await client.jetStream().publish(subject, Uint8List(0), header: header);
+    final ack =
+        await client.jetStream().publish(subject, Uint8List(0), header: header);
     return ack.sequence > 0;
   }
 
   /// Purge the key (deletes all historical versions for this key)
   Future<bool> purge(String key) async {
     final subject = '\$KV.$bucket.$key';
-    final header = Header()
-        .add('KV-Operation', 'PURGE')
-        .add('Nats-Rollup', 'sub');
-    final ack = await client.jetStream().publish(subject, Uint8List(0), header: header);
+    final header =
+        Header().add('KV-Operation', 'PURGE').add('Nats-Rollup', 'sub');
+    final ack =
+        await client.jetStream().publish(subject, Uint8List(0), header: header);
     return ack.sequence > 0;
   }
 
   /// Watch for real-time key modifications. Can watch a single key or a wildcard (e.g. ">").
-  Stream<KeyValueEntry?> watch({String key = '>', bool includeHistory = false}) {
+  Stream<KeyValueEntry?> watch(
+      {String key = '>', bool includeHistory = false}) {
     final controller = StreamController<KeyValueEntry?>();
     final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
     final sub = client.sub(deliverSubject);
@@ -164,7 +167,10 @@ class KeyValue {
       ackPolicy: 'none',
     );
 
-    client.jetStream().addConsumer(streamName, consumerConfig).catchError((dynamic err) {
+    client
+        .jetStream()
+        .addConsumer(streamName, consumerConfig)
+        .catchError((dynamic err) {
       controller.addError(err);
       controller.close();
       throw err;

@@ -8,14 +8,14 @@ void main() {
   group('Core Client & Connection Enhancements', () {
     test('Server Pooling Failover', () async {
       final client = Client();
-      
+
       // Configure an invalid primary URI and a valid fallback URI
       final primary = Uri.parse('nats://localhost:1234'); // Invalid
       final fallback = Uri.parse('nats://localhost:4222'); // Valid
-      
+
       await client.connect(primary, servers: [fallback], retry: false);
       expect(client.connected, isTrue);
-      
+
       await client.close();
     });
 
@@ -57,7 +57,7 @@ void main() {
       final subscription = sub.stream.listen((msg) {
         received.add(msg);
       });
-      
+
       // Publish some messages
       await client.pubString(subject, 'message-1');
       await client.pubString(subject, 'message-2');
@@ -95,7 +95,9 @@ void main() {
         }
         // Send custom reply directly to replyTo with headers (and do NOT call respond() to avoid duplicate message race)
         if (msg.replyTo != null) {
-          client.pub(msg.replyTo, Uint8List.fromList(utf8.encode('reply-payload')), header: replyHeader);
+          client.pub(
+              msg.replyTo, Uint8List.fromList(utf8.encode('reply-payload')),
+              header: replyHeader);
         }
       });
 
@@ -126,8 +128,12 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 ------END USER NKEY SEED------
 ''';
       final creds = Credentials.parse(credsContent);
-      expect(creds.jwt, equals('eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ1c2VyMSJ9.signature'));
-      expect(creds.seed, equals('SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY'));
+      expect(
+          creds.jwt,
+          equals(
+              'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ1c2VyMSJ9.signature'));
+      expect(creds.seed,
+          equals('SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY'));
     });
 
     test('Auth Handlers and loadCredentials', () async {
@@ -141,7 +147,8 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 ------END USER NKEY SEED------
 ''';
       client.loadCredentials(credsContent);
-      expect(client.seed, equals('SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY'));
+      expect(client.seed,
+          equals('SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY'));
       expect(client.userJwtHandler!(), equals('test-jwt'));
     });
   });
@@ -216,7 +223,7 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 
       // 1. Create Stream
       await js.addStream(streamConfig);
-      
+
       // 2. Get Stream Info
       final info = await js.getStream(streamName);
       expect(info.config.name, equals(streamName));
@@ -258,7 +265,7 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 
       final purgeOk = await js.purgeStream(streamName);
       expect(purgeOk, isTrue);
-      
+
       final infoAfterPurge = await js.getStream(streamName);
       expect(infoAfterPurge.state.messages, equals(0));
 
@@ -269,7 +276,7 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
     test('Sync Acknowledgements and Metadata extraction', () async {
       final streamName = 'sync-ack-stream';
       final consumerName = 'sync-ack-consumer';
-      
+
       await js.addStream(StreamConfig(
         name: streamName,
         subjects: ['sync-ack.*'],
@@ -282,7 +289,7 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 
       final messages = await js.pull(streamName, consumerName, batch: 1);
       expect(messages.length, equals(1));
-      
+
       final msg = messages[0];
       // Verify replyTo subject format and parsed stream sequence
       expect(msg.streamSequence, equals(1));
@@ -312,7 +319,7 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
     test('KeyValue Store put/get/delete/purge/watch lifecycle', () async {
       final bucket = 'my_test_kv_${DateTime.now().millisecondsSinceEpoch}';
       final kv = await js.keyValue(bucket, create: true, storage: 'memory');
-      
+
       // 1. Put
       final rev1 = await kv.putString('setting1', 'value1');
       expect(rev1, equals(1));
@@ -325,14 +332,17 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 
       // 3. Watch
       final watchCompleter = Completer<KeyValueEntry?>();
-      final watchSub = kv.watch(key: 'setting1', includeHistory: true).listen((update) {
-        print('KV Watch received update: key=${update?.key}, value=${update?.string}, revision=${update?.revision}');
+      final watchSub =
+          kv.watch(key: 'setting1', includeHistory: true).listen((update) {
+        print(
+            'KV Watch received update: key=${update?.key}, value=${update?.string}, revision=${update?.revision}');
         if (!watchCompleter.isCompleted) {
           watchCompleter.complete(update);
         }
       });
 
-      final watchEntry = await watchCompleter.future.timeout(const Duration(seconds: 4));
+      final watchEntry =
+          await watchCompleter.future.timeout(const Duration(seconds: 4));
       expect(watchEntry, isNotNull);
       expect(watchEntry!.string, equals('value1'));
       watchSub.cancel();
@@ -356,7 +366,8 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
       await js.deleteStream('KV_$bucket');
     });
 
-    test('Object Store chunking, hashing, put/get/delete/list lifecycle', () async {
+    test('Object Store chunking, hashing, put/get/delete/list lifecycle',
+        () async {
       final bucket = 'my_test_obj_${DateTime.now().millisecondsSinceEpoch}';
       final os = await js.objectStore(bucket, create: true, storage: 'memory');
 
@@ -368,7 +379,8 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
       }
 
       // 1. Put
-      final info = await os.put('large-file.bin', originalData, description: 'binary data');
+      final info = await os.put('large-file.bin', originalData,
+          description: 'binary data');
       expect(info.name, equals('large-file.bin'));
       expect(info.size, equals(size));
       expect(info.chunks, equals(2)); // 150 KiB / 128 KiB chunking = 2 chunks

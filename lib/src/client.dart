@@ -75,12 +75,16 @@ class Client {
 
   /// Callback when the client connects to the server
   void Function()? onConnect;
+
   /// Callback when the client disconnects from the server
   void Function()? onDisconnect;
+
   /// Callback when an error occurs
   void Function(dynamic error)? onError;
+
   /// Callback when the client reconnects to the server
   void Function()? onReconnect;
+
   /// Callback when the client is closed
   void Function()? onClose;
 
@@ -129,7 +133,7 @@ class Client {
 
   final _jsonDecoder = <Type, dynamic Function(String)>{};
 
-  /// Register a JSON decoder for a generic type <T>
+  /// Register a JSON decoder for a generic type `<T>`
   void registerJsonDecoder<T>(T Function(String) f) {
     if (T == dynamic) {
       throw NatsException('can not register dynamic type');
@@ -164,7 +168,8 @@ class Client {
     }
     if (_info.nonce != null) {
       if (signatureHandler != null) {
-        final sig = signatureHandler!(Uint8List.fromList(utf8.encode(_info.nonce!)));
+        final sig =
+            signatureHandler!(Uint8List.fromList(utf8.encode(_info.nonce!)));
         _connectOption.sig = base64.encode(sig);
       } else if (_nkeys != null) {
         final sig = _nkeys?.sign(utf8.encode(_info.nonce!));
@@ -195,13 +200,17 @@ class Client {
         if (n13 == -1) break;
 
         final msgFull =
-            String.fromCharCodes(_buffer.sublist(_bufferOffset, n13)).toLowerCase().trim();
+            String.fromCharCodes(_buffer.sublist(_bufferOffset, n13))
+                .toLowerCase()
+                .trim();
         final msgList = msgFull.split(' ');
         final msgType = msgList[0];
 
         if (msgType == 'msg' || msgType == 'hmsg') {
           final len = int.parse(msgList.last);
-          if (len > 0 && (_buffer.length - _bufferOffset) < (n13 - _bufferOffset + len + 4)) {
+          if (len > 0 &&
+              (_buffer.length - _bufferOffset) <
+                  (n13 - _bufferOffset + len + 4)) {
             break;
           }
         }
@@ -300,7 +309,9 @@ class Client {
     required int retryCount,
   }) async {
     int attempts = 0;
-    final maxAttempts = _retry ? (retryCount == -1 ? -1 : retryCount * _serverPool.length) : _serverPool.length;
+    final maxAttempts = _retry
+        ? (retryCount == -1 ? -1 : retryCount * _serverPool.length)
+        : _serverPool.length;
 
     while (attempts < maxAttempts || maxAttempts == -1) {
       if (attempts == 0) {
@@ -353,8 +364,8 @@ class Client {
 
     if (!_connectCompleter.isCompleted) {
       _clientStatus = _ClientStatus.closed;
-      _connectCompleter
-          .completeError(NatsException('can not connect to any servers in the pool'));
+      _connectCompleter.completeError(
+          NatsException('can not connect to any servers in the pool'));
     }
   }
 
@@ -484,7 +495,8 @@ class Client {
     final nextLineIndex = _buffer.indexOf(13, _bufferOffset);
     if (nextLineIndex == -1) return;
 
-    final line = String.fromCharCodes(_buffer.sublist(_bufferOffset, nextLineIndex));
+    final line =
+        String.fromCharCodes(_buffer.sublist(_bufferOffset, nextLineIndex));
     _bufferOffset = nextLineIndex + 2;
 
     final splitIndex = line.indexOf(' ');
@@ -523,7 +535,8 @@ class Client {
           }
           _connectOptionSent = true;
 
-          if ((_tlsRequired || (_info.tlsRequired ?? false)) && _tcpSocket != null) {
+          if ((_tlsRequired || (_info.tlsRequired ?? false)) &&
+              _tcpSocket != null) {
             _setStatus(Status.tlsHandshake);
             try {
               final secureSocket = await SecureSocket.secure(
@@ -654,7 +667,8 @@ class Client {
     }
 
     if ((_buffer.length - _bufferOffset) < length) return;
-    final payload = Uint8List.fromList(_buffer.sublist(_bufferOffset, _bufferOffset + length));
+    final payload = Uint8List.fromList(
+        _buffer.sublist(_bufferOffset, _bufferOffset + length));
 
     _bufferOffset += length + 2; // Move past payload and trailing \r\n
 
@@ -687,8 +701,10 @@ class Client {
     }
 
     if ((_buffer.length - _bufferOffset) < length) return;
-    final header = Uint8List.fromList(_buffer.sublist(_bufferOffset, _bufferOffset + headerLength));
-    final payload = Uint8List.fromList(_buffer.sublist(_bufferOffset + headerLength, _bufferOffset + length));
+    final header = Uint8List.fromList(
+        _buffer.sublist(_bufferOffset, _bufferOffset + headerLength));
+    final payload = Uint8List.fromList(
+        _buffer.sublist(_bufferOffset + headerLength, _bufferOffset + length));
 
     _bufferOffset += length + 2; // Move past payload and trailing \r\n
 
@@ -1094,11 +1110,11 @@ class Client {
     final ws = _wsChannel;
     _wsChannel = null;
     await ws?.sink.close();
-    
+
     final secure = _secureSocket;
     _secureSocket = null;
     await secure?.close();
-    
+
     final tcp = _tcpSocket;
     _tcpSocket = null;
     await tcp?.close();
@@ -1115,19 +1131,19 @@ class Client {
     _setStatus(Status.closed);
     _backendSubs.forEach((k, v) => _backendSubs[k] = false);
     _inboxs.clear();
-    
+
     final ws = _wsChannel;
     _wsChannel = null;
     await ws?.sink.close();
-    
+
     final secure = _secureSocket;
     _secureSocket = null;
     await secure?.close();
-    
+
     final tcp = _tcpSocket;
     _tcpSocket = null;
     await tcp?.close();
-    
+
     await _inboxSub?.close();
     _inboxSub = null;
     _inboxSubPrefix = null;

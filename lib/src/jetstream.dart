@@ -318,13 +318,19 @@ class JetStream {
     final h = header ?? Header();
     if (opts != null) {
       if (opts.msgId != null) h.add('Nats-Msg-Id', opts.msgId!);
-      if (opts.expectStream != null) h.add('Nats-Expected-Stream', opts.expectStream!);
-      if (opts.expectLastSeq != null) h.add('Nats-Expected-Last-Sequence', opts.expectLastSeq!.toString());
-      if (opts.expectLastMsgId != null) h.add('Nats-Expected-Last-Msg-Id', opts.expectLastMsgId!);
-      if (opts.expectLastSubjectSeq != null) h.add('Nats-Expected-Last-Subject-Sequence', opts.expectLastSubjectSeq!.toString());
+      if (opts.expectStream != null)
+        h.add('Nats-Expected-Stream', opts.expectStream!);
+      if (opts.expectLastSeq != null)
+        h.add('Nats-Expected-Last-Sequence', opts.expectLastSeq!.toString());
+      if (opts.expectLastMsgId != null)
+        h.add('Nats-Expected-Last-Msg-Id', opts.expectLastMsgId!);
+      if (opts.expectLastSubjectSeq != null)
+        h.add('Nats-Expected-Last-Subject-Sequence',
+            opts.expectLastSubjectSeq!.toString());
     }
 
-    final response = await client.request(subject, data, timeout: timeout, header: h);
+    final response =
+        await client.request(subject, data, timeout: timeout, header: h);
     final map = jsonDecode(response.string);
     if (map['error'] != null) {
       throw NatsException(map['error']['description'] as String);
@@ -400,7 +406,9 @@ class JetStream {
       throw NatsException(map['error']['description'] as String);
     }
     final list = map['streams'] as List? ?? [];
-    return list.map((item) => StreamInfo.fromJson(item as Map<String, dynamic>)).toList();
+    return list
+        .map((item) => StreamInfo.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   /// Get information about a consumer
@@ -427,7 +435,9 @@ class JetStream {
       throw NatsException(map['error']['description'] as String);
     }
     final list = map['consumers'] as List? ?? [];
-    return list.map((item) => ConsumerInfo.fromJson(item as Map<String, dynamic>)).toList();
+    return list
+        .map((item) => ConsumerInfo.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   /// Create or update a stream
@@ -562,7 +572,8 @@ class JetStream {
   }
 
   /// Create or bind to a Key-Value bucket
-  Future<KeyValue> keyValue(String bucket, {bool create = false, String? storage = 'file'}) async {
+  Future<KeyValue> keyValue(String bucket,
+      {bool create = false, String? storage = 'file'}) async {
     if (create) {
       final config = KeyValueConfig(bucket: bucket, storage: storage ?? 'file');
       await addStream(config.toStreamConfig());
@@ -571,7 +582,8 @@ class JetStream {
   }
 
   /// Create or bind to an Object Store bucket
-  Future<ObjectStore> objectStore(String bucket, {bool create = false, String? storage = 'file'}) async {
+  Future<ObjectStore> objectStore(String bucket,
+      {bool create = false, String? storage = 'file'}) async {
     final streamName = 'OBJ_$bucket';
     if (create) {
       final config = StreamConfig(

@@ -8,7 +8,8 @@ import 'package:test/test.dart';
 
 void main() {
   group('High Throughput (Issue #38)', () {
-    test('0038 Process 50,000 messages under high load without bottleneck', () async {
+    test('0038 Process 50,000 messages under high load without bottleneck',
+        () async {
       final client = Client();
       await client.connect(Uri.parse('nats://localhost:4222'));
 
@@ -46,7 +47,8 @@ void main() {
       await completer.future.timeout(const Duration(seconds: 20));
       stopwatch.stop();
 
-      print('Processed $totalMessages messages in ${stopwatch.elapsedMilliseconds}ms (${(totalMessages / (stopwatch.elapsedMilliseconds / 1000)).toStringAsFixed(2)} msgs/sec)');
+      print(
+          'Processed $totalMessages messages in ${stopwatch.elapsedMilliseconds}ms (${(totalMessages / (stopwatch.elapsedMilliseconds / 1000)).toStringAsFixed(2)} msgs/sec)');
 
       expect(receivedCount, equals(totalMessages));
 

@@ -18,7 +18,8 @@ void main() async {
   try {
     // 3. Create or bind to an Object Store bucket
     print('Creating Object Store bucket "$bucketName" with memory storage...');
-    final os = await js.objectStore(bucketName, create: true, storage: 'memory');
+    final os =
+        await js.objectStore(bucketName, create: true, storage: 'memory');
     print('Object Store bucket initialized.');
 
     // 4. Store a text file
@@ -41,8 +42,9 @@ void main() async {
     for (var i = 0; i < binarySize; i++) {
       binaryData[i] = i % 256;
     }
-    
-    print('Storing binary file "data.bin" of size 150 KiB (should be split into multiple chunks)...');
+
+    print(
+        'Storing binary file "data.bin" of size 150 KiB (should be split into multiple chunks)...');
     final binInfo = await os.put(
       'data.bin',
       binaryData,
@@ -94,12 +96,13 @@ void main() async {
 
     final infoAfterDel = await os.getInfo('hello.txt');
     if (infoAfterDel != null) {
-      print('Checking deleted metadata -> Deleted flag status: ${infoAfterDel.deleted}');
+      print(
+          'Checking deleted metadata -> Deleted flag status: ${infoAfterDel.deleted}');
     }
 
     final dataAfterDel = await os.get('hello.txt');
-    print('Attempting to fetch deleted "hello.txt" -> Data is null: ${dataAfterDel == null}');
-
+    print(
+        'Attempting to fetch deleted "hello.txt" -> Data is null: ${dataAfterDel == null}');
   } catch (e) {
     print('Error: $e');
   } finally {
