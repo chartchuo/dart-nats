@@ -5,10 +5,6 @@
 
 A lightweight, high-performance Dart client library for the [NATS](https://nats.io) messaging system. Designed specifically for use with **Dart** and **Flutter** applications.
 
-> [!NOTE]
-> **Good news—this repository is active and maintained again!** To help us move fast and keep maintenance overhead light, we're using AI assistants to help write code, document features, and write tests. Currently, we're building out exciting new features like NATS JetStream, Key-Value, and Object Stores, and keeping updated with the latest Dart SDK.
-
----
 
 ## 📖 Introduction & Core Concepts
 
@@ -549,6 +545,33 @@ for (final file in files) {
 // Delete object chunks and reclaim space
 await os.delete('report.pdf');
 ```
+
+## 🚀 Running Examples
+
+This repository includes several pre-configured examples demonstrating Core NATS, JetStream, Key-Value, and Object Stores.
+
+To run the examples:
+
+1. **Start NATS Server**: Ensure you have a local NATS server running. The JetStream and high-level feature examples require JetStream to be enabled (e.g. running `nats-server -js` or using the provided docker compose configuration):
+   ```bash
+   # Using docker compose
+   docker compose up -d
+   ```
+
+2. **Execute an Example**: Run the example file using the Dart CLI:
+   ```bash
+   # Run the Core Pub/Sub example
+   dart run example/main.dart
+
+   # Run the JetStream Core example
+   dart run example/jetstream.dart
+
+   # Run the JetStream Key-Value Store example
+   dart run example/jetstream_kv.dart
+
+   # Run the JetStream Object Store example
+   dart run example/jetstream_object_store.dart
+   ```
 
 ---
 
