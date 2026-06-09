@@ -50,6 +50,29 @@ class _DashboardPageState extends State<DashboardPage> {
   // JetStream context
   nats.JetStream? _js;
 
+  // JetStream Message Replay states
+  bool _jsStreamInitialized = false;
+  bool _jsConsumerInitialized = false;
+  List<nats.Message> _jsReplayedMessages = [];
+  final TextEditingController _jsStreamController =
+      TextEditingController(text: 'demo-stream');
+  final TextEditingController _jsStreamSubjectController =
+      TextEditingController(text: 'demo.flutter.>');
+
+  // JetStream Publisher states
+  final TextEditingController _jsPubSubjectController =
+      TextEditingController(text: 'demo.flutter.alerts');
+  final TextEditingController _jsPubMsgIdController = TextEditingController();
+  final TextEditingController _jsPubPayloadController =
+      TextEditingController(text: 'JetStream alert payload!');
+
+  // JetStream Consumer states
+  final TextEditingController _jsConsumerController =
+      TextEditingController(text: 'demo-consumer');
+  final TextEditingController _jsBatchController =
+      TextEditingController(text: '5');
+  String _jsDeliverPolicy = 'all'; // 'all', 'last', 'new'
+
   // Key-Value Store states
   nats.KeyValue? _kv;
   bool _kvInitialized = false;
@@ -120,6 +143,11 @@ class _DashboardPageState extends State<DashboardPage> {
           _os = null;
           _osInitialized = false;
           _osFiles.clear();
+
+          // Reset JetStream Tab states
+          _jsStreamInitialized = false;
+          _jsConsumerInitialized = false;
+          _jsReplayedMessages.clear();
         }
       });
     });
@@ -146,6 +174,13 @@ class _DashboardPageState extends State<DashboardPage> {
     _osBucketController.dispose();
     _osFilenameController.dispose();
     _osPayloadController.dispose();
+    _jsStreamController.dispose();
+    _jsStreamSubjectController.dispose();
+    _jsPubSubjectController.dispose();
+    _jsPubMsgIdController.dispose();
+    _jsPubPayloadController.dispose();
+    _jsConsumerController.dispose();
+    _jsBatchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -231,6 +266,103 @@ class _DashboardPageState extends State<DashboardPage> {
   void _disconnect() {
     _addLog('Closing NATS connection...', 'info');
     _client.close().catchError((_) {});
+  }
+
+  // --- JetStream Stream & Message Replay Operations ---
+  Future<void> _createJsStream() async {
+    if (_js == null) return;
+    final name = _jsStreamController.text.trim();
+    final subject = _jsStreamSubjectController.text.trim();
+    if (name.isEmpty || subject.isEmpty) {
+      _addLog('Error: Stream name and subject filter cannot be empty.', 'error');
+      return;
+    }
+    _addLog('Creating stream "$name" for subject filter "$subject"...', 'info');
+    try {
+      final config = nats.StreamConfig(
+        name: name,
+        subjects: [subject],
+        storage: 'memory',
+      );
+      final ok = await _js!.addStream(config);
+      setState(() {
+        _jsStreamInitialized = ok;
+      });
+      _addLog('Stream "$name" created successfully: $ok', 'success');
+    } catch (e) {
+      _addLog('Failed to create stream: $e', 'error');
+    }
+  }
+
+  Future<void> _publishJs() async {
+    if (_js == null) return;
+    final subject = _jsPubSubjectController.text.trim();
+    final payload = _jsPubPayloadController.text;
+    final msgId = _jsPubMsgIdController.text.trim();
+    if (subject.isEmpty) {
+      _addLog('Error: JetStream publish subject cannot be empty.', 'error');
+      return;
+    }
+    _addLog('Publishing message to JetStream subject "$subject"...', 'info');
+    try {
+      final opts = msgId.isNotEmpty ? nats.PubOpts(msgId: msgId) : null;
+      final ack = await _js!.publishString(subject, payload, opts: opts);
+      _addLog('PubAck -> Stream: ${ack.stream}, Sequence: ${ack.sequence}, Duplicate: ${ack.duplicate}', 'success');
+    } catch (e) {
+      _addLog('JetStream publish failed: $e', 'error');
+    }
+  }
+
+  Future<void> _createJsConsumer() async {
+    if (_js == null) return;
+    final stream = _jsStreamController.text.trim();
+    final consumerName = _jsConsumerController.text.trim();
+    if (stream.isEmpty || consumerName.isEmpty) {
+      _addLog('Error: Stream name and consumer name cannot be empty.', 'error');
+      return;
+    }
+    _addLog('Creating pull consumer "$consumerName" on stream "$stream" with deliver policy "$_jsDeliverPolicy"...', 'info');
+    try {
+      final config = nats.ConsumerConfig(
+        durable: consumerName,
+        ackPolicy: 'explicit',
+        deliverPolicy: _jsDeliverPolicy,
+      );
+      final ok = await _js!.addConsumer(stream, config);
+      setState(() {
+        _jsConsumerInitialized = ok;
+      });
+      _addLog('Pull consumer "$consumerName" created successfully: $ok', 'success');
+    } catch (e) {
+      _addLog('Failed to create pull consumer: $e', 'error');
+    }
+  }
+
+  Future<void> _pullJsMessages() async {
+    if (_js == null) return;
+    final stream = _jsStreamController.text.trim();
+    final consumerName = _jsConsumerController.text.trim();
+    final batchStr = _jsBatchController.text.trim();
+    final batch = int.tryParse(batchStr) ?? 5;
+    if (stream.isEmpty || consumerName.isEmpty) {
+      _addLog('Error: Stream name and consumer name cannot be empty.', 'error');
+      return;
+    }
+    _addLog('Pulling batch of up to $batch messages from consumer "$consumerName"...', 'info');
+    try {
+      final msgs = await _js!.pull(stream, consumerName, batch: batch, timeout: const Duration(seconds: 2));
+      setState(() {
+        _jsReplayedMessages = msgs;
+      });
+      _addLog('Replayed ${msgs.length} message(s) from JetStream.', 'success');
+      for (var i = 0; i < msgs.length; i++) {
+        final m = msgs[i];
+        _addLog('Replayed [$i] Seq: ${m.streamSequence} Subj: ${m.subject} Data: "${m.string}"', 'received');
+        m.ack(); // Acknowledge to NATS
+      }
+    } catch (e) {
+      _addLog('Failed to pull messages: $e', 'error');
+    }
   }
 
   // --- Key-Value Store Operations ---
@@ -787,10 +919,10 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // --- Tabbed Area for Pub/Sub, KV, and Object Store ---
+  // --- Tabbed Area for Pub/Sub, JetStream, KV, and Object Store ---
   Widget _buildTabsCard(bool isConnected) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Column(
         children: [
           TabBar(
@@ -800,17 +932,19 @@ class _DashboardPageState extends State<DashboardPage> {
             labelStyle: const TextStyle(fontWeight: FontWeight.bold),
             tabs: const [
               Tab(text: 'Pub / Sub'),
+              Tab(text: 'JetStream'),
               Tab(text: 'Key-Value'),
               Tab(text: 'Object Store'),
             ],
           ),
           const SizedBox(height: 20),
           SizedBox(
-            height: 720,
+            height: 820,
             child: TabBarView(
               physics: const NeverScrollableScrollPhysics(), // Prevent swipe to make text input smooth
               children: [
                 _buildPubSubTab(isConnected),
+                _buildJetStreamTab(isConnected),
                 _buildKeyValueTab(isConnected),
                 _buildObjectStoreTab(isConnected),
               ],
@@ -942,7 +1076,325 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // --- Tab 2: Key-Value Store ---
+  // --- Tab 2: JetStream ---
+  Widget _buildJetStreamTab(bool isConnected) {
+    final isJsActive = isConnected && _js != null;
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Stream Config
+          _buildGlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Stream Configuration',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _jsStreamInitialized
+                            ? const Color(0xFF10B981).withOpacity(0.15)
+                            : const Color(0xFFEF4444).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _jsStreamInitialized ? 'ACTIVE' : 'NOT INITIALIZED',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _jsStreamInitialized
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFEF4444),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24, color: Color(0x1AFFFFFF)),
+                const Text(
+                  'STREAM NAME',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _jsStreamController,
+                  enabled: isJsActive,
+                  decoration: _buildInputDecoration('demo-stream'),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'SUBJECT FILTER',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _jsStreamSubjectController,
+                        enabled: isJsActive,
+                        decoration: _buildInputDecoration('demo.flutter.>'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: isJsActive ? _createJsStream : null,
+                      style: _buildSubButtonStyle(isJsActive),
+                      child: const Text('Create'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // JetStream Pub
+          _buildGlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Publish to JetStream (with PubAck)',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const Divider(height: 24, color: Color(0x1AFFFFFF)),
+                const Text(
+                  'SUBJECT',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _jsPubSubjectController,
+                  enabled: isJsActive,
+                  decoration: _buildInputDecoration('demo.flutter.alerts'),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'MSG-ID (FOR DEDUPLICATION)',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _jsPubMsgIdController,
+                  enabled: isJsActive,
+                  decoration: _buildInputDecoration('Optional Msg-ID'),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'PAYLOAD',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _jsPubPayloadController,
+                  enabled: isJsActive,
+                  decoration: _buildInputDecoration('Payload text...'),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isJsActive ? _publishJs : null,
+                    style: _buildPrimaryButtonStyle(),
+                    child: const Text('Publish String to Stream'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Consumer & Replay
+          _buildGlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Pull Consumer & Message Replay',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _jsConsumerInitialized
+                            ? const Color(0xFF10B981).withOpacity(0.15)
+                            : const Color(0xFFEF4444).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _jsConsumerInitialized ? 'CONSUMER ACTIVE' : 'NO CONSUMER',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _jsConsumerInitialized
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFEF4444),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24, color: Color(0x1AFFFFFF)),
+                const Text(
+                  'CONSUMER DURABLE NAME',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _jsConsumerController,
+                  enabled: isJsActive,
+                  decoration: _buildInputDecoration('demo-consumer'),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'DELIVER POLICY',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                          ),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            value: _jsDeliverPolicy,
+                            dropdownColor: const Color(0xFF1E293B),
+                            decoration: InputDecoration(
+                              fillColor: const Color(0xFF0F172A).withOpacity(0.6),
+                              filled: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'all', child: Text('All Messages')),
+                              DropdownMenuItem(value: 'last', child: Text('Last Message')),
+                              DropdownMenuItem(value: 'new', child: Text('New Messages')),
+                            ],
+                            onChanged: isJsActive
+                                ? (val) {
+                                    setState(() {
+                                      _jsDeliverPolicy = val!;
+                                    });
+                                  }
+                                : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'BATCH SIZE',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _jsBatchController,
+                            enabled: isJsActive,
+                            decoration: _buildInputDecoration('5'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isJsActive ? _createJsConsumer : null,
+                        style: _buildActionButtonStyle(const Color(0xFF6366F1)),
+                        child: const Text('Create Consumer'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isJsActive && _jsConsumerInitialized ? _pullJsMessages : null,
+                        style: _buildActionButtonStyle(const Color(0xFF10B981)),
+                        child: const Text('Pull & Replay'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'REPLAYED MESSAGES',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 8),
+                if (_jsReplayedMessages.isEmpty)
+                  const Text(
+                    'No messages replayed yet. Pull a batch to display.',
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF64748B)),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _jsReplayedMessages.length,
+                    itemBuilder: (context, index) {
+                      final msg = _jsReplayedMessages[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0x1Affffff),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0x0Fffffff)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Subject: ${msg.subject}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF818CF8)),
+                                ),
+                                Text(
+                                  'Seq: ${msg.streamSequence}',
+                                  style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              msg.string,
+                              style: const TextStyle(fontSize: 12.5, color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Tab 3: Key-Value Store ---
   Widget _buildKeyValueTab(bool isConnected) {
     final isKvActive = isConnected && _kvInitialized;
 
@@ -1064,7 +1516,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     ElevatedButton(
                       onPressed: isKvActive ? _watchKv : null,
-                      style: _buildActionButtonStyle(const Color(0xFFA855F7)),
+                      style: _buildActionButtonStyle(const Color(0xFFFA55F7)),
                       child: const Text('Watch Key'),
                     ),
                   ],
@@ -1077,7 +1529,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // --- Tab 3: Object Store ---
+  // --- Tab 4: Object Store ---
   Widget _buildObjectStoreTab(bool isConnected) {
     final isOsActive = isConnected && _osInitialized;
 
