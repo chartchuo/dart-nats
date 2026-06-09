@@ -174,5 +174,41 @@ void main() {
       expect(statusHistory[2], equals(Status.reconnecting));
       expect(statusHistory[3], equals(Status.closed));
     });
+
+    test('observe client.status getter during connection lifecycle', () async {
+      var client = Client();
+      expect(client.status, equals(Status.disconnected));
+
+      final connectFuture = client.connect(Uri.parse('nats://localhost:4222'));
+      expect(client.status, equals(Status.connecting));
+
+      await connectFuture;
+      expect(client.status, equals(Status.connected));
+
+      await client.close();
+      expect(client.status, equals(Status.closed));
+    });
+
+    test('ensure no connection socket leak after close', () async {
+      // Test for TCP connection
+      var clientTcp = Client();
+      expect(clientTcp.isClosedAndCleaned, isTrue);
+
+      await clientTcp.connect(Uri.parse('nats://localhost:4222'));
+      expect(clientTcp.isClosedAndCleaned, isFalse);
+
+      await clientTcp.close();
+      expect(clientTcp.isClosedAndCleaned, isTrue);
+
+      // Test for WebSocket connection
+      var clientWs = Client();
+      expect(clientWs.isClosedAndCleaned, isTrue);
+
+      await clientWs.connect(Uri.parse('ws://localhost:8080'));
+      expect(clientWs.isClosedAndCleaned, isFalse);
+
+      await clientWs.close();
+      expect(clientWs.isClosedAndCleaned, isTrue);
+    });
   });
 }

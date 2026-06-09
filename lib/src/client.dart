@@ -106,6 +106,11 @@ class Client {
   /// Get current connection status of client
   Status get status => _status;
 
+  /// Returns true if all underlying connection sockets (TCP, Secure, WS) are fully closed and null.
+  /// This is useful for verifying there are no socket leaks.
+  bool get isClosedAndCleaned =>
+      _tcpSocket == null && _secureSocket == null && _wsChannel == null;
+
   /// Accept self-signed or invalid certificate. Not recommended for production.
   bool acceptBadCert = false;
 

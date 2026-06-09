@@ -163,5 +163,90 @@ void main() {
       tempDir.deleteSync(recursive: true);
       await js.deleteStream('OBJ_$bucket');
     });
+
+    test('Standard Pub/Sub Interop: Dart Pub to CLI Sub', () async {
+      final subject =
+          'interop.pubsub.dart2cli.${DateTime.now().millisecondsSinceEpoch}';
+
+      // Start CLI subscriber that quits after receiving 1 message
+      final process = await Process.start(natsExec, [
+        'sub',
+        subject,
+        '--count=1',
+        '--raw',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+
+      // Give CLI time to subscribe
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Publish from Dart client
+      await client.pubString(subject, 'hello-from-dart');
+
+      // Wait for process to exit
+      final exitCode =
+          await process.exitCode.timeout(const Duration(seconds: 5));
+      expect(exitCode, equals(0), reason: 'CLI sub failed');
+
+      final output = await process.stdout.transform(utf8.decoder).join();
+      expect(output.trim(), equals('hello-from-dart'));
+    });
+
+    test('Request/Reply Interop: CLI Request to Dart Reply', () async {
+      final subject =
+          'interop.reqrep.cli2dart.${DateTime.now().millisecondsSinceEpoch}';
+      final sub = client.sub(subject);
+
+      final streamSub = sub.stream.listen((msg) {
+        msg.respondString('reply-from-dart');
+      });
+
+      // Run CLI request
+      final res = await Process.run(natsExec, [
+        'request',
+        subject,
+        'hello-from-cli',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+      expect(res.exitCode, equals(0),
+          reason: 'CLI request failed: ${res.stderr}');
+      expect(res.stdout.toString(), contains('reply-from-dart'));
+
+      await streamSub.cancel();
+      client.unSub(sub);
+    });
+
+    test('Request/Reply Interop: Dart Request to CLI Reply', () async {
+      final subject =
+          'interop.reqrep.dart2cli.${DateTime.now().millisecondsSinceEpoch}';
+
+      // Start CLI responder that responds and exits after 1 request
+      final process = await Process.start(natsExec, [
+        'reply',
+        subject,
+        'reply-from-cli: {{Request}}',
+        '--count=1',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+
+      // Give CLI time to start the responder
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Request from Dart
+      final response = await client.request(
+        subject,
+        Uint8List.fromList(utf8.encode('hello-from-dart')),
+        timeout: const Duration(seconds: 5),
+      );
+      expect(response.string, equals('reply-from-cli: hello-from-dart'));
+
+      final exitCode =
+          await process.exitCode.timeout(const Duration(seconds: 5));
+      expect(exitCode == 0 || exitCode == 1, isTrue,
+          reason: 'CLI responder failed to exit cleanly (exit code: $exitCode)');
+    });
   });
 }
