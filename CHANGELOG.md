@@ -1,4 +1,4 @@
-## 0.7.0
+## 1.0.0
 
 * Add NATS JetStream Support (Stream/Consumer management, Publish/Subscribe, Pull mode with Ack/Nak/Term)
 * Add NATS Key-Value (KV) Store (Put, Get, Delete, Purge, Watch)
