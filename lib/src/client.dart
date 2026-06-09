@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:universal_io/io.dart';
+import 'platform/platform.dart';
 import 'dart:typed_data';
 
 import 'package:mutex/mutex.dart';

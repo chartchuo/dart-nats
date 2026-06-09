@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:dart_nats/dart_nats.dart';
 import 'package:test/test.dart';
 

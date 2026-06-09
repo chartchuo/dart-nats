@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:dart_nats/dart_nats.dart';
 
 // Custom HttpOverrides to accept self-signed certificates for local development.

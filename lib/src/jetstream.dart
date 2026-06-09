@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:dart_nats/dart_nats.dart';
-
+import 'client.dart';
+import 'common.dart';
+import 'inbox.dart';
+import 'message.dart';
 import 'kv.dart';
 import 'object_store.dart';
 
@@ -317,16 +319,22 @@ class JetStream {
   }) async {
     final h = header ?? Header();
     if (opts != null) {
-      if (opts.msgId != null) h.add('Nats-Msg-Id', opts.msgId!);
-      if (opts.expectStream != null)
+      if (opts.msgId != null) {
+        h.add('Nats-Msg-Id', opts.msgId!);
+      }
+      if (opts.expectStream != null) {
         h.add('Nats-Expected-Stream', opts.expectStream!);
-      if (opts.expectLastSeq != null)
+      }
+      if (opts.expectLastSeq != null) {
         h.add('Nats-Expected-Last-Sequence', opts.expectLastSeq!.toString());
-      if (opts.expectLastMsgId != null)
+      }
+      if (opts.expectLastMsgId != null) {
         h.add('Nats-Expected-Last-Msg-Id', opts.expectLastMsgId!);
-      if (opts.expectLastSubjectSeq != null)
+      }
+      if (opts.expectLastSubjectSeq != null) {
         h.add('Nats-Expected-Last-Subject-Sequence',
             opts.expectLastSubjectSeq!.toString());
+      }
     }
 
     final response =
