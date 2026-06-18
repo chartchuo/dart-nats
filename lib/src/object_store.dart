@@ -8,6 +8,42 @@ import 'client.dart';
 import 'common.dart';
 import 'jetstream.dart';
 import 'inbox.dart';
+
+/// Object Store Configuration
+class ObjectStoreConfig {
+  /// The bucket name.
+  final String bucket;
+
+  /// Human‑readable description of the bucket.
+  final String description;
+
+  /// Storage type, either 'file' or 'memory'.
+  final String storage; // 'file' or 'memory'
+
+  /// Maximum total bytes for the bucket (‑1 for unlimited).
+  final int maxBytes;
+
+  /// Create an [ObjectStoreConfig] for a bucket.
+  ObjectStoreConfig({
+    required this.bucket,
+    this.description = '',
+    this.storage = 'file',
+    this.maxBytes = -1,
+  });
+
+  /// Convert to JetStream StreamConfig
+  StreamConfig toStreamConfig() {
+    return StreamConfig(
+      name: 'OBJ_$bucket',
+      subjects: ['\$O.$bucket.>'],
+      storage: storage,
+      maxBytes: maxBytes,
+      allowRollup: true,
+      discard: 'new',
+    );
+  }
+}
+
 /// Represents a link to another object or bucket in the Object Store.
 class ObjectLink {
   /// The bucket name the link points to

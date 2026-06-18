@@ -661,18 +661,17 @@ class JetStream {
   }
 
   /// Create or bind to an Object Store bucket
+  ///
+  /// Pass [config] to control the backing stream settings; otherwise a
+  /// default [ObjectStoreConfig] using [storage] is applied when [create] is true.
   Future<ObjectStore> objectStore(String bucket,
-      {bool create = false, String? storage = 'file'}) async {
-    final streamName = 'OBJ_$bucket';
+      {bool create = false,
+      String? storage = 'file',
+      ObjectStoreConfig? config}) async {
     if (create) {
-      final config = StreamConfig(
-        name: streamName,
-        subjects: ['\$O.$bucket.>'],
-        storage: storage ?? 'file',
-        allowRollup: true,
-        discard: 'new',
-      );
-      await addStream(config);
+      final cfg = config ??
+          ObjectStoreConfig(bucket: bucket, storage: storage ?? 'file');
+      await addStream(cfg.toStreamConfig());
     }
     return ObjectStore(client, bucket);
   }
