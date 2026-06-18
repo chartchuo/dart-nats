@@ -284,11 +284,11 @@ class _DashboardPageState extends State<DashboardPage> {
         subjects: [subject],
         storage: 'memory',
       );
-      final ok = await _js!.addStream(config);
+      await _js!.createStream(config);
       setState(() {
-        _jsStreamInitialized = ok;
+        _jsStreamInitialized = true;
       });
-      _addLog('Stream "$name" created successfully: $ok', 'success');
+      _addLog('Stream "$name" created successfully.', 'success');
     } catch (e) {
       _addLog('Failed to create stream: $e', 'error');
     }
@@ -328,11 +328,11 @@ class _DashboardPageState extends State<DashboardPage> {
         ackPolicy: 'explicit',
         deliverPolicy: _jsDeliverPolicy,
       );
-      final ok = await _js!.addConsumer(stream, config);
+      await _js!.createConsumer(stream, config);
       setState(() {
-        _jsConsumerInitialized = ok;
+        _jsConsumerInitialized = true;
       });
-      _addLog('Pull consumer "$consumerName" created successfully: $ok', 'success');
+      _addLog('Pull consumer "$consumerName" created successfully.', 'success');
     } catch (e) {
       _addLog('Failed to create pull consumer: $e', 'error');
     }
@@ -350,7 +350,8 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     _addLog('Pulling batch of up to $batch messages from consumer "$consumerName"...', 'info');
     try {
-      final msgs = await _js!.pull(stream, consumerName, batch: batch, timeout: const Duration(seconds: 2));
+      final consumer = _js!.consumer(stream, consumerName);
+      final msgs = await consumer.fetch(batch: batch, timeout: const Duration(seconds: 2));
       setState(() {
         _jsReplayedMessages = msgs;
       });
@@ -365,6 +366,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+
   // --- Key-Value Store Operations ---
   Future<void> _initKv() async {
     if (_js == null) return;
@@ -375,7 +377,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     _addLog('Initializing Key-Value bucket "$bucket"...', 'info');
     try {
-      _kv = await _js!.keyValue(bucket, create: true, storage: 'memory');
+      _kv = await _js!.createKeyValue(KeyValueConfig(bucket: bucket, storage: 'memory'));
       setState(() {
         _kvInitialized = true;
       });
@@ -483,7 +485,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     _addLog('Initializing Object Store bucket "$bucket"...', 'info');
     try {
-      _os = await _js!.objectStore(bucket, create: true, storage: 'memory');
+      _os = await _js!.createObjectStore(ObjectStoreConfig(bucket: bucket, storage: 'memory'));
       setState(() {
         _osInitialized = true;
       });

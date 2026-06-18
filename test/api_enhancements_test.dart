@@ -169,7 +169,7 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 
     test('Exactly-Once Dedup & Expected Last Sequence', () async {
       final streamName = 'test-pub-opts-stream';
-      await js.addStream(StreamConfig(
+      await js.createStream(StreamConfig(
         name: streamName,
         subjects: ['pub-opts-subject.*'],
         storage: 'memory',
@@ -222,10 +222,10 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
       );
 
       // 1. Create Stream
-      await js.addStream(streamConfig);
+      final stream = await js.createStream(streamConfig);
 
       // 2. Get Stream Info
-      final info = await js.getStream(streamName);
+      final info = await stream.info();
       expect(info.config.name, equals(streamName));
       expect(info.state.messages, equals(0));
 
@@ -235,18 +235,17 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
         subjects: ['mgmt.*', 'mgmt-extra.*'],
         storage: 'memory',
       );
-      final updateOk = await js.updateStream(updatedConfig);
-      expect(updateOk, isTrue);
+      final updatedStream = await js.updateStream(updatedConfig);
 
-      final updatedInfo = await js.getStream(streamName);
+      final updatedInfo = await updatedStream.info();
       expect(updatedInfo.config.subjects.length, equals(2));
 
       // 4. Create Consumer
       final consumerName = 'mgmt-consumer';
-      await js.addConsumer(streamName, ConsumerConfig(durable: consumerName));
+      final consumer = await updatedStream.createConsumer(ConsumerConfig(durable: consumerName));
 
       // 5. Get Consumer Info
-      final consInfo = await js.getConsumer(streamName, consumerName);
+      final consInfo = await consumer.info();
       expect(consInfo.name, equals(consumerName));
 
       // 6. List consumers
@@ -260,13 +259,13 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 
       // 8. Purge stream
       await js.publishString('mgmt.test', 'purge-me');
-      final infoBeforePurge = await js.getStream(streamName);
+      final infoBeforePurge = await updatedStream.info();
       expect(infoBeforePurge.state.messages, equals(1));
 
-      final purgeOk = await js.purgeStream(streamName);
+      final purgeOk = await stream.purge();
       expect(purgeOk, isTrue);
 
-      final infoAfterPurge = await js.getStream(streamName);
+      final infoAfterPurge = await updatedStream.info();
       expect(infoAfterPurge.state.messages, equals(0));
 
       await js.deleteConsumer(streamName, consumerName);
@@ -277,7 +276,7 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
       final streamName = 'sync-ack-stream';
       final consumerName = 'sync-ack-consumer';
 
-      await js.addStream(StreamConfig(
+      final stream = await js.createStream(StreamConfig(
         name: streamName,
         subjects: ['sync-ack.*'],
         storage: 'memory',
@@ -285,9 +284,9 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 
       await js.publishString('sync-ack.test', 'sync-ack-data');
 
-      await js.addConsumer(streamName, ConsumerConfig(durable: consumerName));
+      final consumer = await stream.createConsumer(ConsumerConfig(durable: consumerName));
 
-      final messages = await js.pull(streamName, consumerName, batch: 1);
+      final messages = await consumer.fetch(batch: 1);
       expect(messages.length, equals(1));
 
       final msg = messages[0];
@@ -318,7 +317,7 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 
     test('KeyValue Store put/get/delete/purge/watch lifecycle', () async {
       final bucket = 'my_test_kv_${DateTime.now().millisecondsSinceEpoch}';
-      final kv = await js.keyValue(bucket, create: true, storage: 'memory');
+      final kv = await js.createKeyValue(KeyValueConfig(bucket: bucket, storage: 'memory', history: 10));
 
       // 1. Put
       final rev1 = await kv.putString('setting1', 'value1');
@@ -329,47 +328,77 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
       expect(entry, isNotNull);
       expect(entry!.string, equals('value1'));
       expect(entry.revision, equals(1));
+      expect(entry.bucket, equals(bucket));
+      expect(entry.op, equals(KeyValueOp.put));
 
-      // 3. Watch
-      final watchCompleter = Completer<KeyValueEntry?>();
+      // 3. Create (Atomic conditional put)
+      final rev2 = await kv.createString('setting2', 'value2');
+      expect(rev2, isPositive);
+
+      // Attempting to create existing key should throw
+      expect(() => kv.createString('setting2', 'value2_new'), throwsA(isA<NatsException>()));
+
+      // 4. Update (Atomic conditional update)
+      final rev3 = await kv.updateString('setting2', 'value2_updated', rev2);
+      expect(rev3, isPositive);
+
+      // Updating with incorrect revision should throw
+      expect(() => kv.updateString('setting2', 'value2_stale', rev2), throwsA(isA<NatsException>()));
+
+      // 5. GetRevision
+      final revEntry = await kv.getRevision('setting2', rev2);
+      expect(revEntry, isNotNull);
+      expect(revEntry!.string, equals('value2'));
+
+      // 6. Watch (with deletion/purge structured entries)
+      final watchCompleter = Completer<KeyValueEntry>();
+      final watchDeletes = <KeyValueEntry>[];
       final watchSub =
           kv.watch(key: 'setting1', includeHistory: true).listen((update) {
-        print(
-            'KV Watch received update: key=${update?.key}, value=${update?.string}, revision=${update?.revision}');
-        if (!watchCompleter.isCompleted) {
-          watchCompleter.complete(update);
+        if (update != null) {
+          print(
+              'KV Watch received update: key=${update.key}, value=${update.string}, revision=${update.revision}, op=${update.op}');
+          if (update.op == KeyValueOp.put) {
+            if (!watchCompleter.isCompleted) {
+              watchCompleter.complete(update);
+            }
+          } else {
+            watchDeletes.add(update);
+          }
         }
       });
 
       final watchEntry =
           await watchCompleter.future.timeout(const Duration(seconds: 4));
       expect(watchEntry, isNotNull);
-      expect(watchEntry!.string, equals('value1'));
-      watchSub.cancel();
+      expect(watchEntry.string, equals('value1'));
 
-      // 4. Delete
+      // Delete & Purge
       final delOk = await kv.delete('setting1');
       expect(delOk, isTrue);
 
       final entryAfterDel = await kv.get('setting1');
       expect(entryAfterDel, isNull);
 
-      // 5. Purge
-      await kv.putString('setting1', 'value2');
+      await kv.putString('setting1', 'value3');
       final purgeOk = await kv.purge('setting1');
       expect(purgeOk, isTrue);
 
-      final entryAfterPurge = await kv.get('setting1');
-      expect(entryAfterPurge, isNull);
+      // Wait a moment for watch events to propagate
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      watchSub.cancel();
 
-      // Clean up backing stream
-      await js.deleteStream('KV_$bucket');
+      expect(watchDeletes.any((e) => e.op == KeyValueOp.delete), isTrue);
+      expect(watchDeletes.any((e) => e.op == KeyValueOp.purge), isTrue);
+
+      // Clean up bucket using modern deleteKeyValue
+      await js.deleteKeyValue(bucket);
     });
 
     test('Object Store chunking, hashing, put/get/delete/list lifecycle',
         () async {
       final bucket = 'my_test_obj_${DateTime.now().millisecondsSinceEpoch}';
-      final os = await js.objectStore(bucket, create: true, storage: 'memory');
+      final os = await js.createObjectStore(ObjectStoreConfig(bucket: bucket, storage: 'memory'));
 
       // Generate random binary data larger than 128 KiB chunk size
       final size = 150 * 1024;
@@ -378,16 +407,16 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
         originalData[i] = i % 256;
       }
 
-      // 1. Put
-      final info = await os.put('large-file.bin', originalData,
+      // 1. PutBytes
+      final info = await os.putBytes('large-file.bin', originalData,
           description: 'binary data');
       expect(info.name, equals('large-file.bin'));
       expect(info.size, equals(size));
       expect(info.chunks, equals(2)); // 150 KiB / 128 KiB chunking = 2 chunks
       expect(info.deleted, isFalse);
 
-      // 2. Get & verify integrity
-      final retrievedData = await os.get('large-file.bin');
+      // 2. GetBytes & verify integrity
+      final retrievedData = await os.getBytes('large-file.bin');
       expect(retrievedData, isNotNull);
       expect(retrievedData!.length, equals(size));
       expect(retrievedData, equals(originalData));
@@ -404,11 +433,11 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
       final infoAfterDel = await os.getInfo('large-file.bin');
       expect(infoAfterDel!.deleted, isTrue);
 
-      final dataAfterDel = await os.get('large-file.bin');
+      final dataAfterDel = await os.getBytes('large-file.bin');
       expect(dataAfterDel, isNull);
 
-      // Clean up backing stream
-      await js.deleteStream('OBJ_$bucket');
+      // Clean up bucket using modern deleteObjectStore
+      await js.deleteObjectStore(bucket);
     });
   });
 }

@@ -62,8 +62,8 @@ void main() {
           storage: 'memory',
         );
 
-        final added = await js.addStream(config);
-        expect(added, isTrue);
+        final stream = await js.createStream(config);
+        expect(stream.name, equals(streamName));
 
         // Publish to JetStream
         await js.publishString(
@@ -78,11 +78,11 @@ void main() {
           ackPolicy: 'explicit',
         );
 
-        final consumerAdded = await js.addConsumer(streamName, consumerConfig);
-        expect(consumerAdded, isTrue);
+        final consumer = await stream.createConsumer(consumerConfig);
+        expect(consumer.name, equals(consumerName));
 
         // Fetch messages asynchronously
-        final messages = await js.pull(streamName, consumerName, batch: 2);
+        final messages = await consumer.fetch(batch: 2);
         expect(messages.length, equals(2));
         expect(messages[0].string, equals('payload-1'));
         expect(messages[1].string, equals('payload-2'));

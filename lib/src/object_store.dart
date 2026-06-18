@@ -108,6 +108,39 @@ class ObjectInfo {
   }
 }
 
+/// Object Store Configuration
+class ObjectStoreConfig {
+  final String bucket;
+  final String description;
+  final String storage; // 'file' or 'memory'
+  final int replicas;
+  final int maxBytes;
+  final Duration ttl;
+
+  ObjectStoreConfig({
+    required this.bucket,
+    this.description = '',
+    this.storage = 'file',
+    this.replicas = 1,
+    this.maxBytes = -1,
+    this.ttl = Duration.zero,
+  });
+
+  /// Convert to StreamConfig
+  StreamConfig toStreamConfig() {
+    return StreamConfig(
+      name: 'OBJ_$bucket',
+      subjects: ['\$O.$bucket.>'],
+      storage: storage,
+      maxBytes: maxBytes,
+      maxAge: ttl,
+      numReplicas: replicas,
+      allowRollup: true,
+      discard: 'new',
+    );
+  }
+}
+
 /// EXPERIMENTAL: Object Store APIs are experimental and subject to change in future releases.
 ///
 /// NATS Object Store implementation
@@ -178,6 +211,12 @@ class ObjectStore {
         .jetStream()
         .publish(metadataSubject, Uint8List.fromList(payload));
     return info;
+  }
+
+  /// Store a byte payload as an object
+  Future<ObjectInfo> putBytes(String name, Uint8List data,
+      {String description = ''}) {
+    return put(name, data, description: description);
   }
 
   /// Store a string payload as an object
@@ -359,7 +398,7 @@ class ObjectStore {
     });
 
     try {
-      await client.jetStream().addConsumer('OBJ_$bucket', consumerConfig);
+      await client.jetStream().createConsumer('OBJ_$bucket', consumerConfig);
     } catch (e) {
       cleanup();
       if (!completer.isCompleted) {
@@ -368,6 +407,11 @@ class ObjectStore {
     }
 
     return completer.future;
+  }
+
+  /// Retrieve full byte data of the object and verify integrity
+  Future<Uint8List?> getBytes(String name) {
+    return get(name);
   }
 
   /// Retrieve object data as string
@@ -481,7 +525,7 @@ class ObjectStore {
     });
 
     try {
-      await client.jetStream().addConsumer('OBJ_$bucket', consumerConfig);
+      await client.jetStream().createConsumer('OBJ_$bucket', consumerConfig);
     } catch (e) {
       cleanup();
       if (!completer.isCompleted) {

@@ -17,7 +17,7 @@ void main() {
       await client.close();
     });
 
-    test('Full JetStream lifecycle: Stream, Pub, Consumer, Pull, Ack',
+    test('Full JetStream lifecycle: Stream, Pub, Consumer, Fetch, Ack',
         () async {
       final streamName = 'test-lifecycle-stream';
       final subjectFilter = 'test-lifecycle-subject.*';
@@ -30,8 +30,8 @@ void main() {
       );
 
       // 2. Create the Stream
-      final createStreamResult = await js.addStream(streamConfig);
-      expect(createStreamResult, isTrue);
+      final JsStream stream = await js.createStream(streamConfig);
+      expect(stream.name, equals(streamName));
 
       // 3. Publish messages to Stream and verify PubAck
       final pubAck1 =
@@ -53,12 +53,12 @@ void main() {
         deliverPolicy: 'all',
       );
 
-      final createConsumerResult =
-          await js.addConsumer(streamName, consumerConfig);
-      expect(createConsumerResult, isTrue);
+      final Consumer consumer =
+          await stream.createConsumer(consumerConfig);
+      expect(consumer.name, equals(consumerName));
 
-      // 5. Pull messages using the consumer
-      final messages = await js.pull(streamName, consumerName, batch: 2);
+      // 5. Fetch messages using the consumer
+      final messages = await consumer.fetch(batch: 2);
       expect(messages.length, equals(2));
       expect(messages[0].string, equals('hello-1'));
       expect(messages[1].string, equals('hello-2'));
@@ -73,9 +73,7 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 200));
 
       // 7. Pulling again should yield no messages
-      final emptyMessages = await js.pull(
-        streamName,
-        consumerName,
+      final emptyMessages = await consumer.fetch(
         batch: 1,
         timeout: const Duration(milliseconds: 500),
       );
@@ -104,7 +102,7 @@ void main() {
       final subjectFilter = 'test-nak-subject.*';
       final consumerName = 'test-nak-consumer';
 
-      await js.addStream(StreamConfig(
+      final stream = await js.createStream(StreamConfig(
         name: streamName,
         subjects: [subjectFilter],
         storage: 'memory',
@@ -112,8 +110,7 @@ void main() {
 
       await js.publishString('test-nak-subject.a', 'hello-nak');
 
-      await js.addConsumer(
-        streamName,
+      final consumer = await stream.createConsumer(
         ConsumerConfig(
           durable: consumerName,
           ackPolicy: 'explicit',
@@ -122,7 +119,7 @@ void main() {
       );
 
       // 1. Pull the message
-      var messages = await js.pull(streamName, consumerName, batch: 1);
+      var messages = await consumer.fetch(batch: 1);
       expect(messages.length, equals(1));
       expect(messages[0].string, equals('hello-nak'));
 
@@ -134,7 +131,7 @@ void main() {
 
       // 3. Pull again -> should receive the message again due to NAK
       var redeliveredMessages =
-          await js.pull(streamName, consumerName, batch: 1);
+          await consumer.fetch(batch: 1);
       expect(redeliveredMessages.length, equals(1));
       expect(redeliveredMessages[0].string, equals('hello-nak'));
 
@@ -149,7 +146,7 @@ void main() {
       final subjectFilter = 'test-term-subject.*';
       final consumerName = 'test-term-consumer';
 
-      await js.addStream(StreamConfig(
+      final stream = await js.createStream(StreamConfig(
         name: streamName,
         subjects: [subjectFilter],
         storage: 'memory',
@@ -157,8 +154,7 @@ void main() {
 
       await js.publishString('test-term-subject.a', 'hello-term');
 
-      await js.addConsumer(
-        streamName,
+      final consumer = await stream.createConsumer(
         ConsumerConfig(
           durable: consumerName,
           ackPolicy: 'explicit',
@@ -167,7 +163,7 @@ void main() {
       );
 
       // 1. Pull the message
-      var messages = await js.pull(streamName, consumerName, batch: 1);
+      var messages = await consumer.fetch(batch: 1);
       expect(messages.length, equals(1));
       expect(messages[0].string, equals('hello-term'));
 
@@ -178,9 +174,7 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 100));
 
       // 3. Pull again -> should NOT receive the message again
-      var emptyMessages = await js.pull(
-        streamName,
-        consumerName,
+      var emptyMessages = await consumer.fetch(
         batch: 1,
         timeout: const Duration(milliseconds: 500),
       );
@@ -188,6 +182,51 @@ void main() {
 
       // 4. Cleanup
       await js.deleteConsumer(streamName, consumerName);
+      await js.deleteStream(streamName);
+    });
+
+    test('New APIs: accountInfo, streamNameBySubject, createOrUpdateStream, createOrUpdateConsumer', () async {
+      // 1. Test accountInfo
+      final accInfo = await js.accountInfo();
+      expect(accInfo.tier.memory, isNotNull);
+
+      // 2. Test createOrUpdateStream & streamNameBySubject
+      final streamName = 'test-update-stream';
+      final subjectFilter = 'test-update-subject.*';
+
+      final stream = await js.createOrUpdateStream(StreamConfig(
+        name: streamName,
+        subjects: [subjectFilter],
+        storage: 'memory',
+      ));
+      expect(stream.name, equals(streamName));
+
+      // Verify streamNameBySubject
+      final foundName = await js.streamNameBySubject('test-update-subject.item');
+      expect(foundName, equals(streamName));
+
+      // Update config and verify update works
+      final updatedStream = await js.createOrUpdateStream(StreamConfig(
+        name: streamName,
+        subjects: [subjectFilter, 'test-update-subject-extra.*'],
+        storage: 'memory',
+      ));
+      final info = await updatedStream.info();
+      expect(info.config.subjects, contains('test-update-subject-extra.*'));
+
+      // 3. Test createOrUpdateConsumer
+      final consumerConfig = ConsumerConfig(
+        durable: 'test-update-consumer',
+        ackPolicy: 'explicit',
+      );
+      final consumer = await js.createOrUpdateConsumer(streamName, consumerConfig);
+      expect(consumer.name, equals('test-update-consumer'));
+
+      final consumerInfo = await consumer.info();
+      expect(consumerInfo.name, equals('test-update-consumer'));
+
+      // Cleanup
+      await js.deleteConsumer(streamName, 'test-update-consumer');
       await js.deleteStream(streamName);
     });
   });

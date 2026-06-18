@@ -21,7 +21,7 @@ void main() {
       final streamName = 'direct-get-stream';
       final subject = 'direct.get.test';
 
-      await js.addStream(StreamConfig(
+      await js.createStream(StreamConfig(
         name: streamName,
         subjects: [subject],
         storage: 'memory',
@@ -47,7 +47,7 @@ void main() {
       final streamName = 'push-sub-stream';
       final subject = 'push.sub.test';
 
-      await js.addStream(StreamConfig(
+      await js.createStream(StreamConfig(
         name: streamName,
         subjects: [subject],
         storage: 'memory',
@@ -69,7 +69,7 @@ void main() {
       final streamName = 'ordered-cons-stream';
       final subject = 'ordered.cons.test';
 
-      await js.addStream(StreamConfig(
+      await js.createStream(StreamConfig(
         name: streamName,
         subjects: [subject],
         storage: 'memory',
@@ -107,7 +107,10 @@ void main() {
 
     test('KeyValue Store keys(), history(), and status()', () async {
       final bucket = 'adv_kv_test';
-      final kv = await js.keyValue(bucket, create: true, storage: 'memory');
+      try {
+        await js.deleteKeyValue(bucket);
+      } catch (_) {}
+      final kv = await js.createKeyValue(KeyValueConfig(bucket: bucket, storage: 'memory', history: 10));
 
       await kv.putString('a', 'apple');
       await kv.putString('b', 'banana');
@@ -121,6 +124,7 @@ void main() {
 
       // 2. Verify history() - returns all versions of a key
       final historyList = await kv.history('a').toList();
+      print('DEBUG HISTORY: ${historyList.map((e) => "${e.key} : ${e.string} (rev ${e.revision})").toList()}');
       expect(historyList.length, equals(2));
       expect(historyList[0].string, equals('apple'));
       expect(historyList[0].revision, equals(1));
@@ -133,15 +137,15 @@ void main() {
       expect(statusInfo.storage, equals('memory'));
       expect(statusInfo.values, equals(4)); // 3 puts + 1 delete tombstone
 
-      await js.deleteStream('KV_$bucket');
+      await js.deleteKeyValue(bucket);
     });
 
     test('Object Store putLink(), putBucketLink(), and automatic resolution', () async {
       final srcBucket = 'src_obj_bucket';
       final linkBucket = 'link_obj_bucket';
 
-      final srcStore = await js.objectStore(srcBucket, create: true, storage: 'memory');
-      final linkStore = await js.objectStore(linkBucket, create: true, storage: 'memory');
+      final srcStore = await js.createObjectStore(ObjectStoreConfig(bucket: srcBucket, storage: 'memory'));
+      final linkStore = await js.createObjectStore(ObjectStoreConfig(bucket: linkBucket, storage: 'memory'));
 
       // 1. Put standard object in source
       final targetInfo = await srcStore.putString('source-obj', 'original payload');
@@ -162,8 +166,8 @@ void main() {
       expect(bucketLinkInfo.link!.bucket, equals(srcBucket));
       expect(bucketLinkInfo.link!.name, isNull);
 
-      await js.deleteStream('OBJ_$srcBucket');
-      await js.deleteStream('OBJ_$linkBucket');
+      await js.deleteObjectStore(srcBucket);
+      await js.deleteObjectStore(linkBucket);
     });
   });
 }
