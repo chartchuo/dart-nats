@@ -633,7 +633,7 @@ class _DashboardPageState extends State<DashboardPage> {
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF6366F1).withOpacity(0.15),
+                color: const Color(0xFF6366F1).withValues(alpha: 0.15),
               ),
             ),
           ),
@@ -645,7 +645,7 @@ class _DashboardPageState extends State<DashboardPage> {
               height: 450,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFA855F7).withOpacity(0.12),
+                color: const Color(0xFFA855F7).withValues(alpha: 0.12),
               ),
             ),
           ),
@@ -693,10 +693,10 @@ class _DashboardPageState extends State<DashboardPage> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF6366F1).withOpacity(0.15),
+                                color: const Color(0xFF6366F1).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: const Color(0xFF6366F1).withOpacity(0.3),
+                                  color: const Color(0xFF6366F1).withValues(alpha: 0.3),
                                 ),
                               ),
                               child: const Text(
@@ -765,7 +765,7 @@ class _DashboardPageState extends State<DashboardPage> {
         border: Border.all(color: const Color(0x1Fffffff), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -812,7 +812,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       color: statusColor,
                       boxShadow: [
                         BoxShadow(
-                          color: statusColor.withOpacity(0.6),
+                          color: statusColor.withValues(alpha: 0.6),
                           blurRadius: 8,
                           spreadRadius: 2,
                         ),
@@ -848,7 +848,7 @@ class _DashboardPageState extends State<DashboardPage> {
             controller: _urlController,
             decoration: InputDecoration(
               hintText: 'ws://localhost:8080',
-              fillColor: const Color(0xFF0F172A).withOpacity(0.6),
+              fillColor: const Color(0xFF0F172A).withValues(alpha: 0.6),
               filled: true,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               border: OutlineInputBorder(
@@ -901,7 +901,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     foregroundColor: const Color(0xFFFCA5A5),
                     side: BorderSide(
                       color: isConnected
-                          ? const Color(0xFFEF4444).withOpacity(0.4)
+                          ? const Color(0xFFEF4444).withValues(alpha: 0.4)
                           : const Color(0x1Fffffff),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1099,8 +1099,8 @@ class _DashboardPageState extends State<DashboardPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: _jsStreamInitialized
-                            ? const Color(0xFF10B981).withOpacity(0.15)
-                            : const Color(0xFFEF4444).withOpacity(0.15),
+                            ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                            : const Color(0xFFEF4444).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1227,8 +1227,8 @@ class _DashboardPageState extends State<DashboardPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: _jsConsumerInitialized
-                            ? const Color(0xFF10B981).withOpacity(0.15)
-                            : const Color(0xFFEF4444).withOpacity(0.15),
+                            ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                            : const Color(0xFFEF4444).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1269,10 +1269,10 @@ class _DashboardPageState extends State<DashboardPage> {
                           ),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
-                            value: _jsDeliverPolicy,
+                            initialValue: _jsDeliverPolicy,
                             dropdownColor: const Color(0xFF1E293B),
                             decoration: InputDecoration(
-                              fillColor: const Color(0xFF0F172A).withOpacity(0.6),
+                              fillColor: const Color(0xFF0F172A).withValues(alpha: 0.6),
                               filled: true,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -1416,7 +1416,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isKvActive ? const Color(0xFF10B981).withOpacity(0.15) : const Color(0xFFEF4444).withOpacity(0.15),
+                        color: isKvActive ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFEF4444).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1551,7 +1551,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isOsActive ? const Color(0xFF10B981).withOpacity(0.15) : const Color(0xFFEF4444).withOpacity(0.15),
+                        color: isOsActive ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFEF4444).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1734,7 +1734,7 @@ class _DashboardPageState extends State<DashboardPage> {
   InputDecoration _buildInputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      fillColor: const Color(0xFF0F172A).withOpacity(0.6),
+      fillColor: const Color(0xFF0F172A).withValues(alpha: 0.6),
       filled: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
@@ -1757,8 +1757,8 @@ class _DashboardPageState extends State<DashboardPage> {
     return ElevatedButton.styleFrom(
       backgroundColor: const Color(0x1Affffff),
       foregroundColor: Colors.white,
-      disabledBackgroundColor: const Color(0xFF475569).withOpacity(0.2),
-      disabledForegroundColor: const Color(0xFF94A3B8).withOpacity(0.5),
+      disabledBackgroundColor: const Color(0xFF475569).withValues(alpha: 0.2),
+      disabledForegroundColor: const Color(0xFF94A3B8).withValues(alpha: 0.5),
       side: BorderSide(
         color: isConnected ? const Color(0x1Fffffff) : Colors.transparent,
       ),
@@ -1784,13 +1784,13 @@ class _DashboardPageState extends State<DashboardPage> {
 
   ButtonStyle _buildActionButtonStyle(Color color) {
     return ElevatedButton.styleFrom(
-      backgroundColor: color.withOpacity(0.15),
+      backgroundColor: color.withValues(alpha: 0.15),
       foregroundColor: color,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
       ),
-      side: BorderSide(color: color.withOpacity(0.3)),
+      side: BorderSide(color: color.withValues(alpha: 0.3)),
     );
   }
 
@@ -1803,7 +1803,7 @@ class _DashboardPageState extends State<DashboardPage> {
         border: Border.all(color: const Color(0x1Fffffff), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -1844,7 +1844,7 @@ class _DashboardPageState extends State<DashboardPage> {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF0A0F1E).withOpacity(0.7),
+                color: const Color(0xFF0A0F1E).withValues(alpha: 0.7),
                 border: Border.all(color: const Color(0x1Fffffff)),
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -1863,7 +1863,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFBBF24).withOpacity(0.08),
+                        color: const Color(0xFFFBBF24).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
                         border: const Border(
                           left: BorderSide(color: Color(0xFFFBBF24), width: 3),

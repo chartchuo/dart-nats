@@ -41,16 +41,26 @@ class ObjectLink {
 
 /// Object Store Metadata Information
 class ObjectInfo {
-  final String name;
-  final String description;
-  final String bucket;
-  final String nuid;
-  final int size;
-  final DateTime mtime;
-  final int chunks;
-  final String digest;
-  final bool deleted;
-  final ObjectLink? link;
+  /// The object's name.
+final String name;
+  /// Human‑readable description of the object.
+final String description;
+  /// Bucket containing the object.
+final String bucket;
+  /// Unique identifier for the object.
+final String nuid;
+  /// Size of the object in bytes.
+final int size;
+  /// Modification timestamp of the object.
+final DateTime mtime;
+  /// Number of data chunks the object is split into.
+final int chunks;
+  /// SHA‑256 digest of the object's data.
+final String digest;
+  /// Indicates if the object is marked as deleted.
+final bool deleted;
+  /// Optional link to another object or bucket.
+final ObjectLink? link;
 
   ObjectInfo({
     required this.name,

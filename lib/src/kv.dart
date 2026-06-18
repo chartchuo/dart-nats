@@ -10,12 +10,18 @@ import 'inbox.dart';
 
 /// KeyValue Configuration
 class KeyValueConfig {
-  final String bucket;
-  final String description;
-  final String storage; // 'file' or 'memory'
-  final int history; // max_msgs_per_subject
-  final int maxBytes;
-  final Duration ttl; // max_age
+  /// The bucket name.
+final String bucket;
+  /// Human‑readable description of the bucket.
+final String description;
+  /// Storage type, either 'file' or 'memory'.
+final String storage; // 'file' or 'memory'
+  /// Maximum number of messages per key (history depth).
+final int history; // max_msgs_per_subject
+  /// Maximum total bytes for the bucket (‑1 for unlimited).
+final int maxBytes;
+  /// Time‑to‑live for entries; 0 for no expiry.
+final Duration ttl; // max_age
 
   KeyValueConfig({
     required this.bucket,
@@ -45,10 +51,14 @@ class KeyValueConfig {
 
 /// KeyValue Entry holding value and metadata revision details
 class KeyValueEntry {
-  final String key;
-  final Uint8List value;
-  final int revision;
-  final DateTime created;
+  /// The entry's key.
+final String key;
+  /// The entry's value bytes.
+final Uint8List value;
+  /// Revision number for this entry.
+final int revision;
+  /// Creation timestamp of the entry.
+final DateTime created;
 
   KeyValueEntry({
     required this.key,
@@ -65,26 +75,32 @@ class KeyValueEntry {
 ///
 /// NATS Key-Value Store implementation
 class KeyValue {
-  final Client client;
-  final String bucket;
-  final String streamName;
+  /// Underlying NATS client used for all operations.
+final Client client;
+  /// Name of the bucket this instance operates on.
+final String bucket;
+  /// Backing JetStream stream name (derived from the bucket).
+final String streamName;
 
   KeyValue(this.client, this.bucket) : streamName = 'KV_$bucket';
 
   /// Associate a value with a key
-  Future<int> put(String key, Uint8List value) async {
+  /// Store a binary value under the given [key]. Returns the sequence number of the stored message.
+Future<int> put(String key, Uint8List value) async {
     final subject = '\$KV.$bucket.$key';
     final ack = await client.jetStream().publish(subject, value);
     return ack.sequence;
   }
 
   /// Associate a string value with a key
-  Future<int> putString(String key, String value) {
+  /// Store a string value under the given [key] by encoding it as UTF‑8.
+Future<int> putString(String key, String value) {
     return put(key, Uint8List.fromList(utf8.encode(value)));
   }
 
   /// Retrieve the latest entry associated with a key
-  Future<KeyValueEntry?> get(String key) async {
+  /// Retrieve the latest entry for [key]; returns `null` if the key does not exist.
+Future<KeyValueEntry?> get(String key) async {
     final apiSubject = '\$JS.API.STREAM.MSG.GET.$streamName';
     final payload = utf8.encode(jsonEncode({
       'last_by_subj': '\$KV.$bucket.$key',
@@ -110,7 +126,8 @@ class KeyValue {
   }
 
   /// Delete the key (adds a deletion tombstone message to history)
-  Future<bool> delete(String key) async {
+  /// Delete the entry for [key] by publishing a tombstone message.
+Future<bool> delete(String key) async {
     final subject = '\$KV.$bucket.$key';
     final header = Header().add('KV-Operation', 'DEL');
     final ack =
@@ -119,7 +136,8 @@ class KeyValue {
   }
 
   /// Purge the key (deletes all historical versions for this key)
-  Future<bool> purge(String key) async {
+  /// Purge all historical versions of [key] from the stream.
+Future<bool> purge(String key) async {
     final subject = '\$KV.$bucket.$key';
     final header =
         Header().add('KV-Operation', 'PURGE').add('Nats-Rollup', 'sub');
@@ -128,7 +146,7 @@ class KeyValue {
     return ack.sequence > 0;
   }
 
-  /// Watch for real-time key modifications. Can watch a single key or a wildcard (e.g. ">").
+  /// Watch real‑time modifications for [key] (supports wild‑cards). If [includeHistory] is true, emits past entries as well.
   Stream<KeyValueEntry?> watch(
       {String key = '>', bool includeHistory = false}) {
     final controller = StreamController<KeyValueEntry?>();
@@ -217,7 +235,8 @@ class KeyValue {
   }
 
   /// List all active keys in this bucket (excluding deleted/purged ones).
-  Future<List<String>> keys({Duration timeout = const Duration(seconds: 5)}) async {
+  /// List all active keys in the bucket, excluding those that are deleted or purged.
+Future<List<String>> keys({Duration timeout = const Duration(seconds: 5)}) async {
     final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
     final sub = client.sub(deliverSubject);
 
@@ -302,7 +321,8 @@ class KeyValue {
 
   /// Get a stream of all revisions (history) for a specific key.
   /// The stream will yield historical entries and automatically close when the existing history is fully read.
-  Stream<KeyValueEntry> history(String key, {Duration timeout = const Duration(seconds: 5)}) {
+  /// Stream the historical revisions for [key] in order of creation.
+Stream<KeyValueEntry> history(String key, {Duration timeout = const Duration(seconds: 5)}) {
     final controller = StreamController<KeyValueEntry>();
     final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
     final sub = client.sub(deliverSubject);
@@ -376,7 +396,8 @@ class KeyValue {
   }
 
   /// Get status details for this Key-Value bucket.
-  Future<KeyValueStatus> status() async {
+  /// Retrieve status and statistics for this bucket.
+Future<KeyValueStatus> status() async {
     final info = await client.jetStream().getStream(streamName);
     return KeyValueStatus(bucket, info);
   }
