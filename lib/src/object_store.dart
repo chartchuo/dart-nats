@@ -41,17 +41,37 @@ class ObjectLink {
 
 /// Object Store Metadata Information
 class ObjectInfo {
+  /// Name of the object
   final String name;
+
+  /// Optional description
   final String description;
+
+  /// Name of the bucket
   final String bucket;
+
+  /// Unique NUID identifier of the object
   final String nuid;
+
+  /// Size of the object in bytes
   final int size;
+
+  /// Modification timestamp
   final DateTime mtime;
+
+  /// Number of chunks the object is split into
   final int chunks;
+
+  /// SHA-256 digest of the full object payload
   final String digest;
+
+  /// Whether the object is marked as deleted (tombstoned)
   final bool deleted;
+
+  /// Link mapping if this object is a link to another object/bucket
   final ObjectLink? link;
 
+  /// Constructor for ObjectInfo
   ObjectInfo({
     required this.name,
     this.description = '',
@@ -65,6 +85,7 @@ class ObjectInfo {
     this.link,
   });
 
+  /// Factory from JSON map
   factory ObjectInfo.fromJson(Map<String, dynamic> json) {
     final opts = json['options'] as Map<String, dynamic>?;
     ObjectLink? link;
@@ -87,6 +108,7 @@ class ObjectInfo {
     );
   }
 
+  /// Export metadata to JSON map
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{
       'name': name,
@@ -110,13 +132,25 @@ class ObjectInfo {
 
 /// Object Store Configuration
 class ObjectStoreConfig {
+  /// Name of the object store bucket
   final String bucket;
+
+  /// Description of the object store bucket
   final String description;
-  final String storage; // 'file' or 'memory'
+
+  /// Storage type: 'file' or 'memory'
+  final String storage;
+
+  /// Number of replicas for the backing stream
   final int replicas;
+
+  /// Maximum size of the bucket in bytes
   final int maxBytes;
+
+  /// Time to live for objects in the bucket
   final Duration ttl;
 
+  /// Constructor for ObjectStoreConfig
   ObjectStoreConfig({
     required this.bucket,
     this.description = '',

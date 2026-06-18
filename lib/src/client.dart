@@ -90,6 +90,8 @@ class Client {
 
   /// User authentication callbacks
   String Function()? userJwtHandler;
+
+  /// Callback to sign a challenge nonce during NKEY authentication
   Uint8List Function(Uint8List nonce)? signatureHandler;
 
   /// Error handler for websocket errors

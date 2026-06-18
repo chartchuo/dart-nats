@@ -10,13 +10,25 @@ import 'inbox.dart';
 
 /// KeyValue Configuration
 class KeyValueConfig {
+  /// Name of the key-value bucket
   final String bucket;
-  final String description;
-  final String storage; // 'file' or 'memory'
-  final int history; // max_msgs_per_subject
-  final int maxBytes;
-  final Duration ttl; // max_age
 
+  /// Description of the key-value bucket
+  final String description;
+
+  /// Storage type: 'file' or 'memory'
+  final String storage;
+
+  /// History depth (maximum historical values kept per key)
+  final int history;
+
+  /// Maximum size of the bucket in bytes
+  final int maxBytes;
+
+  /// Time to live for values in the bucket
+  final Duration ttl;
+
+  /// Constructor for KeyValueConfig
   KeyValueConfig({
     required this.bucket,
     this.description = '',
@@ -45,21 +57,40 @@ class KeyValueConfig {
 
 /// KeyValue operations
 enum KeyValueOp {
+  /// Put operation (set/update value)
   put,
+
+  /// Delete operation (add tombstone)
   delete,
+
+  /// Purge operation (delete all key history)
   purge,
 }
 
 /// KeyValue Entry holding value and metadata revision details
 class KeyValueEntry {
+  /// Name of the bucket containing entry
   final String bucket;
+
+  /// The entry key
   final String key;
+
+  /// Byte payload value
   final Uint8List value;
+
+  /// Revision number in the backing stream
   final int revision;
+
+  /// Created timestamp
   final DateTime created;
+
+  /// Sequence delta number
   final int delta;
+
+  /// Operation type performed
   final KeyValueOp op;
 
+  /// Constructor for KeyValueEntry
   KeyValueEntry({
     required this.key,
     required this.value,
@@ -78,10 +109,16 @@ class KeyValueEntry {
 ///
 /// NATS Key-Value Store implementation
 class KeyValue {
+  /// Reference to the core NATS Client
   final Client client;
+
+  /// Name of the bucket
   final String bucket;
+
+  /// Backing stream name
   final String streamName;
 
+  /// Constructor for KeyValue store
   KeyValue(this.client, this.bucket) : streamName = 'KV_$bucket';
 
   /// Associate a value with a key

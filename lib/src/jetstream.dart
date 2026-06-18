@@ -205,12 +205,22 @@ class ConsumerConfig {
 }
 /// Publish options for JetStream de-duplication and optimistic concurrency control
 class PubOpts {
+  /// Expected message ID
   final String? msgId;
+
+  /// Expected stream name
   final String? expectStream;
+
+  /// Expected last sequence number
   final int? expectLastSeq;
+
+  /// Expected last message ID
   final String? expectLastMsgId;
+
+  /// Expected last subject sequence number
   final int? expectLastSubjectSeq;
 
+  /// Constructor for PubOpts
   PubOpts({
     this.msgId,
     this.expectStream,
@@ -222,14 +232,28 @@ class PubOpts {
 
 /// JetStream Stream State
 class StreamState {
+  /// Number of messages in the stream
   final int messages;
+
+  /// Number of bytes in the stream
   final int bytes;
+
+  /// First sequence number in the stream
   final int firstSeq;
+
+  /// First timestamp in the stream
   final String firstTs;
+
+  /// Last sequence number in the stream
   final int lastSeq;
+
+  /// Last timestamp in the stream
   final String lastTs;
+
+  /// Number of consumers bound to the stream
   final int consumerCount;
 
+  /// Constructor for StreamState
   StreamState({
     required this.messages,
     required this.bytes,
@@ -240,6 +264,7 @@ class StreamState {
     required this.consumerCount,
   });
 
+  /// Factory from JSON map
   factory StreamState.fromJson(Map<String, dynamic> json) {
     return StreamState(
       messages: json['messages'] as int? ?? 0,
@@ -255,11 +280,19 @@ class StreamState {
 
 /// JetStream Stream Information
 class StreamInfo {
+  /// Type of response/event
   final String type;
+
+  /// Stream configuration
   final StreamConfig config;
+
+  /// Created timestamp
   final String created;
+
+  /// Stream state detail
   final StreamState state;
 
+  /// Constructor for StreamInfo
   StreamInfo({
     required this.type,
     required this.config,
@@ -267,6 +300,7 @@ class StreamInfo {
     required this.state,
   });
 
+  /// Factory from JSON map
   factory StreamInfo.fromJson(Map<String, dynamic> json) {
     final cfg = json['config'] as Map<String, dynamic>? ?? {};
     return StreamInfo(
@@ -287,16 +321,34 @@ class StreamInfo {
 
 /// JetStream Consumer Information
 class ConsumerInfo {
+  /// Type of response/event
   final String type;
+
+  /// Stream name bound to consumer
   final String streamName;
+
+  /// Consumer name
   final String name;
+
+  /// Created timestamp
   final String created;
+
+  /// Consumer configuration
   final ConsumerConfig config;
+
+  /// Number of pending messages
   final int numPending;
+
+  /// Number of waiting messages
   final int numWaiting;
+
+  /// Number of ack pending messages
   final int numAckPending;
+
+  /// Number of redelivered messages
   final int numRedelivered;
 
+  /// Constructor for ConsumerInfo
   ConsumerInfo({
     required this.type,
     required this.streamName,
@@ -309,6 +361,7 @@ class ConsumerInfo {
     required this.numRedelivered,
   });
 
+  /// Factory from JSON map
   factory ConsumerInfo.fromJson(Map<String, dynamic> json) {
     final cfg = json['config'] as Map<String, dynamic>? ?? {};
     return ConsumerInfo(
@@ -1019,9 +1072,13 @@ class OrderedConsumer {
 
 /// NATS JetStream Stream handle wrapping operations for a specific stream.
 class JsStream {
+  /// Reference to the JetStream context
   final JetStream js;
+
+  /// Name of the stream
   final String name;
 
+  /// Constructor for JsStream
   JsStream(this.js, this.name);
 
   /// Get details/status of this stream
@@ -1048,10 +1105,16 @@ class JsStream {
 
 /// NATS JetStream Consumer handle wrapping operations for a specific consumer.
 class Consumer {
+  /// Reference to the JetStream context
   final JetStream js;
+
+  /// Name of the stream bound to this consumer
   final String streamName;
+
+  /// Name of the consumer
   final String name;
 
+  /// Constructor for Consumer
   Consumer(this.js, this.streamName, this.name);
 
   /// Get status of this consumer
@@ -1068,13 +1131,25 @@ class Consumer {
 
 /// JetStream Tier resource usage
 class Tier {
+  /// Memory resource usage
   final int memory;
+
+  /// Storage resource usage
   final int storage;
+
+  /// Reserved memory limit
   final int reservedMemory;
+
+  /// Reserved storage limit
   final int reservedStorage;
+
+  /// Number of streams
   final int streams;
+
+  /// Number of consumers
   final int consumers;
 
+  /// Constructor for Tier
   Tier({
     required this.memory,
     required this.storage,
@@ -1084,6 +1159,7 @@ class Tier {
     required this.consumers,
   });
 
+  /// Factory from JSON map
   factory Tier.fromJson(Map<String, dynamic> json) {
     return Tier(
       memory: json['memory'] as int? ?? 0,
@@ -1098,11 +1174,19 @@ class Tier {
 
 /// JetStream API usage statistics for an account
 class APIStats {
+  /// API limits level
   final int level;
+
+  /// Total requests count
   final int total;
+
+  /// Total errors count
   final int errors;
+
+  /// Current inflight requests
   final int inflight;
 
+  /// Constructor for APIStats
   APIStats({
     required this.level,
     required this.total,
@@ -1110,6 +1194,7 @@ class APIStats {
     required this.inflight,
   });
 
+  /// Factory from JSON map
   factory APIStats.fromJson(Map<String, dynamic> json) {
     return APIStats(
       level: json['level'] as int? ?? 0,
@@ -1122,11 +1207,19 @@ class APIStats {
 
 /// JetStream account information
 class AccountInfo {
+  /// JetStream domain
   final String domain;
+
+  /// API statistics
   final APIStats api;
+
+  /// Tier resource usage
   final Tier tier;
+
+  /// Multi-tier configurations mapped by tier name
   final Map<String, Tier> tiers;
 
+  /// Constructor for AccountInfo
   AccountInfo({
     required this.domain,
     required this.api,
@@ -1134,6 +1227,7 @@ class AccountInfo {
     required this.tiers,
   });
 
+  /// Factory from JSON map
   factory AccountInfo.fromJson(Map<String, dynamic> json) {
     final tiersMap = <String, Tier>{};
     if (json['tiers'] != null) {
