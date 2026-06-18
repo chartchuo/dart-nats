@@ -261,7 +261,7 @@ class ObjectStore {
   }
 
   /// Create a link to another object in the same or different bucket.
-  Future<ObjectInfo> putLink(String name, ObjectInfo target,
+  Future<ObjectInfo> addLink(String name, ObjectInfo target,
       {String description = ''}) async {
     final nuid = Nuid().next();
 
@@ -293,7 +293,7 @@ class ObjectStore {
   }
 
   /// Create a link to an entire bucket.
-  Future<ObjectInfo> putBucketLink(String name, String targetBucket,
+  Future<ObjectInfo> addBucketLink(String name, String targetBucket,
       {String description = ''}) async {
     final nuid = Nuid().next();
 
@@ -503,7 +503,7 @@ class ObjectStore {
       ackPolicy: 'none',
     );
 
-    final list = <ObjectInfo>[];
+    final activeObjects = <String, ObjectInfo>{};
     final completer = Completer<List<ObjectInfo>>();
     StreamSubscription? streamSub;
     Timer? timeoutTimer;
@@ -517,7 +517,7 @@ class ObjectStore {
     timeoutTimer = Timer(const Duration(seconds: 5), () {
       cleanup();
       if (!completer.isCompleted) {
-        completer.complete(list);
+        completer.complete(activeObjects.values.toList());
       }
     });
 
@@ -525,8 +525,10 @@ class ObjectStore {
       try {
         final map = jsonDecode(msg.string);
         final info = ObjectInfo.fromJson(map as Map<String, dynamic>);
-        if (!info.deleted) {
-          list.add(info);
+        if (info.deleted) {
+          activeObjects.remove(info.name);
+        } else {
+          activeObjects[info.name] = info;
         }
       } catch (_) {}
 
@@ -542,7 +544,7 @@ class ObjectStore {
         if (pending == 0) {
           cleanup();
           if (!completer.isCompleted) {
-            completer.complete(list);
+            completer.complete(activeObjects.values.toList());
           }
         }
       }
@@ -554,7 +556,7 @@ class ObjectStore {
     }, onDone: () {
       cleanup();
       if (!completer.isCompleted) {
-        completer.complete(list);
+        completer.complete(activeObjects.values.toList());
       }
     });
 

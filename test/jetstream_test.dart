@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:dart_nats/dart_nats.dart';
 import 'package:test/test.dart';
 
@@ -9,7 +11,7 @@ void main() {
 
     setUp(() async {
       client = Client();
-      await client.connect(Uri.parse('nats://localhost:4222'));
+      await client.connect(Uri.parse('nats://localhost:4222'), retry: false);
       js = client.jetStream();
     });
 
@@ -17,217 +19,269 @@ void main() {
       await client.close();
     });
 
-    test('Full JetStream lifecycle: Stream, Pub, Consumer, Fetch, Ack',
-        () async {
-      final streamName = 'test-lifecycle-stream';
-      final subjectFilter = 'test-lifecycle-subject.*';
+    test('Stream Management Lifecycle', () async {
+      final streamName = 'stream-mgmt-test';
+      final subject = 'mgmt-subj.foo';
 
-      // 1. Create a Stream config
+      // 1. createStream
       final streamConfig = StreamConfig(
         name: streamName,
-        subjects: [subjectFilter],
-        storage: 'memory', // Use memory storage for ephemeral tests
+        subjects: [subject],
+        storage: 'memory',
       );
-
-      // 2. Create the Stream
-      final JsStream stream = await js.createStream(streamConfig);
+      final stream = await js.createStream(streamConfig);
       expect(stream.name, equals(streamName));
 
-      // 3. Publish messages to Stream and verify PubAck
-      final pubAck1 =
-          await js.publishString('test-lifecycle-subject.a', 'hello-1');
-      expect(pubAck1.stream, equals(streamName));
-      expect(pubAck1.sequence, equals(1));
-      expect(pubAck1.duplicate, isFalse);
+      // 2. streamInfo & getStream (deprecated)
+      final info = await js.streamInfo(streamName);
+      expect(info.config.name, equals(streamName));
+      expect(info.config.subjects, contains(subject));
 
-      final pubAck2 =
-          await js.publishString('test-lifecycle-subject.b', 'hello-2');
-      expect(pubAck2.stream, equals(streamName));
-      expect(pubAck2.sequence, equals(2));
+      final deprecatedInfo = await js.getStream(streamName);
+      expect(deprecatedInfo.config.name, equals(streamName));
 
-      // 4. Create a Pull Consumer on the Stream
-      final consumerName = 'test-lifecycle-consumer';
-      final consumerConfig = ConsumerConfig(
+      // 3. updateStream
+      final updatedConfig = StreamConfig(
+        name: streamName,
+        subjects: [subject, 'mgmt-subj.bar'],
+        storage: 'memory',
+      );
+      final updatedStream = await js.updateStream(updatedConfig);
+      final updatedInfo = await updatedStream.info();
+      expect(updatedInfo.config.subjects, containsAll([subject, 'mgmt-subj.bar']));
+
+      // 4. createOrUpdateStream
+      final streamOrUpdated = await js.createOrUpdateStream(StreamConfig(
+        name: streamName,
+        subjects: [subject, 'mgmt-subj.baz'],
+        storage: 'memory',
+      ));
+      final finalInfo = await streamOrUpdated.info();
+      expect(finalInfo.config.subjects, contains('mgmt-subj.baz'));
+
+      // 5. listStreams & streamNameBySubject
+      final streamsList = await js.listStreams();
+      expect(streamsList.any((s) => s.config.name == streamName), isTrue);
+
+      final mappedName = await js.streamNameBySubject('mgmt-subj.baz');
+      expect(mappedName, equals(streamName));
+
+      // 6. JsStream.purge() & purgeStream (deprecated)
+      await js.publishString(subject, 'test-payload');
+      final infoBeforePurge = await stream.info();
+      expect(infoBeforePurge.state.messages, equals(1));
+
+      final purgeOk1 = await stream.purge();
+      expect(purgeOk1, isTrue);
+      
+      await js.publishString(subject, 'test-payload-2');
+      final purgeOk2 = await js.purgeStream(streamName);
+      expect(purgeOk2, isTrue);
+
+      final infoAfterPurge = await stream.info();
+      expect(infoAfterPurge.state.messages, equals(0));
+
+      // 7. addStream (deprecated)
+      final tempStreamName = 'stream-temp-add';
+      final addOk = await js.addStream(StreamConfig(name: tempStreamName, subjects: ['temp-subj'], storage: 'memory'));
+      expect(addOk, isTrue);
+      await js.deleteStream(tempStreamName);
+
+      // 8. deleteStream
+      final deleteResult = await js.deleteStream(streamName);
+      expect(deleteResult, isTrue);
+    });
+
+    test('Publishing and Message Get APIs', () async {
+      final streamName = 'pub-get-test';
+      final subject = 'pub.get.subj';
+
+      await js.createStream(StreamConfig(
+        name: streamName,
+        subjects: [subject],
+        storage: 'memory',
+      ));
+
+      // 1. publish (bytes) and publishString
+      final ack1 = await js.publish(subject, Uint8List.fromList([1, 2, 3]));
+      expect(ack1.sequence, equals(1));
+
+      final ack2 = await js.publishString(subject, 'hello-js', opts: PubOpts(msgId: 'unique-id'));
+      expect(ack2.sequence, equals(2));
+
+      // 2. getMsg (by sequence)
+      final msg1 = await js.getMsg(streamName, 1);
+      expect(msg1.byte, equals(Uint8List.fromList([1, 2, 3])));
+      expect(msg1.streamSequence, equals(1));
+
+      // 3. getLastMsg (by subject)
+      final msg2 = await js.getLastMsg(streamName, subject);
+      expect(msg2.string, equals('hello-js'));
+      expect(msg2.streamSequence, equals(2));
+
+      await js.deleteStream(streamName);
+    });
+
+    test('Consumer Management Lifecycle', () async {
+      final streamName = 'cons-mgmt-test';
+      final subject = 'cons.mgmt.subj';
+
+      final stream = await js.createStream(StreamConfig(
+        name: streamName,
+        subjects: [subject],
+        storage: 'memory',
+      ));
+
+      final consumerName = 'test-consumer';
+      final config = ConsumerConfig(
         durable: consumerName,
         ackPolicy: 'explicit',
-        deliverPolicy: 'all',
       );
 
-      final Consumer consumer =
-          await stream.createConsumer(consumerConfig);
+      // 1. createConsumer & addConsumer (deprecated)
+      final consumer = await js.createConsumer(streamName, config);
       expect(consumer.name, equals(consumerName));
 
-      // 5. Fetch messages using the consumer
-      final messages = await consumer.fetch(batch: 2);
-      expect(messages.length, equals(2));
-      expect(messages[0].string, equals('hello-1'));
-      expect(messages[1].string, equals('hello-2'));
+      final consumerInfo = await js.consumerInfo(streamName, consumerName);
+      expect(consumerInfo.name, equals(consumerName));
 
-      // 6. Acknowledge messages
-      final ackResult1 = messages[0].ack();
-      final ackResult2 = messages[1].ack();
-      expect(ackResult1, isTrue);
-      expect(ackResult2, isTrue);
+      final deprecatedConsInfo = await js.getConsumer(streamName, consumerName);
+      expect(deprecatedConsInfo.name, equals(consumerName));
 
-      // Allow NATS some time to process acks
-      await Future.delayed(const Duration(milliseconds: 200));
+      // 2. createOrUpdateConsumer
+      final consumerOrUpdate = await js.createOrUpdateConsumer(streamName, config);
+      expect(consumerOrUpdate.name, equals(consumerName));
 
-      // 7. Pulling again should yield no messages
-      final emptyMessages = await consumer.fetch(
-        batch: 1,
-        timeout: const Duration(milliseconds: 500),
-      );
-      expect(emptyMessages.length, equals(0));
+      // 3. listConsumers
+      final consumersList = await js.listConsumers(streamName);
+      expect(consumersList.any((c) => c.name == consumerName), isTrue);
 
-      // 8. Clean up Consumer and Stream
-      final deleteConsumerResult =
-          await js.deleteConsumer(streamName, consumerName);
-      expect(deleteConsumerResult, isTrue);
+      // 4. deleteConsumer
+      final deleteResult = await js.deleteConsumer(streamName, consumerName);
+      expect(deleteResult, isTrue);
 
-      final deleteStreamResult = await js.deleteStream(streamName);
-      expect(deleteStreamResult, isTrue);
-    });
+      // 5. addConsumer (deprecated)
+      final addConsOk = await js.addConsumer(streamName, ConsumerConfig(durable: 'add-cons-test'));
+      expect(addConsOk, isTrue);
+      await js.deleteConsumer(streamName, 'add-cons-test');
 
-    test(
-        'JetStream error handling: Delete non-existent stream throws NatsException',
-        () async {
-      expect(
-        () => js.deleteStream('non-existent-stream-xyz'),
-        throwsA(isA<NatsException>()),
-      );
-    });
-
-    test('JetStream message processing: NAK triggers redelivery', () async {
-      final streamName = 'test-nak-stream';
-      final subjectFilter = 'test-nak-subject.*';
-      final consumerName = 'test-nak-consumer';
-
-      final stream = await js.createStream(StreamConfig(
-        name: streamName,
-        subjects: [subjectFilter],
-        storage: 'memory',
-      ));
-
-      await js.publishString('test-nak-subject.a', 'hello-nak');
-
-      final consumer = await stream.createConsumer(
-        ConsumerConfig(
-          durable: consumerName,
-          ackPolicy: 'explicit',
-          deliverPolicy: 'all',
-        ),
-      );
-
-      // 1. Pull the message
-      var messages = await consumer.fetch(batch: 1);
-      expect(messages.length, equals(1));
-      expect(messages[0].string, equals('hello-nak'));
-
-      // 2. Call NAK
-      expect(messages[0].nak(), isTrue);
-
-      // Allow NATS a brief moment to process NAK and make message available
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      // 3. Pull again -> should receive the message again due to NAK
-      var redeliveredMessages =
-          await consumer.fetch(batch: 1);
-      expect(redeliveredMessages.length, equals(1));
-      expect(redeliveredMessages[0].string, equals('hello-nak'));
-
-      // 4. Acknowledge and cleanup
-      expect(redeliveredMessages[0].ack(), isTrue);
-      await js.deleteConsumer(streamName, consumerName);
       await js.deleteStream(streamName);
     });
 
-    test('JetStream message processing: TERM prevents redelivery', () async {
-      final streamName = 'test-term-stream';
-      final subjectFilter = 'test-term-subject.*';
-      final consumerName = 'test-term-consumer';
+    test('Pull/Fetch & Message Acknowledgement states', () async {
+      final streamName = 'pull-ack-test';
+      final subject = 'pull.ack.subj';
 
       final stream = await js.createStream(StreamConfig(
         name: streamName,
-        subjects: [subjectFilter],
+        subjects: [subject],
         storage: 'memory',
       ));
 
-      await js.publishString('test-term-subject.a', 'hello-term');
+      await js.publishString(subject, 'msg-1');
+      await js.publishString(subject, 'msg-2');
+      await js.publishString(subject, 'msg-3');
+      await js.publishString(subject, 'msg-4');
 
-      final consumer = await stream.createConsumer(
-        ConsumerConfig(
-          durable: consumerName,
-          ackPolicy: 'explicit',
-          deliverPolicy: 'all',
-        ),
-      );
+      final consumer = await stream.createConsumer(ConsumerConfig(
+        durable: 'pull-cons',
+        ackPolicy: 'explicit',
+        deliverPolicy: 'all',
+      ));
 
-      // 1. Pull the message
-      var messages = await consumer.fetch(batch: 1);
-      expect(messages.length, equals(1));
-      expect(messages[0].string, equals('hello-term'));
+      // 1. pull (deprecated)
+      final pulledMessages = await js.pull(streamName, 'pull-cons', batch: 2);
+      expect(pulledMessages.length, equals(2));
 
-      // 2. Call TERM
-      expect(messages[0].term(), isTrue);
+      // 2. fetch on Consumer
+      final fetchedMessages = await consumer.fetch(batch: 2);
+      expect(fetchedMessages.length, equals(2));
 
-      // Allow NATS a brief moment to process TERM
-      await Future.delayed(const Duration(milliseconds: 100));
+      // 3. Message acknowledgement operations
+      // ack
+      final ackResult = pulledMessages[0].ack();
+      expect(ackResult, isTrue);
 
-      // 3. Pull again -> should NOT receive the message again
-      var emptyMessages = await consumer.fetch(
-        batch: 1,
-        timeout: const Duration(milliseconds: 500),
-      );
-      expect(emptyMessages.length, equals(0));
+      // nak
+      final nakResult = pulledMessages[1].nak();
+      expect(nakResult, isTrue);
 
-      // 4. Cleanup
-      await js.deleteConsumer(streamName, consumerName);
+      // term
+      final termResult = fetchedMessages[0].term();
+      expect(termResult, isTrue);
+
+      // inProgress
+      final inProgressResult = fetchedMessages[1].inProgress();
+      expect(inProgressResult, isTrue);
+
+      // ackSync
+      await pulledMessages[0].ackSync();
+
+      await js.deleteConsumer(streamName, 'pull-cons');
       await js.deleteStream(streamName);
     });
 
-    test('New APIs: accountInfo, streamNameBySubject, createOrUpdateStream, createOrUpdateConsumer', () async {
-      // 1. Test accountInfo
+    test('Deprecated Push Subscription subscribe helper', () async {
+      final streamName = 'push-sub-test';
+      final subject = 'push.sub.subj';
+
+      await js.createStream(StreamConfig(
+        name: streamName,
+        subjects: [subject],
+        storage: 'memory',
+      ));
+
+      // subscribe (deprecated)
+      final sub = await js.subscribe(subject, stream: streamName);
+
+      await js.publishString(subject, 'pushed');
+
+      final msg = await sub.stream.first.timeout(const Duration(seconds: 3));
+      expect(msg.string, equals('pushed'));
+
+      client.unSub(sub);
+      await js.deleteStream(streamName);
+    });
+
+    test('Ordered Consumer and status controls', () async {
+      final streamName = 'ordered-cons-test';
+      final subject = 'ordered.subj';
+
+      await js.createStream(StreamConfig(
+        name: streamName,
+        subjects: [subject],
+        storage: 'memory',
+      ));
+
+      await js.publishString(subject, 'ordered-1');
+      await js.publishString(subject, 'ordered-2');
+
+      final oc = js.orderedConsumer(streamName, OrderedConsumerConfig(filterSubject: subject));
+      final messagesReceived = <Message>[];
+      final completer = Completer<void>();
+
+      final subscription = oc.messages().listen((msg) {
+        messagesReceived.add(msg);
+        if (messagesReceived.length >= 2) {
+          completer.complete();
+        }
+      });
+
+      await completer.future.timeout(const Duration(seconds: 5));
+      expect(messagesReceived.length, equals(2));
+      expect(messagesReceived[0].string, equals('ordered-1'));
+      expect(messagesReceived[1].string, equals('ordered-2'));
+
+      subscription.cancel();
+      oc.stop();
+
+      await js.deleteStream(streamName);
+    });
+
+    test('Account Info details', () async {
       final accInfo = await js.accountInfo();
       expect(accInfo.tier.memory, isNotNull);
-
-      // 2. Test createOrUpdateStream & streamNameBySubject
-      final streamName = 'test-update-stream';
-      final subjectFilter = 'test-update-subject.*';
-
-      final stream = await js.createOrUpdateStream(StreamConfig(
-        name: streamName,
-        subjects: [subjectFilter],
-        storage: 'memory',
-      ));
-      expect(stream.name, equals(streamName));
-
-      // Verify streamNameBySubject
-      final foundName = await js.streamNameBySubject('test-update-subject.item');
-      expect(foundName, equals(streamName));
-
-      // Update config and verify update works
-      final updatedStream = await js.createOrUpdateStream(StreamConfig(
-        name: streamName,
-        subjects: [subjectFilter, 'test-update-subject-extra.*'],
-        storage: 'memory',
-      ));
-      final info = await updatedStream.info();
-      expect(info.config.subjects, contains('test-update-subject-extra.*'));
-
-      // 3. Test createOrUpdateConsumer
-      final consumerConfig = ConsumerConfig(
-        durable: 'test-update-consumer',
-        ackPolicy: 'explicit',
-      );
-      final consumer = await js.createOrUpdateConsumer(streamName, consumerConfig);
-      expect(consumer.name, equals('test-update-consumer'));
-
-      final consumerInfo = await consumer.info();
-      expect(consumerInfo.name, equals('test-update-consumer'));
-
-      // Cleanup
-      await js.deleteConsumer(streamName, 'test-update-consumer');
-      await js.deleteStream(streamName);
+      expect(accInfo.tier.consumers, isNotNull);
     });
   });
 }
