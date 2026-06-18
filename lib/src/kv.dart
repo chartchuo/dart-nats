@@ -23,6 +23,7 @@ final int maxBytes;
   /// Time‑to‑live for entries; 0 for no expiry.
 final Duration ttl; // max_age
 
+  /// Create a [KeyValueConfig] for a bucket.
   KeyValueConfig({
     required this.bucket,
     this.description = '',
@@ -60,6 +61,7 @@ final int revision;
   /// Creation timestamp of the entry.
 final DateTime created;
 
+  /// Create a [KeyValueEntry] holding a value and its metadata.
   KeyValueEntry({
     required this.key,
     required this.value,
@@ -82,6 +84,7 @@ final String bucket;
   /// Backing JetStream stream name (derived from the bucket).
 final String streamName;
 
+  /// Create a [KeyValue] store bound to [client] and [bucket].
   KeyValue(this.client, this.bucket) : streamName = 'KV_$bucket';
 
   /// Associate a value with a key

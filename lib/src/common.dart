@@ -230,9 +230,13 @@ class NkeysException implements Exception {
 
 /// NATS Credentials helper class to parse user credentials files (.creds)
 class Credentials {
+  /// User JWT extracted from the credentials file.
   final String jwt;
+
+  /// User seed (private key) extracted from the credentials file.
   final String seed;
 
+  /// Create [Credentials] from a [jwt] and a [seed].
   Credentials({required this.jwt, required this.seed});
 
   /// Parse a NATS credentials file content

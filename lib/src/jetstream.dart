@@ -191,12 +191,22 @@ class ConsumerConfig {
 }
 /// Publish options for JetStream de-duplication and optimistic concurrency control
 class PubOpts {
+  /// Unique message ID used for de-duplication.
   final String? msgId;
+
+  /// Require the message to be published to this stream.
   final String? expectStream;
+
+  /// Require the stream's last sequence to match this value.
   final int? expectLastSeq;
+
+  /// Require the last message ID in the stream to match this value.
   final String? expectLastMsgId;
+
+  /// Require the last sequence for the subject to match this value.
   final int? expectLastSubjectSeq;
 
+  /// Create [PubOpts] for a JetStream publish.
   PubOpts({
     this.msgId,
     this.expectStream,
@@ -208,14 +218,28 @@ class PubOpts {
 
 /// JetStream Stream State
 class StreamState {
+  /// Number of messages currently in the stream.
   final int messages;
+
+  /// Total bytes stored in the stream.
   final int bytes;
+
+  /// Sequence number of the first message.
   final int firstSeq;
+
+  /// Timestamp of the first message.
   final String firstTs;
+
+  /// Sequence number of the last message.
   final int lastSeq;
+
+  /// Timestamp of the last message.
   final String lastTs;
+
+  /// Number of consumers bound to the stream.
   final int consumerCount;
 
+  /// Create a [StreamState].
   StreamState({
     required this.messages,
     required this.bytes,
@@ -226,6 +250,7 @@ class StreamState {
     required this.consumerCount,
   });
 
+  /// Create a [StreamState] from its JSON representation.
   factory StreamState.fromJson(Map<String, dynamic> json) {
     return StreamState(
       messages: json['messages'] as int? ?? 0,
@@ -241,11 +266,19 @@ class StreamState {
 
 /// JetStream Stream Information
 class StreamInfo {
+  /// Response type returned by the server.
   final String type;
+
+  /// Configuration of the stream.
   final StreamConfig config;
+
+  /// Creation timestamp of the stream.
   final String created;
+
+  /// Current state of the stream.
   final StreamState state;
 
+  /// Create a [StreamInfo].
   StreamInfo({
     required this.type,
     required this.config,
@@ -253,6 +286,7 @@ class StreamInfo {
     required this.state,
   });
 
+  /// Create a [StreamInfo] from its JSON representation.
   factory StreamInfo.fromJson(Map<String, dynamic> json) {
     final cfg = json['config'] as Map<String, dynamic>? ?? {};
     return StreamInfo(
@@ -273,16 +307,34 @@ class StreamInfo {
 
 /// JetStream Consumer Information
 class ConsumerInfo {
+  /// Response type returned by the server.
   final String type;
+
+  /// Name of the stream this consumer belongs to.
   final String streamName;
+
+  /// Name of the consumer.
   final String name;
+
+  /// Creation timestamp of the consumer.
   final String created;
+
+  /// Configuration of the consumer.
   final ConsumerConfig config;
+
+  /// Number of messages pending delivery.
   final int numPending;
+
+  /// Number of pull requests waiting to be fulfilled.
   final int numWaiting;
+
+  /// Number of delivered messages awaiting acknowledgement.
   final int numAckPending;
+
+  /// Number of messages that have been redelivered.
   final int numRedelivered;
 
+  /// Create a [ConsumerInfo].
   ConsumerInfo({
     required this.type,
     required this.streamName,
@@ -295,6 +347,7 @@ class ConsumerInfo {
     required this.numRedelivered,
   });
 
+  /// Create a [ConsumerInfo] from its JSON representation.
   factory ConsumerInfo.fromJson(Map<String, dynamic> json) {
     final cfg = json['config'] as Map<String, dynamic>? ?? {};
     return ConsumerInfo(

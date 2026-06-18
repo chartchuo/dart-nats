@@ -62,6 +62,7 @@ final bool deleted;
   /// Optional link to another object or bucket.
 final ObjectLink? link;
 
+  /// Create an [ObjectInfo] describing a stored object.
   ObjectInfo({
     required this.name,
     this.description = '',
@@ -75,6 +76,7 @@ final ObjectLink? link;
     this.link,
   });
 
+  /// Create an [ObjectInfo] from its JSON representation.
   factory ObjectInfo.fromJson(Map<String, dynamic> json) {
     final opts = json['options'] as Map<String, dynamic>?;
     ObjectLink? link;
@@ -97,6 +99,7 @@ final ObjectLink? link;
     );
   }
 
+  /// Convert this [ObjectInfo] to its JSON representation.
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{
       'name': name,

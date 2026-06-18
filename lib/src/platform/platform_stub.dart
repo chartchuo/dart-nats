@@ -34,7 +34,10 @@ abstract class SecureSocket extends Stream<Uint8List> {
 
 /// Abstract TLS exception placeholder for platform‑specific implementations.
 abstract class TlsException {
+  /// Description of the TLS error.
   final String message;
+
+  /// Create a [TlsException] with an optional [message].
   TlsException([this.message = '']);
 }
 
