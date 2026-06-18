@@ -375,7 +375,8 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     _addLog('Initializing Key-Value bucket "$bucket"...', 'info');
     try {
-      _kv = await _js!.keyValue(bucket, create: true, storage: 'memory');
+      final config = nats.KeyValueConfig(bucket: bucket, storage: 'memory');
+      _kv = await _js!.keyValue(bucket, create: true, config: config);
       setState(() {
         _kvInitialized = true;
       });
@@ -483,7 +484,8 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     _addLog('Initializing Object Store bucket "$bucket"...', 'info');
     try {
-      _os = await _js!.objectStore(bucket, create: true, storage: 'memory');
+      final config = nats.ObjectStoreConfig(bucket: bucket, storage: 'memory');
+      _os = await _js!.objectStore(bucket, create: true, config: config);
       setState(() {
         _osInitialized = true;
       });

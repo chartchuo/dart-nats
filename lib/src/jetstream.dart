@@ -651,11 +651,17 @@ class JetStream {
   }
 
   /// Create or bind to a Key-Value bucket
+  ///
+  /// Pass [config] to control the backing stream settings; otherwise a
+  /// default [KeyValueConfig] using [storage] is applied when [create] is true.
   Future<KeyValue> keyValue(String bucket,
-      {bool create = false, String? storage = 'file'}) async {
+      {bool create = false,
+      String? storage = 'file',
+      KeyValueConfig? config}) async {
     if (create) {
-      final config = KeyValueConfig(bucket: bucket, storage: storage ?? 'file');
-      await addStream(config.toStreamConfig());
+      final cfg =
+          config ?? KeyValueConfig(bucket: bucket, storage: storage ?? 'file');
+      await addStream(cfg.toStreamConfig());
     }
     return KeyValue(client, bucket);
   }
