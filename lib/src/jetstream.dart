@@ -448,14 +448,45 @@ class JetStream {
     );
   }
 
+  /// Publish a generic payload to a JetStream subject and wait for acknowledgement.
+  ///
+  /// The payload is serialized using [serializer] if provided. If not provided:
+  /// - If `payload` is `Uint8List`, it's sent directly.
+  /// - If `payload` is `List<int>`, it's converted to `Uint8List`.
+  /// - If `payload` is `String`, it's encoded to UTF-8.
+  /// - Otherwise, it falls back to JSON encoding using `jsonEncode(payload)`.
+  Future<PubAck> publishPayload<T>(
+    String subject,
+    T payload, {
+    Duration timeout = const Duration(seconds: 2),
+    PubOpts? opts,
+    Header? header,
+    List<int> Function(T)? serializer,
+  }) {
+    Uint8List bytes;
+    if (serializer != null) {
+      bytes = Uint8List.fromList(serializer(payload));
+    } else if (payload is Uint8List) {
+      bytes = payload;
+    } else if (payload is List<int>) {
+      bytes = Uint8List.fromList(payload);
+    } else if (payload is String) {
+      bytes = Uint8List.fromList(utf8.encode(payload));
+    } else {
+      bytes = Uint8List.fromList(utf8.encode(jsonEncode(payload)));
+    }
+    return publish(subject, bytes, timeout: timeout, opts: opts, header: header);
+  }
+
   /// Get a handle to a stream
   JsStream stream(String name) {
     return JsStream(this, name);
   }
 
   /// Get a handle to a consumer
-  Consumer consumer(String streamName, String consumerName) {
-    return Consumer(this, streamName, consumerName);
+  Consumer<T> consumer<T>(String streamName, String consumerName,
+      {T Function(String)? jsonDecoder}) {
+    return Consumer<T>(this, streamName, consumerName, jsonDecoder: jsonDecoder);
   }
 
   /// Get information about a stream
@@ -629,8 +660,9 @@ class JetStream {
   }
 
   /// Create a consumer (durable or ephemeral) on a stream
-  Future<Consumer> createConsumer(String streamName, ConsumerConfig config,
-      {Duration timeout = const Duration(seconds: 2)}) async {
+  Future<Consumer<T>> createConsumer<T>(String streamName, ConsumerConfig config,
+      {Duration timeout = const Duration(seconds: 2),
+      T Function(String)? jsonDecoder}) async {
     String subject;
     if (config.durable != null) {
       subject =
@@ -649,13 +681,14 @@ class JetStream {
       throw NatsException(map['error']['description'] as String);
     }
     final consumerName = config.durable ?? map['name'] as String? ?? '';
-    return Consumer(this, streamName, consumerName);
+    return Consumer<T>(this, streamName, consumerName, jsonDecoder: jsonDecoder);
   }
 
   /// Create or update a consumer
-  Future<Consumer> createOrUpdateConsumer(String streamName, ConsumerConfig config,
-      {Duration timeout = const Duration(seconds: 2)}) {
-    return createConsumer(streamName, config, timeout: timeout);
+  Future<Consumer<T>> createOrUpdateConsumer<T>(String streamName, ConsumerConfig config,
+      {Duration timeout = const Duration(seconds: 2),
+      T Function(String)? jsonDecoder}) {
+    return createConsumer<T>(streamName, config, timeout: timeout, jsonDecoder: jsonDecoder);
   }
 
   /// Create a consumer (durable or ephemeral) on a stream (Deprecated: Use createConsumer instead)
@@ -683,14 +716,16 @@ class JetStream {
   @Deprecated('Use consumer(stream, consumer).fetch() instead')
   Future<List<Message>> pull(String stream, String consumer,
       {int batch = 1, Duration timeout = const Duration(seconds: 2)}) {
-    return _pull(stream, consumer, batch: batch, timeout: timeout);
+    return _pull<dynamic>(stream, consumer, batch: batch, timeout: timeout);
   }
 
   /// Internal pull implementation
-  Future<List<Message>> _pull(String stream, String consumer,
-      {int batch = 1, Duration timeout = const Duration(seconds: 2)}) async {
+  Future<List<Message<T>>> _pull<T>(String stream, String consumer,
+      {int batch = 1,
+      Duration timeout = const Duration(seconds: 2),
+      T Function(String)? jsonDecoder}) async {
     final inbox = client.inboxPrefix + '.' + Nuid().next();
-    final sub = client.sub(inbox);
+    final sub = client.sub<T>(inbox, jsonDecoder: jsonDecoder);
 
     final subject = '\$JS.API.CONSUMER.MSG.NEXT.$stream.$consumer';
     final payload = utf8.encode(jsonEncode({
@@ -701,10 +736,10 @@ class JetStream {
     // Publish the pull request pointing responses to our inbox
     client.pub(subject, Uint8List.fromList(payload), replyTo: inbox);
 
-    final messages = <Message>[];
-    final completer = Completer<List<Message>>();
+    final messages = <Message<T>>[];
+    final completer = Completer<List<Message<T>>>();
 
-    StreamSubscription? streamSub;
+    StreamSubscription<Message<T>>? streamSub;
     Timer? timer;
 
     void cleanup() {
@@ -1092,19 +1127,20 @@ class JsStream {
   }
 
   /// Bind to a consumer on this stream
-  Consumer consumer(String consumerName) {
-    return js.consumer(name, consumerName);
+  Consumer<T> consumer<T>(String consumerName, {T Function(String)? jsonDecoder}) {
+    return js.consumer<T>(name, consumerName, jsonDecoder: jsonDecoder);
   }
 
   /// Create a consumer on this stream
-  Future<Consumer> createConsumer(ConsumerConfig config,
-      {Duration timeout = const Duration(seconds: 2)}) {
-    return js.createConsumer(name, config, timeout: timeout);
+  Future<Consumer<T>> createConsumer<T>(ConsumerConfig config,
+      {Duration timeout = const Duration(seconds: 2),
+      T Function(String)? jsonDecoder}) {
+    return js.createConsumer<T>(name, config, timeout: timeout, jsonDecoder: jsonDecoder);
   }
 }
 
 /// NATS JetStream Consumer handle wrapping operations for a specific consumer.
-class Consumer {
+class Consumer<T> {
   /// Reference to the JetStream context
   final JetStream js;
 
@@ -1114,8 +1150,11 @@ class Consumer {
   /// Name of the consumer
   final String name;
 
+  /// Optional JSON decoder for generic type T
+  final T Function(String)? jsonDecoder;
+
   /// Constructor for Consumer
-  Consumer(this.js, this.streamName, this.name);
+  Consumer(this.js, this.streamName, this.name, {this.jsonDecoder});
 
   /// Get status of this consumer
   Future<ConsumerInfo> info({Duration timeout = const Duration(seconds: 2)}) {
@@ -1123,9 +1162,96 @@ class Consumer {
   }
 
   /// Pull a batch of messages from this pull consumer
-  Future<List<Message>> fetch(
+  Future<List<Message<T>>> fetch(
       {int batch = 1, Duration timeout = const Duration(seconds: 2)}) {
-    return js._pull(streamName, name, batch: batch, timeout: timeout);
+    return js._pull<T>(streamName, name, batch: batch, timeout: timeout, jsonDecoder: jsonDecoder);
+  }
+
+  /// Consume messages continuously from this consumer.
+  ///
+  /// Under the hood, if the consumer is configured as a push consumer (has a deliver subject),
+  /// it subscribes to that deliver subject.
+  /// If it is configured as a pull consumer, it continuously polls/fetches messages in the background.
+  ///
+  /// [batch] specifies the number of messages to pull per fetch request (only applicable for pull consumers).
+  /// [timeout] specifies the expiration timeout for each pull request (only applicable for pull consumers).
+  Stream<Message<T>> messages({int batch = 1, Duration timeout = const Duration(seconds: 5)}) {
+    late StreamController<Message<T>> controller;
+    StreamSubscription<Message<T>>? pushSub;
+    bool active = true;
+    bool isPaused = false;
+
+    void stop() {
+      active = false;
+      pushSub?.cancel();
+      if (!controller.isClosed) {
+        controller.close();
+      }
+    }
+
+    Future<void> startPullLoop() async {
+      while (active && !controller.isClosed) {
+        if (isPaused) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          continue;
+        }
+        try {
+          final msgs = await fetch(batch: batch, timeout: timeout);
+          for (final msg in msgs) {
+            if (!active || controller.isClosed) break;
+            controller.add(msg);
+          }
+        } catch (e) {
+          // Avoid tight loop if fetch throws
+          await Future.delayed(const Duration(seconds: 1));
+        }
+      }
+    }
+
+    controller = StreamController<Message<T>>(
+      onListen: () async {
+        try {
+          final consumerInfo = await info(timeout: timeout);
+          if (!active || controller.isClosed) return;
+
+          final deliverSubject = consumerInfo.config.deliverSubject;
+          if (deliverSubject != null && deliverSubject.isNotEmpty) {
+            // Push Consumer: Subscribe to the deliver subject
+            final sub = js.client.sub<T>(deliverSubject, jsonDecoder: jsonDecoder);
+            pushSub = sub.stream.listen(
+              (msg) {
+                if (!controller.isClosed) {
+                  controller.add(msg);
+                }
+              },
+              onError: (err) {
+                if (!controller.isClosed) controller.addError(err);
+              },
+              onDone: stop,
+            );
+          } else {
+            // Pull Consumer: Start pull loop in background
+            startPullLoop();
+          }
+        } catch (e) {
+          if (!controller.isClosed) {
+            controller.addError(e);
+            stop();
+          }
+        }
+      },
+      onCancel: stop,
+      onPause: () {
+        isPaused = true;
+        pushSub?.pause();
+      },
+      onResume: () {
+        isPaused = false;
+        pushSub?.resume();
+      },
+    );
+
+    return controller.stream;
   }
 }
 

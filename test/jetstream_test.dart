@@ -48,7 +48,8 @@ void main() {
       );
       final updatedStream = await js.updateStream(updatedConfig);
       final updatedInfo = await updatedStream.info();
-      expect(updatedInfo.config.subjects, containsAll([subject, 'mgmt-subj.bar']));
+      expect(
+          updatedInfo.config.subjects, containsAll([subject, 'mgmt-subj.bar']));
 
       // 4. createOrUpdateStream
       final streamOrUpdated = await js.createOrUpdateStream(StreamConfig(
@@ -73,7 +74,7 @@ void main() {
 
       final purgeOk1 = await stream.purge();
       expect(purgeOk1, isTrue);
-      
+
       await js.publishString(subject, 'test-payload-2');
       final purgeOk2 = await js.purgeStream(streamName);
       expect(purgeOk2, isTrue);
@@ -83,7 +84,8 @@ void main() {
 
       // 7. addStream (deprecated)
       final tempStreamName = 'stream-temp-add';
-      final addOk = await js.addStream(StreamConfig(name: tempStreamName, subjects: ['temp-subj'], storage: 'memory'));
+      final addOk = await js.addStream(StreamConfig(
+          name: tempStreamName, subjects: ['temp-subj'], storage: 'memory'));
       expect(addOk, isTrue);
       await js.deleteStream(tempStreamName);
 
@@ -106,7 +108,8 @@ void main() {
       final ack1 = await js.publish(subject, Uint8List.fromList([1, 2, 3]));
       expect(ack1.sequence, equals(1));
 
-      final ack2 = await js.publishString(subject, 'hello-js', opts: PubOpts(msgId: 'unique-id'));
+      final ack2 = await js.publishString(subject, 'hello-js',
+          opts: PubOpts(msgId: 'unique-id'));
       expect(ack2.sequence, equals(2));
 
       // 2. getMsg (by sequence)
@@ -126,7 +129,7 @@ void main() {
       final streamName = 'cons-mgmt-test';
       final subject = 'cons.mgmt.subj';
 
-      final stream = await js.createStream(StreamConfig(
+      await js.createStream(StreamConfig(
         name: streamName,
         subjects: [subject],
         storage: 'memory',
@@ -149,7 +152,8 @@ void main() {
       expect(deprecatedConsInfo.name, equals(consumerName));
 
       // 2. createOrUpdateConsumer
-      final consumerOrUpdate = await js.createOrUpdateConsumer(streamName, config);
+      final consumerOrUpdate =
+          await js.createOrUpdateConsumer(streamName, config);
       expect(consumerOrUpdate.name, equals(consumerName));
 
       // 3. listConsumers
@@ -161,7 +165,8 @@ void main() {
       expect(deleteResult, isTrue);
 
       // 5. addConsumer (deprecated)
-      final addConsOk = await js.addConsumer(streamName, ConsumerConfig(durable: 'add-cons-test'));
+      final addConsOk = await js.addConsumer(
+          streamName, ConsumerConfig(durable: 'add-cons-test'));
       expect(addConsOk, isTrue);
       await js.deleteConsumer(streamName, 'add-cons-test');
 
@@ -256,7 +261,8 @@ void main() {
       await js.publishString(subject, 'ordered-1');
       await js.publishString(subject, 'ordered-2');
 
-      final oc = js.orderedConsumer(streamName, OrderedConsumerConfig(filterSubject: subject));
+      final oc = js.orderedConsumer(
+          streamName, OrderedConsumerConfig(filterSubject: subject));
       final messagesReceived = <Message>[];
       final completer = Completer<void>();
 
@@ -278,10 +284,186 @@ void main() {
       await js.deleteStream(streamName);
     });
 
+    test('Continuous Consumer messages() - Pull Consumer', () async {
+      final streamName = 'cont-pull-test';
+      final subject = 'cont.pull.subj';
+
+      final stream = await js.createStream(StreamConfig(
+        name: streamName,
+        subjects: [subject],
+        storage: 'memory',
+      ));
+
+      final consumer = await stream.createConsumer(ConsumerConfig(
+        durable: 'cont-pull-cons',
+        ackPolicy: 'explicit',
+        deliverPolicy: 'all',
+      ));
+
+      final messagesReceived = <Message>[];
+      final subscription = consumer.messages().listen((msg) {
+        messagesReceived.add(msg);
+        msg.ack();
+      });
+
+      // Publish messages
+      await js.publishString(subject, 'msg-1');
+      await js.publishString(subject, 'msg-2');
+
+      // Wait a short time to receive them
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      expect(messagesReceived.length, equals(2));
+      expect(messagesReceived[0].string, equals('msg-1'));
+      expect(messagesReceived[1].string, equals('msg-2'));
+
+      // Test pause/resume
+      subscription.pause();
+      await js.publishString(subject, 'msg-3');
+      await Future.delayed(const Duration(milliseconds: 300));
+      expect(messagesReceived.length, equals(2)); // Still 2, as we paused
+
+      subscription.resume();
+      await Future.delayed(const Duration(milliseconds: 500));
+      expect(messagesReceived.length, equals(3)); // Received msg-3 after resume
+      expect(messagesReceived[2].string, equals('msg-3'));
+
+      await subscription.cancel();
+      await js.deleteStream(streamName);
+    });
+
+    test('Continuous Consumer messages() - Push Consumer', () async {
+      final streamName = 'cont-push-test';
+      final subject = 'cont.push.subj';
+      final deliverSubject = client.inboxPrefix + '.cont-push-deliver';
+
+      final stream = await js.createStream(StreamConfig(
+        name: streamName,
+        subjects: [subject],
+        storage: 'memory',
+      ));
+
+      final consumer = await stream.createConsumer(ConsumerConfig(
+        durable: 'cont-push-cons',
+        deliverSubject: deliverSubject,
+        ackPolicy: 'none',
+        deliverPolicy: 'all',
+      ));
+
+      final messagesReceived = <Message>[];
+      final subscription = consumer.messages().listen((msg) {
+        messagesReceived.add(msg);
+      });
+
+      // Wait for info check and subscription to start
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Publish messages
+      await js.publishString(subject, 'msg-1');
+      await js.publishString(subject, 'msg-2');
+
+      // Wait a short time to receive them
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      expect(messagesReceived.length, equals(2));
+      expect(messagesReceived[0].string, equals('msg-1'));
+      expect(messagesReceived[1].string, equals('msg-2'));
+
+      // Test pause/resume
+      subscription.pause();
+      await js.publishString(subject, 'msg-3');
+      await Future.delayed(const Duration(milliseconds: 300));
+      expect(messagesReceived.length, equals(2)); // Still 2, as we paused
+
+      subscription.resume();
+      await Future.delayed(const Duration(milliseconds: 500));
+      expect(messagesReceived.length, equals(3)); // Received msg-3 after resume
+      expect(messagesReceived[2].string, equals('msg-3'));
+
+      await subscription.cancel();
+      await js.deleteStream(streamName);
+    });
+
+    test('Generic publishing and generic Consumer message parsing', () async {
+      final streamName = 'gen-test-stream';
+      final subject = 'gen.test.subj';
+
+      // Register decoder
+      client.registerJsonDecoder<TestUser>(
+          (str) => TestUser.fromJson(jsonDecode(str) as Map<String, dynamic>));
+
+      await js.createStream(StreamConfig(
+        name: streamName,
+        subjects: [subject],
+        storage: 'memory',
+      ));
+
+      // 1. Generic Publishing
+      final user1 = TestUser(42, 'Alice');
+      final user2 = TestUser(100, 'Bob');
+
+      await js.publishPayload<TestUser>(subject, user1);
+      await js.publishPayload<TestUser>(subject, user2);
+
+      // 2. Generic Consumer (Fetch)
+      final consumer = await js.createConsumer<TestUser>(
+        streamName,
+        ConsumerConfig(
+          durable: 'gen-cons',
+          ackPolicy: 'explicit',
+          deliverPolicy: 'all',
+        ),
+      );
+
+      final fetchedMsgs = await consumer.fetch(batch: 2);
+      expect(fetchedMsgs.length, equals(2));
+      expect(fetchedMsgs[0].data, isA<TestUser>());
+      expect(fetchedMsgs[0].data.name, equals('Alice'));
+      expect(fetchedMsgs[1].data.id, equals(100));
+      expect(fetchedMsgs[1].data.name, equals('Bob'));
+
+      // 3. Generic Consumer (messages() Stream)
+      final messagesReceived = <Message<TestUser>>[];
+      final completer = Completer<void>();
+      final sub = consumer.messages().listen((msg) {
+        messagesReceived.add(msg);
+        msg.ack();
+        if (messagesReceived.length >= 2) {
+          completer.complete();
+        }
+      });
+
+      // Publish new messages so that the continuous pull consumer has new messages to fetch
+      await js.publishPayload<TestUser>(subject, TestUser(3, 'Charlie'));
+      await js.publishPayload<TestUser>(subject, TestUser(4, 'David'));
+
+      await completer.future.timeout(const Duration(seconds: 3));
+      expect(messagesReceived.length, equals(2));
+      expect(messagesReceived[0].data.name, equals('Charlie'));
+      expect(messagesReceived[1].data.name, equals('David'));
+
+      await sub.cancel();
+      await js.deleteConsumer(streamName, 'gen-cons');
+      await js.deleteStream(streamName);
+    });
+
     test('Account Info details', () async {
       final accInfo = await js.accountInfo();
       expect(accInfo.tier.memory, isNotNull);
       expect(accInfo.tier.consumers, isNotNull);
     });
   });
+}
+
+class TestUser {
+  final int id;
+  final String name;
+
+  TestUser(this.id, this.name);
+
+  factory TestUser.fromJson(Map<String, dynamic> json) {
+    return TestUser(json['id'] as int, json['name'] as String);
+  }
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
 }
