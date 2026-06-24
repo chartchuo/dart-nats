@@ -18,8 +18,10 @@ void main() async {
   try {
     // 3. Create or bind to an Object Store bucket
     print('Creating Object Store bucket "$bucketName" with memory storage...');
-    final os =
-        await js.objectStore(bucketName, create: true, storage: 'memory');
+    final os = await js.createObjectStore(ObjectStoreConfig(
+      bucket: bucketName,
+      storage: 'memory',
+    ));
     print('Object Store bucket initialized.');
 
     // 4. Store a text file
@@ -45,7 +47,7 @@ void main() async {
 
     print(
         'Storing binary file "data.bin" of size 150 KiB (should be split into multiple chunks)...');
-    final binInfo = await os.put(
+    final binInfo = await os.putBytes(
       'data.bin',
       binaryData,
       description: 'Larger chunked binary data',
@@ -62,7 +64,7 @@ void main() async {
 
     // 7. Retrieve binary contents of a file and verify SHA-256 integrity
     print('\n--- Get (Binary) Operation ---');
-    final retrievedData = await os.get('data.bin');
+    final retrievedData = await os.getBytes('data.bin');
     if (retrievedData != null) {
       print('Retrieved "data.bin" size: ${retrievedData.length} bytes');
       var matched = true;

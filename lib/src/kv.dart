@@ -123,7 +123,7 @@ class KeyValue {
 
   /// Associate a value with a key
   /// Store a binary value under the given [key]. Returns the sequence number of the stored message.
-Future<int> put(String key, Uint8List value) async {
+  Future<int> put(String key, Uint8List value) async {
     final subject = '\$KV.$bucket.$key';
     final ack = await client.jetStream().publish(subject, value);
     return ack.sequence;
@@ -131,7 +131,7 @@ Future<int> put(String key, Uint8List value) async {
 
   /// Associate a string value with a key
   /// Store a string value under the given [key] by encoding it as UTF‑8.
-Future<int> putString(String key, String value) {
+  Future<int> putString(String key, String value) {
     return put(key, Uint8List.fromList(utf8.encode(value)));
   }
 
@@ -259,7 +259,7 @@ Future<int> putString(String key, String value) {
 
   /// Delete the key (adds a deletion tombstone message to history)
   /// Delete the entry for [key] by publishing a tombstone message.
-Future<bool> delete(String key) async {
+  Future<bool> delete(String key) async {
     final subject = '\$KV.$bucket.$key';
     final header = Header().add('KV-Operation', 'DEL');
     final ack =
@@ -269,7 +269,7 @@ Future<bool> delete(String key) async {
 
   /// Purge the key (deletes all historical versions for this key)
   /// Purge all historical versions of [key] from the stream.
-Future<bool> purge(String key) async {
+  Future<bool> purge(String key) async {
     final subject = '\$KV.$bucket.$key';
     final header =
         Header().add('KV-Operation', 'PURGE').add('Nats-Rollup', 'sub');

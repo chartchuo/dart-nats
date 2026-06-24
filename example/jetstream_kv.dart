@@ -42,6 +42,40 @@ void main() async {
       print('"config.theme" not found.');
     }
 
+    // 5b. Atomic conditional create and update operations
+    print('\n--- Conditional Create & Update Operations ---');
+    final lockRev = await kv.createString('config.lock', 'locked_by_worker_1');
+    print(
+        'Created "config.lock" -> value: "locked_by_worker_1", Revision: $lockRev');
+
+    // Trying to create it again will throw a NatsException (key already exists)
+    try {
+      await kv.createString('config.lock', 'locked_by_worker_2');
+    } catch (e) {
+      print('Expected error on duplicate create: $e');
+    }
+
+    // Update the key conditionally using the correct revision
+    final newRev =
+        await kv.updateString('config.lock', 'renewed_by_worker_1', lockRev);
+    print(
+        'Updated "config.lock" -> value: "renewed_by_worker_1", New Revision: $newRev');
+
+    // Trying to update with an outdated revision will fail
+    try {
+      await kv.updateString('config.lock', 'hijacked_by_worker_2', lockRev);
+    } catch (e) {
+      print('Expected error on outdated update: $e');
+    }
+
+    // Retrieve historical versions
+    print('\n--- Key History ---');
+    final historyStream = kv.history('config.lock');
+    await for (final hEntry in historyStream) {
+      print(
+          'History -> Key: ${hEntry.key}, Value: "${hEntry.string}", Revision: ${hEntry.revision}, Op: ${hEntry.op}');
+    }
+
     // 6. Watch a specific key for real-time updates
     print('\n--- Watching "config.theme" ---');
     final watchStream = kv.watch(key: 'config.theme', includeHistory: true);

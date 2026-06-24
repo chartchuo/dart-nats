@@ -394,7 +394,7 @@ final streamConfig = StreamConfig(
 );
 
 // 2. Create the stream
-final Stream stream = await js.createStream(streamConfig);
+final JsStream stream = await js.createStream(streamConfig);
 
 // 3. Get stream info (e.g. sequence numbers, message counts)
 final StreamInfo info = await stream.info();
