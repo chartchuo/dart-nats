@@ -17,7 +17,8 @@ void main() async {
   try {
     // 3. Create or bind to a Key-Value bucket
     print('Creating Key-Value bucket "$bucketName" with memory storage...');
-    final kv = await js.createKeyValue(KeyValueConfig(bucket: bucketName, storage: 'memory'));
+    final kv = await js
+        .createKeyValue(KeyValueConfig(bucket: bucketName, storage: 'memory'));
     print('Key-Value bucket initialized.');
 
     // 4. Put string values associated with keys
@@ -49,7 +50,8 @@ void main() async {
         print(
             'Watch Update -> key: ${update.key}, value: "${update.string}", Revision: ${update.revision}');
       } else if (update != null) {
-        print('Watch Update -> key: config.theme was DELETED or PURGED (Operation: ${update.op}).');
+        print(
+            'Watch Update -> key: config.theme was DELETED or PURGED (Operation: ${update.op}).');
       }
     });
 

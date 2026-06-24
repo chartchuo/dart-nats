@@ -242,7 +242,8 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 
       // 4. Create Consumer
       final consumerName = 'mgmt-consumer';
-      final consumer = await updatedStream.createConsumer(ConsumerConfig(durable: consumerName));
+      final consumer = await updatedStream
+          .createConsumer(ConsumerConfig(durable: consumerName));
 
       // 5. Get Consumer Info
       final consInfo = await consumer.info();
@@ -284,7 +285,8 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 
       await js.publishString('sync-ack.test', 'sync-ack-data');
 
-      final consumer = await stream.createConsumer(ConsumerConfig(durable: consumerName));
+      final consumer =
+          await stream.createConsumer(ConsumerConfig(durable: consumerName));
 
       final messages = await consumer.fetch(batch: 1);
       expect(messages.length, equals(1));
@@ -317,7 +319,8 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
 
     test('KeyValue Store put/get/delete/purge/watch lifecycle', () async {
       final bucket = 'my_test_kv_${DateTime.now().millisecondsSinceEpoch}';
-      final kv = await js.createKeyValue(KeyValueConfig(bucket: bucket, storage: 'memory', history: 10));
+      final kv = await js.createKeyValue(
+          KeyValueConfig(bucket: bucket, storage: 'memory', history: 10));
 
       // 1. Put
       final rev1 = await kv.putString('setting1', 'value1');
@@ -336,14 +339,16 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
       expect(rev2, isPositive);
 
       // Attempting to create existing key should throw
-      expect(() => kv.createString('setting2', 'value2_new'), throwsA(isA<NatsException>()));
+      expect(() => kv.createString('setting2', 'value2_new'),
+          throwsA(isA<NatsException>()));
 
       // 4. Update (Atomic conditional update)
       final rev3 = await kv.updateString('setting2', 'value2_updated', rev2);
       expect(rev3, isPositive);
 
       // Updating with incorrect revision should throw
-      expect(() => kv.updateString('setting2', 'value2_stale', rev2), throwsA(isA<NatsException>()));
+      expect(() => kv.updateString('setting2', 'value2_stale', rev2),
+          throwsA(isA<NatsException>()));
 
       // 5. GetRevision
       final revEntry = await kv.getRevision('setting2', rev2);
@@ -398,7 +403,8 @@ SUACSSL3UAHUDXKFSNVUZRF5UHPMWZ6BFDTJ7M6USDXIEDNPPQYYYCU3VY
     test('Object Store chunking, hashing, put/get/delete/list lifecycle',
         () async {
       final bucket = 'my_test_obj_${DateTime.now().millisecondsSinceEpoch}';
-      final os = await js.createObjectStore(ObjectStoreConfig(bucket: bucket, storage: 'memory'));
+      final os = await js.createObjectStore(
+          ObjectStoreConfig(bucket: bucket, storage: 'memory'));
 
       // Generate random binary data larger than 128 KiB chunk size
       final size = 150 * 1024;

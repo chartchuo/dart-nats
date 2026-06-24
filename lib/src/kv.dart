@@ -373,7 +373,8 @@ class KeyValue {
   }
 
   /// List all active keys in this bucket (excluding deleted/purged ones).
-  Future<List<String>> keys({Duration timeout = const Duration(seconds: 5)}) async {
+  Future<List<String>> keys(
+      {Duration timeout = const Duration(seconds: 5)}) async {
     final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
     final sub = client.sub(deliverSubject);
 
@@ -398,7 +399,10 @@ class KeyValue {
     timeoutTimer = Timer(timeout, () {
       cleanup();
       if (!completer.isCompleted) {
-        completer.complete(activeKeys.entries.where((e) => e.value).map((e) => e.key).toList());
+        completer.complete(activeKeys.entries
+            .where((e) => e.value)
+            .map((e) => e.key)
+            .toList());
       }
     });
 
@@ -428,7 +432,10 @@ class KeyValue {
         if (pending == 0) {
           cleanup();
           if (!completer.isCompleted) {
-            completer.complete(activeKeys.entries.where((e) => e.value).map((e) => e.key).toList());
+            completer.complete(activeKeys.entries
+                .where((e) => e.value)
+                .map((e) => e.key)
+                .toList());
           }
         }
       }
@@ -440,7 +447,10 @@ class KeyValue {
     }, onDone: () {
       cleanup();
       if (!completer.isCompleted) {
-        completer.complete(activeKeys.entries.where((e) => e.value).map((e) => e.key).toList());
+        completer.complete(activeKeys.entries
+            .where((e) => e.value)
+            .map((e) => e.key)
+            .toList());
       }
     });
 
@@ -458,7 +468,8 @@ class KeyValue {
 
   /// Get a stream of all revisions (history) for a specific key.
   /// The stream will yield historical entries and automatically close when the existing history is fully read.
-  Stream<KeyValueEntry> history(String key, {Duration timeout = const Duration(seconds: 5)}) {
+  Stream<KeyValueEntry> history(String key,
+      {Duration timeout = const Duration(seconds: 5)}) {
     final controller = StreamController<KeyValueEntry>();
     final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
     final sub = client.sub(deliverSubject);
@@ -485,7 +496,7 @@ class KeyValue {
         if (parts.length >= 3) {
           final keyName = parts.sublist(2).join('.');
           final seq = msg.streamSequence ?? 0;
-          
+
           Header? header = msg.header;
           final op = header?.get('KV-Operation');
           KeyValueOp kvOp = KeyValueOp.put;
@@ -528,12 +539,17 @@ class KeyValue {
       cleanup();
     });
 
-    client.jetStream().createConsumer(streamName, ConsumerConfig(
-      deliverSubject: deliverSubject,
-      filterSubject: '\$KV.$bucket.$key',
-      deliverPolicy: 'all',
-      ackPolicy: 'none',
-    )).catchError((dynamic err) {
+    client
+        .jetStream()
+        .createConsumer(
+            streamName,
+            ConsumerConfig(
+              deliverSubject: deliverSubject,
+              filterSubject: '\$KV.$bucket.$key',
+              deliverPolicy: 'all',
+              ackPolicy: 'none',
+            ))
+        .catchError((dynamic err) {
       controller.addError(err);
       cleanup();
       throw err;

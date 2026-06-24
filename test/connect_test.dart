@@ -211,7 +211,8 @@ void main() {
       expect(clientWs.isClosedAndCleaned, isTrue);
     });
 
-    test('reconnect to valid server after connection failure to invalid server', () async {
+    test('reconnect to valid server after connection failure to invalid server',
+        () async {
       var client = Client();
 
       // 1. Attempt connection to a non-existent WebSocket NATS server
@@ -240,7 +241,8 @@ void main() {
 
       // 4. Verify that publish/subscribe works after reconnecting
       var sub = client.sub('reconnect_test_subject');
-      await client.pub('reconnect_test_subject', Uint8List.fromList('test_data'.codeUnits));
+      await client.pub(
+          'reconnect_test_subject', Uint8List.fromList('test_data'.codeUnits));
       var msg = await sub.stream.first;
       expect(String.fromCharCodes(msg.byte), equals('test_data'));
 
@@ -255,7 +257,7 @@ void main() {
 
       // Verify pending ping is completed with error upon close
       var pingFuture = client.ping();
-      
+
       // Expect that pingFuture will throw NatsException when closed.
       // This is registered before close() is called to avoid unhandled async errors in the test Zone.
       expect(pingFuture, throwsA(isA<NatsException>()));
@@ -301,12 +303,13 @@ void main() {
       expect(client.status, equals(Status.closed));
     });
 
-    test('connection drain gracefully receives pending messages and closes', () async {
+    test('connection drain gracefully receives pending messages and closes',
+        () async {
       var client = Client();
       await client.connect(Uri.parse('nats://localhost:4222'), retry: false);
 
       var sub = client.sub('drain_test');
-      
+
       // Publish messages
       await client.pubString('drain_test', 'msg1');
       await client.pubString('drain_test', 'msg2');
@@ -315,7 +318,7 @@ void main() {
       // Collect received messages and track stream completion
       var received = <String>[];
       var streamClosed = Completer<void>();
-      
+
       sub.stream.listen(
         (msg) {
           received.add(msg.string);

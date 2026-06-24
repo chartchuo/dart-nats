@@ -267,22 +267,27 @@ class Client {
 
         if (lineLen >= 4 &&
             (_buffer[_readOffset] == 109 || _buffer[_readOffset] == 77) &&
-            (_buffer[_readOffset + 1] == 115 || _buffer[_readOffset + 1] == 83) &&
-            (_buffer[_readOffset + 2] == 103 || _buffer[_readOffset + 2] == 71) &&
+            (_buffer[_readOffset + 1] == 115 ||
+                _buffer[_readOffset + 1] == 83) &&
+            (_buffer[_readOffset + 2] == 103 ||
+                _buffer[_readOffset + 2] == 71) &&
             _buffer[_readOffset + 3] == 32) {
           isMsg = true;
         } else if (lineLen >= 5 &&
             (_buffer[_readOffset] == 104 || _buffer[_readOffset] == 72) &&
-            (_buffer[_readOffset + 1] == 109 || _buffer[_readOffset + 1] == 77) &&
-            (_buffer[_readOffset + 2] == 115 || _buffer[_readOffset + 2] == 83) &&
-            (_buffer[_readOffset + 3] == 103 || _buffer[_readOffset + 3] == 71) &&
+            (_buffer[_readOffset + 1] == 109 ||
+                _buffer[_readOffset + 1] == 77) &&
+            (_buffer[_readOffset + 2] == 115 ||
+                _buffer[_readOffset + 2] == 83) &&
+            (_buffer[_readOffset + 3] == 103 ||
+                _buffer[_readOffset + 3] == 71) &&
             _buffer[_readOffset + 4] == 32) {
           isHmsg = true;
         }
 
         if (isMsg) {
-          final line = String.fromCharCodes(
-              Uint8List.view(_buffer.buffer, _buffer.offsetInBytes + _readOffset, lineLen));
+          final line = String.fromCharCodes(Uint8List.view(
+              _buffer.buffer, _buffer.offsetInBytes + _readOffset, lineLen));
           final args = _parseArgs(line);
           if (args.length < 4) {
             _readOffset = lineEnd + 2;
@@ -321,8 +326,8 @@ class Client {
         }
 
         if (isHmsg) {
-          final line = String.fromCharCodes(
-              Uint8List.view(_buffer.buffer, _buffer.offsetInBytes + _readOffset, lineLen));
+          final line = String.fromCharCodes(Uint8List.view(
+              _buffer.buffer, _buffer.offsetInBytes + _readOffset, lineLen));
           final args = _parseArgs(line);
           if (args.length < 5) {
             _readOffset = lineEnd + 2;
@@ -348,8 +353,10 @@ class Client {
           }
 
           _readOffset = lineEnd + 2;
-          final header = _buffer.sublist(_readOffset, _readOffset + headerLength);
-          final payload = _buffer.sublist(_readOffset + headerLength, _readOffset + len);
+          final header =
+              _buffer.sublist(_readOffset, _readOffset + headerLength);
+          final payload =
+              _buffer.sublist(_readOffset + headerLength, _readOffset + len);
           _readOffset += len + 2;
 
           if (_subs[sid] != null) {
@@ -366,8 +373,8 @@ class Client {
           continue;
         }
 
-        final line = String.fromCharCodes(
-            Uint8List.view(_buffer.buffer, _buffer.offsetInBytes + _readOffset, lineLen));
+        final line = String.fromCharCodes(Uint8List.view(
+            _buffer.buffer, _buffer.offsetInBytes + _readOffset, lineLen));
         _processOp(line, lineEnd);
       }
 
@@ -854,7 +861,8 @@ class Client {
 
     if ((_bufferLength - _readOffset) < length) return;
     final header = _buffer.sublist(_readOffset, _readOffset + headerLength);
-    final payload = _buffer.sublist(_readOffset + headerLength, _readOffset + length);
+    final payload =
+        _buffer.sublist(_readOffset + headerLength, _readOffset + length);
 
     _readOffset += length + 2; // Move past payload and trailing \r\n
 

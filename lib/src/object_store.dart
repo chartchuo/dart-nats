@@ -8,6 +8,7 @@ import 'client.dart';
 import 'common.dart';
 import 'jetstream.dart';
 import 'inbox.dart';
+
 /// Represents a link to another object or bucket in the Object Store.
 class ObjectLink {
   /// The bucket name the link points to

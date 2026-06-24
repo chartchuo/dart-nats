@@ -71,7 +71,8 @@ void main() {
       expect(entry2.op, equals(KeyValueOp.put));
     });
 
-    test('KeyValue Store atomic create & update (optimistic concurrency)', () async {
+    test('KeyValue Store atomic create & update (optimistic concurrency)',
+        () async {
       final kv = await js.createKeyValue(
         KeyValueConfig(bucket: bucket, storage: 'memory'),
       );
@@ -111,7 +112,8 @@ void main() {
       );
 
       // Update String
-      final rev4 = await kv.updateString('key-atomic-str', 'updated-atomic-string', rev2);
+      final rev4 = await kv.updateString(
+          'key-atomic-str', 'updated-atomic-string', rev2);
       expect(rev4, isPositive);
 
       expect(
@@ -216,7 +218,8 @@ void main() {
       final watchResults = <KeyValueEntry>[];
       final completer = Completer<void>();
 
-      final subscription = kv.watch(key: 'watch.*', includeHistory: true).listen((entry) {
+      final subscription =
+          kv.watch(key: 'watch.*', includeHistory: true).listen((entry) {
         if (entry != null) {
           watchResults.add(entry);
           if (watchResults.length >= 3) {

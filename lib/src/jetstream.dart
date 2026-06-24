@@ -148,6 +148,7 @@ class StreamConfig {
     return map;
   }
 }
+
 /// JetStream Consumer Configuration
 class ConsumerConfig {
   /// Durable consumer name (required for Pull Mode durability)
@@ -198,11 +199,13 @@ class ConsumerConfig {
     if (optStartSeq != null) map['opt_start_seq'] = optStartSeq;
     if (flowControl != null) map['flow_control'] = flowControl;
     if (idleHeartbeat != null) {
-      map['idle_heartbeat'] = idleHeartbeat!.inMicroseconds * 1000; // in nanoseconds
+      map['idle_heartbeat'] =
+          idleHeartbeat!.inMicroseconds * 1000; // in nanoseconds
     }
     return map;
   }
 }
+
 /// Publish options for JetStream de-duplication and optimistic concurrency control
 class PubOpts {
   /// Expected message ID
@@ -475,7 +478,8 @@ class JetStream {
     } else {
       bytes = Uint8List.fromList(utf8.encode(jsonEncode(payload)));
     }
-    return publish(subject, bytes, timeout: timeout, opts: opts, header: header);
+    return publish(subject, bytes,
+        timeout: timeout, opts: opts, header: header);
   }
 
   /// Get a handle to a stream
@@ -486,7 +490,8 @@ class JetStream {
   /// Get a handle to a consumer
   Consumer<T> consumer<T>(String streamName, String consumerName,
       {T Function(String)? jsonDecoder}) {
-    return Consumer<T>(this, streamName, consumerName, jsonDecoder: jsonDecoder);
+    return Consumer<T>(this, streamName, consumerName,
+        jsonDecoder: jsonDecoder);
   }
 
   /// Get information about a stream
@@ -610,8 +615,8 @@ class JetStream {
       {Duration timeout = const Duration(seconds: 2)}) async {
     const apiSubject = '\$JS.API.STREAM.NAMES';
     final payload = utf8.encode(jsonEncode({'subject': subject}));
-    final response = await client.request(apiSubject, Uint8List.fromList(payload),
-        timeout: timeout);
+    final response = await client
+        .request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
     final map = jsonDecode(response.string);
     if (map['error'] != null) {
       throw NatsException(map['error']['description'] as String);
@@ -660,7 +665,8 @@ class JetStream {
   }
 
   /// Create a consumer (durable or ephemeral) on a stream
-  Future<Consumer<T>> createConsumer<T>(String streamName, ConsumerConfig config,
+  Future<Consumer<T>> createConsumer<T>(
+      String streamName, ConsumerConfig config,
       {Duration timeout = const Duration(seconds: 2),
       T Function(String)? jsonDecoder}) async {
     String subject;
@@ -681,14 +687,17 @@ class JetStream {
       throw NatsException(map['error']['description'] as String);
     }
     final consumerName = config.durable ?? map['name'] as String? ?? '';
-    return Consumer<T>(this, streamName, consumerName, jsonDecoder: jsonDecoder);
+    return Consumer<T>(this, streamName, consumerName,
+        jsonDecoder: jsonDecoder);
   }
 
   /// Create or update a consumer
-  Future<Consumer<T>> createOrUpdateConsumer<T>(String streamName, ConsumerConfig config,
+  Future<Consumer<T>> createOrUpdateConsumer<T>(
+      String streamName, ConsumerConfig config,
       {Duration timeout = const Duration(seconds: 2),
       T Function(String)? jsonDecoder}) {
-    return createConsumer<T>(streamName, config, timeout: timeout, jsonDecoder: jsonDecoder);
+    return createConsumer<T>(streamName, config,
+        timeout: timeout, jsonDecoder: jsonDecoder);
   }
 
   /// Create a consumer (durable or ephemeral) on a stream (Deprecated: Use createConsumer instead)
@@ -840,12 +849,14 @@ class JetStream {
   }
 
   /// Get a specific message from a stream by its sequence number
-  Future<Message> getMsg(String stream, int seq, {Duration timeout = const Duration(seconds: 2)}) async {
+  Future<Message> getMsg(String stream, int seq,
+      {Duration timeout = const Duration(seconds: 2)}) async {
     final apiSubject = '\$JS.API.STREAM.MSG.GET.$stream';
     final payload = utf8.encode(jsonEncode({
       'seq': seq,
     }));
-    final response = await client.request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
+    final response = await client
+        .request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
     final map = jsonDecode(response.string);
     if (map['error'] != null) {
       throw NatsException(map['error']['description'] as String);
@@ -854,12 +865,14 @@ class JetStream {
   }
 
   /// Get the last message in a stream for a specific subject
-  Future<Message> getLastMsg(String stream, String subject, {Duration timeout = const Duration(seconds: 2)}) async {
+  Future<Message> getLastMsg(String stream, String subject,
+      {Duration timeout = const Duration(seconds: 2)}) async {
     final apiSubject = '\$JS.API.STREAM.MSG.GET.$stream';
     final payload = utf8.encode(jsonEncode({
       'last_by_subj': subject,
     }));
-    final response = await client.request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
+    final response = await client
+        .request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
     final map = jsonDecode(response.string);
     if (map['error'] != null) {
       throw NatsException(map['error']['description'] as String);
@@ -987,7 +1000,8 @@ class OrderedConsumer {
 
   /// Constructor for OrderedConsumer
   OrderedConsumer(this.js, this.stream, this.config) {
-    if (config.deliverPolicy == 'by_start_sequence' && config.optStartSeq != null) {
+    if (config.deliverPolicy == 'by_start_sequence' &&
+        config.optStartSeq != null) {
       _lastSeq = config.optStartSeq! - 1;
     }
   }
@@ -1038,7 +1052,8 @@ class OrderedConsumer {
           deliverSubject: deliverSubject,
           filterSubject: config.filterSubject,
           ackPolicy: 'none',
-          deliverPolicy: _lastSeq == 0 ? config.deliverPolicy : 'by_start_sequence',
+          deliverPolicy:
+              _lastSeq == 0 ? config.deliverPolicy : 'by_start_sequence',
           optStartSeq: _lastSeq == 0 ? config.optStartSeq : _lastSeq + 1,
           flowControl: true,
           idleHeartbeat: const Duration(seconds: 5),
@@ -1127,7 +1142,8 @@ class JsStream {
   }
 
   /// Bind to a consumer on this stream
-  Consumer<T> consumer<T>(String consumerName, {T Function(String)? jsonDecoder}) {
+  Consumer<T> consumer<T>(String consumerName,
+      {T Function(String)? jsonDecoder}) {
     return js.consumer<T>(name, consumerName, jsonDecoder: jsonDecoder);
   }
 
@@ -1135,7 +1151,8 @@ class JsStream {
   Future<Consumer<T>> createConsumer<T>(ConsumerConfig config,
       {Duration timeout = const Duration(seconds: 2),
       T Function(String)? jsonDecoder}) {
-    return js.createConsumer<T>(name, config, timeout: timeout, jsonDecoder: jsonDecoder);
+    return js.createConsumer<T>(name, config,
+        timeout: timeout, jsonDecoder: jsonDecoder);
   }
 }
 
@@ -1164,7 +1181,8 @@ class Consumer<T> {
   /// Pull a batch of messages from this pull consumer
   Future<List<Message<T>>> fetch(
       {int batch = 1, Duration timeout = const Duration(seconds: 2)}) {
-    return js._pull<T>(streamName, name, batch: batch, timeout: timeout, jsonDecoder: jsonDecoder);
+    return js._pull<T>(streamName, name,
+        batch: batch, timeout: timeout, jsonDecoder: jsonDecoder);
   }
 
   /// Consume messages continuously from this consumer.
@@ -1175,7 +1193,8 @@ class Consumer<T> {
   ///
   /// [batch] specifies the number of messages to pull per fetch request (only applicable for pull consumers).
   /// [timeout] specifies the expiration timeout for each pull request (only applicable for pull consumers).
-  Stream<Message<T>> messages({int batch = 1, Duration timeout = const Duration(seconds: 5)}) {
+  Stream<Message<T>> messages(
+      {int batch = 1, Duration timeout = const Duration(seconds: 5)}) {
     late StreamController<Message<T>> controller;
     StreamSubscription<Message<T>>? pushSub;
     bool active = true;
@@ -1217,7 +1236,8 @@ class Consumer<T> {
           final deliverSubject = consumerInfo.config.deliverSubject;
           if (deliverSubject != null && deliverSubject.isNotEmpty) {
             // Push Consumer: Subscribe to the deliver subject
-            final sub = js.client.sub<T>(deliverSubject, jsonDecoder: jsonDecoder);
+            final sub =
+                js.client.sub<T>(deliverSubject, jsonDecoder: jsonDecoder);
             pushSub = sub.stream.listen(
               (msg) {
                 if (!controller.isClosed) {

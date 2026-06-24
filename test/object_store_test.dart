@@ -42,13 +42,16 @@ void main() {
       expect(existingOs.bucket, equals(bucket));
     });
 
-    test('Object Store basic put and get (bytes, strings, and chunking)', () async {
+    test('Object Store basic put and get (bytes, strings, and chunking)',
+        () async {
       final os = await js.createObjectStore(
         ObjectStoreConfig(bucket: bucket, storage: 'memory'),
       );
 
       // 1. Put and get string
-      final infoString = await os.putString('test-str.txt', 'hello object store', description: 'text content');
+      final infoString = await os.putString(
+          'test-str.txt', 'hello object store',
+          description: 'text content');
       expect(infoString.name, equals('test-str.txt'));
       expect(infoString.description, equals('text content'));
       expect(infoString.size, equals(18));
@@ -109,9 +112,12 @@ void main() {
       expect(list[0].name, equals('b.txt'));
     });
 
-    test('Object Store links (object link resolution and bucket link restriction)', () async {
-      final targetBucket = 'target_bucket_${DateTime.now().millisecondsSinceEpoch}';
-      
+    test(
+        'Object Store links (object link resolution and bucket link restriction)',
+        () async {
+      final targetBucket =
+          'target_bucket_${DateTime.now().millisecondsSinceEpoch}';
+
       final srcStore = await js.createObjectStore(
         ObjectStoreConfig(bucket: bucket, storage: 'memory'),
       );
@@ -121,10 +127,12 @@ void main() {
 
       try {
         // 1. Create a target object in srcStore
-        final targetInfo = await srcStore.putString('real-obj', 'link target payload');
+        final targetInfo =
+            await srcStore.putString('real-obj', 'link target payload');
 
         // 2. Add link in destStore pointing to target object
-        final linkInfo = await destStore.addLink('link-to-obj', targetInfo, description: 'object reference');
+        final linkInfo = await destStore.addLink('link-to-obj', targetInfo,
+            description: 'object reference');
         expect(linkInfo.link, isNotNull);
         expect(linkInfo.link!.bucket, equals(bucket));
         expect(linkInfo.link!.name, equals('real-obj'));
@@ -134,7 +142,8 @@ void main() {
         expect(resolvedString, equals('link target payload'));
 
         // 4. Add bucket link in destStore
-        final bucketLinkInfo = await destStore.addBucketLink('link-to-bucket', bucket);
+        final bucketLinkInfo =
+            await destStore.addBucketLink('link-to-bucket', bucket);
         expect(bucketLinkInfo.link, isNotNull);
         expect(bucketLinkInfo.link!.bucket, equals(bucket));
         expect(bucketLinkInfo.link!.name, isNull);
@@ -173,7 +182,7 @@ void main() {
         link: ObjectLink(bucket: bucket, name: 'link1'),
       );
       await store.addLink('link2', targetInfo3);
-      
+
       final info2 = await store.getInfo('link2');
       expect(info2, isNotNull);
 
@@ -182,7 +191,7 @@ void main() {
       // Now create the link3 pointing back to link1
       final info1 = await store.getInfo('link1');
       expect(info1, isNotNull);
-      
+
       // Overwrite/recreate link3 to point to link1
       await store.addLink('link3', info1!);
 
