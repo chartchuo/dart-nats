@@ -54,59 +54,73 @@ class _DashboardPageState extends State<DashboardPage> {
   bool _jsStreamInitialized = false;
   bool _jsConsumerInitialized = false;
   List<nats.Message> _jsReplayedMessages = [];
-  final TextEditingController _jsStreamController =
-      TextEditingController(text: 'demo-stream');
+  final TextEditingController _jsStreamController = TextEditingController(
+    text: 'demo-stream',
+  );
   final TextEditingController _jsStreamSubjectController =
       TextEditingController(text: 'demo.flutter.>');
 
   // JetStream Publisher states
-  final TextEditingController _jsPubSubjectController =
-      TextEditingController(text: 'demo.flutter.alerts');
+  final TextEditingController _jsPubSubjectController = TextEditingController(
+    text: 'demo.flutter.alerts',
+  );
   final TextEditingController _jsPubMsgIdController = TextEditingController();
-  final TextEditingController _jsPubPayloadController =
-      TextEditingController(text: 'JetStream alert payload!');
+  final TextEditingController _jsPubPayloadController = TextEditingController(
+    text: 'JetStream alert payload!',
+  );
 
   // JetStream Consumer states
-  final TextEditingController _jsConsumerController =
-      TextEditingController(text: 'demo-consumer');
-  final TextEditingController _jsBatchController =
-      TextEditingController(text: '5');
+  final TextEditingController _jsConsumerController = TextEditingController(
+    text: 'demo-consumer',
+  );
+  final TextEditingController _jsBatchController = TextEditingController(
+    text: '5',
+  );
   String _jsDeliverPolicy = 'all'; // 'all', 'last', 'new'
 
   // Key-Value Store states
   nats.KeyValue? _kv;
   bool _kvInitialized = false;
   StreamSubscription<nats.KeyValueEntry?>? _kvWatchSubscription;
-  final TextEditingController _kvBucketController =
-      TextEditingController(text: 'example_settings');
-  final TextEditingController _kvKeyController =
-      TextEditingController(text: 'config.theme');
-  final TextEditingController _kvValueController =
-      TextEditingController(text: 'dark-mode');
+  final TextEditingController _kvBucketController = TextEditingController(
+    text: 'example_settings',
+  );
+  final TextEditingController _kvKeyController = TextEditingController(
+    text: 'config.theme',
+  );
+  final TextEditingController _kvValueController = TextEditingController(
+    text: 'dark-mode',
+  );
 
   // Object Store states
   nats.ObjectStore? _os;
   bool _osInitialized = false;
   List<nats.ObjectInfo> _osFiles = [];
-  final TextEditingController _osBucketController =
-      TextEditingController(text: 'example_files');
-  final TextEditingController _osFilenameController =
-      TextEditingController(text: 'hello.txt');
-  final TextEditingController _osPayloadController =
-      TextEditingController(text: 'Hello from Flutter Object Store!');
+  final TextEditingController _osBucketController = TextEditingController(
+    text: 'example_files',
+  );
+  final TextEditingController _osFilenameController = TextEditingController(
+    text: 'hello.txt',
+  );
+  final TextEditingController _osPayloadController = TextEditingController(
+    text: 'Hello from Flutter Object Store!',
+  );
 
   final Map<String, nats.Subscription> _activeSubs = {};
   final Map<String, StreamSubscription> _activeStreams = {};
   final List<LogEntry> _logs = [
-    LogEntry('Console initialized. Waiting for NATS Connection...', 'system')
+    LogEntry('Console initialized. Waiting for NATS Connection...', 'system'),
   ];
 
-  final TextEditingController _urlController =
-      TextEditingController(text: 'ws://localhost:8080');
-  final TextEditingController _subSubjectController =
-      TextEditingController(text: 'demo.flutter');
-  final TextEditingController _pubSubjectController =
-      TextEditingController(text: 'demo.flutter');
+  final TextEditingController _urlController = TextEditingController(
+    text: 'ws://localhost:8080',
+  );
+  final TextEditingController _subSubjectController = TextEditingController(
+    text: 'demo.flutter',
+  );
+  final TextEditingController _pubSubjectController = TextEditingController(
+    text: 'demo.flutter',
+  );
   final TextEditingController _payloadController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -117,7 +131,8 @@ class _DashboardPageState extends State<DashboardPage> {
     _statusSubscription = _client.statusStream.listen((status) {
       setState(() {
         _currentStatus = status;
-        _isConnecting = status == nats.Status.connecting ||
+        _isConnecting =
+            status == nats.Status.connecting ||
             status == nats.Status.reconnecting ||
             status == nats.Status.tlsHandshake ||
             status == nats.Status.infoHandshake;
@@ -127,7 +142,8 @@ class _DashboardPageState extends State<DashboardPage> {
           _getStatusLogType(status),
         );
 
-        if (status == nats.Status.disconnected || status == nats.Status.closed) {
+        if (status == nats.Status.disconnected ||
+            status == nats.Status.closed) {
           _activeSubs.clear();
           for (var stream in _activeStreams.values) {
             stream.cancel();
@@ -274,7 +290,10 @@ class _DashboardPageState extends State<DashboardPage> {
     final name = _jsStreamController.text.trim();
     final subject = _jsStreamSubjectController.text.trim();
     if (name.isEmpty || subject.isEmpty) {
-      _addLog('Error: Stream name and subject filter cannot be empty.', 'error');
+      _addLog(
+        'Error: Stream name and subject filter cannot be empty.',
+        'error',
+      );
       return;
     }
     _addLog('Creating stream "$name" for subject filter "$subject"...', 'info');
@@ -284,11 +303,11 @@ class _DashboardPageState extends State<DashboardPage> {
         subjects: [subject],
         storage: 'memory',
       );
-      final ok = await _js!.addStream(config);
+      await _js!.createStream(config);
       setState(() {
-        _jsStreamInitialized = ok;
+        _jsStreamInitialized = true;
       });
-      _addLog('Stream "$name" created successfully: $ok', 'success');
+      _addLog('Stream "$name" created successfully.', 'success');
     } catch (e) {
       _addLog('Failed to create stream: $e', 'error');
     }
@@ -307,7 +326,10 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final opts = msgId.isNotEmpty ? nats.PubOpts(msgId: msgId) : null;
       final ack = await _js!.publishString(subject, payload, opts: opts);
-      _addLog('PubAck -> Stream: ${ack.stream}, Sequence: ${ack.sequence}, Duplicate: ${ack.duplicate}', 'success');
+      _addLog(
+        'PubAck -> Stream: ${ack.stream}, Sequence: ${ack.sequence}, Duplicate: ${ack.duplicate}',
+        'success',
+      );
     } catch (e) {
       _addLog('JetStream publish failed: $e', 'error');
     }
@@ -321,18 +343,21 @@ class _DashboardPageState extends State<DashboardPage> {
       _addLog('Error: Stream name and consumer name cannot be empty.', 'error');
       return;
     }
-    _addLog('Creating pull consumer "$consumerName" on stream "$stream" with deliver policy "$_jsDeliverPolicy"...', 'info');
+    _addLog(
+      'Creating pull consumer "$consumerName" on stream "$stream" with deliver policy "$_jsDeliverPolicy"...',
+      'info',
+    );
     try {
       final config = nats.ConsumerConfig(
         durable: consumerName,
         ackPolicy: 'explicit',
         deliverPolicy: _jsDeliverPolicy,
       );
-      final ok = await _js!.addConsumer(stream, config);
+      await _js!.createConsumer(stream, config);
       setState(() {
-        _jsConsumerInitialized = ok;
+        _jsConsumerInitialized = true;
       });
-      _addLog('Pull consumer "$consumerName" created successfully: $ok', 'success');
+      _addLog('Pull consumer "$consumerName" created successfully.', 'success');
     } catch (e) {
       _addLog('Failed to create pull consumer: $e', 'error');
     }
@@ -348,16 +373,26 @@ class _DashboardPageState extends State<DashboardPage> {
       _addLog('Error: Stream name and consumer name cannot be empty.', 'error');
       return;
     }
-    _addLog('Pulling batch of up to $batch messages from consumer "$consumerName"...', 'info');
+    _addLog(
+      'Pulling batch of up to $batch messages from consumer "$consumerName"...',
+      'info',
+    );
     try {
-      final msgs = await _js!.pull(stream, consumerName, batch: batch, timeout: const Duration(seconds: 2));
+      final consumer = _js!.consumer(stream, consumerName);
+      final msgs = await consumer.fetch(
+        batch: batch,
+        timeout: const Duration(seconds: 2),
+      );
       setState(() {
         _jsReplayedMessages = msgs;
       });
       _addLog('Replayed ${msgs.length} message(s) from JetStream.', 'success');
       for (var i = 0; i < msgs.length; i++) {
         final m = msgs[i];
-        _addLog('Replayed [$i] Seq: ${m.streamSequence} Subj: ${m.subject} Data: "${m.string}"', 'received');
+        _addLog(
+          'Replayed [$i] Seq: ${m.streamSequence} Subj: ${m.subject} Data: "${m.string}"',
+          'received',
+        );
         m.ack(); // Acknowledge to NATS
       }
     } catch (e) {
@@ -375,7 +410,9 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     _addLog('Initializing Key-Value bucket "$bucket"...', 'info');
     try {
-      _kv = await _js!.keyValue(bucket, create: true, storage: 'memory');
+      _kv = await _js!.createKeyValue(
+        nats.KeyValueConfig(bucket: bucket, storage: 'memory'),
+      );
       setState(() {
         _kvInitialized = true;
       });
@@ -411,7 +448,10 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final entry = await _kv!.get(key);
       if (entry != null) {
-        _addLog('Get "$key" -> value: "${entry.string}" (Revision: ${entry.revision})', 'success');
+        _addLog(
+          'Get "$key" -> value: "${entry.string}" (Revision: ${entry.revision})',
+          'success',
+        );
       } else {
         _addLog('Get "$key" -> Key not found', 'info');
       }
@@ -463,7 +503,10 @@ class _DashboardPageState extends State<DashboardPage> {
       final watchStream = _kv!.watch(key: key, includeHistory: true);
       _kvWatchSubscription = watchStream.listen((entry) {
         if (entry != null) {
-          _addLog('Watch Update -> key: ${entry.key}, value: "${entry.string}", revision: ${entry.revision}', 'received');
+          _addLog(
+            'Watch Update -> key: ${entry.key}, value: "${entry.string}", revision: ${entry.revision}',
+            'received',
+          );
         } else {
           _addLog('Watch Update -> key: "$key" was DELETED or PURGED.', 'info');
         }
@@ -483,7 +526,9 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     _addLog('Initializing Object Store bucket "$bucket"...', 'info');
     try {
-      _os = await _js!.objectStore(bucket, create: true, storage: 'memory');
+      _os = await _js!.createObjectStore(
+        nats.ObjectStoreConfig(bucket: bucket, storage: 'memory'),
+      );
       setState(() {
         _osInitialized = true;
       });
@@ -503,8 +548,15 @@ class _DashboardPageState extends State<DashboardPage> {
       return;
     }
     try {
-      final info = await _os!.putString(name, content, description: 'Uploaded via Dashboard');
-      _addLog('Stored "$name" (${info.size} bytes, ${info.chunks} chunks, digest: ${info.digest})', 'success');
+      final info = await _os!.putString(
+        name,
+        content,
+        description: 'Uploaded via Dashboard',
+      );
+      _addLog(
+        'Stored "$name" (${info.size} bytes, ${info.chunks} chunks, digest: ${info.digest})',
+        'success',
+      );
       await _refreshOsFiles();
     } catch (e) {
       _addLog('Object Store upload failed: $e', 'error');
@@ -523,7 +575,10 @@ class _DashboardPageState extends State<DashboardPage> {
       if (content != null) {
         _addLog('Downloaded "$name" content:\n$content', 'success');
       } else {
-        _addLog('Downloaded "$name" -> Content is null or file not found', 'info');
+        _addLog(
+          'Downloaded "$name" -> Content is null or file not found',
+          'info',
+        );
       }
     } catch (e) {
       _addLog('Object Store download failed: $e', 'error');
@@ -666,7 +721,11 @@ class _DashboardPageState extends State<DashboardPage> {
                           children: [
                             ShaderMask(
                               shaderCallback: (bounds) => const LinearGradient(
-                                colors: [Colors.white, Color(0xFFA855F7), Color(0xFF6366F1)],
+                                colors: [
+                                  Colors.white,
+                                  Color(0xFFA855F7),
+                                  Color(0xFF6366F1),
+                                ],
                               ).createShader(bounds),
                               child: const Text(
                                 'NATS Flutter Demo Dashboard',
@@ -691,12 +750,19 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                             const SizedBox(height: 12),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                                color: const Color(
+                                  0xFF6366F1,
+                                ).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                                  color: const Color(
+                                    0xFF6366F1,
+                                  ).withValues(alpha: 0.3),
                                 ),
                               ),
                               child: const Text(
@@ -729,10 +795,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               ),
                             ),
                             const SizedBox(width: 24),
-                            Expanded(
-                              flex: 4,
-                              child: _buildConsoleCard(),
-                            ),
+                            Expanded(flex: 4, child: _buildConsoleCard()),
                           ],
                         )
                       else
@@ -850,7 +913,10 @@ class _DashboardPageState extends State<DashboardPage> {
               hintText: 'ws://localhost:8080',
               fillColor: const Color(0xFF0F172A).withValues(alpha: 0.6),
               filled: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: Color(0x1Fffffff)),
@@ -861,7 +927,10 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+                borderSide: const BorderSide(
+                  color: Color(0xFF6366F1),
+                  width: 1.5,
+                ),
               ),
             ),
           ),
@@ -890,7 +959,10 @@ class _DashboardPageState extends State<DashboardPage> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Connect', style: TextStyle(fontWeight: FontWeight.bold)),
+                      : const Text(
+                          'Connect',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -909,7 +981,10 @@ class _DashboardPageState extends State<DashboardPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Disconnect', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Disconnect',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -941,7 +1016,8 @@ class _DashboardPageState extends State<DashboardPage> {
           SizedBox(
             height: 820,
             child: TabBarView(
-              physics: const NeverScrollableScrollPhysics(), // Prevent swipe to make text input smooth
+              physics:
+                  const NeverScrollableScrollPhysics(), // Prevent swipe to make text input smooth
               children: [
                 _buildPubSubTab(isConnected),
                 _buildJetStreamTab(isConnected),
@@ -980,7 +1056,11 @@ class _DashboardPageState extends State<DashboardPage> {
           const Divider(height: 24, color: Color(0x1AFFFFFF)),
           const Text(
             'SUBJECT TO SUBSCRIBE',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF94A3B8),
+            ),
           ),
           const SizedBox(height: 8),
           Row(
@@ -1003,13 +1083,21 @@ class _DashboardPageState extends State<DashboardPage> {
           const SizedBox(height: 16),
           const Text(
             'ACTIVE SUBSCRIPTIONS',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF94A3B8),
+            ),
           ),
           const SizedBox(height: 8),
           if (_activeSubs.isEmpty)
             const Text(
               'No active subscriptions.',
-              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF64748B)),
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: Color(0xFF64748B),
+              ),
             )
           else
             Wrap(
@@ -1042,7 +1130,11 @@ class _DashboardPageState extends State<DashboardPage> {
           const Divider(height: 24, color: Color(0x1AFFFFFF)),
           const Text(
             'PUBLISH SUBJECT',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF94A3B8),
+            ),
           ),
           const SizedBox(height: 8),
           TextField(
@@ -1053,7 +1145,11 @@ class _DashboardPageState extends State<DashboardPage> {
           const SizedBox(height: 12),
           const Text(
             'MESSAGE PAYLOAD',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF94A3B8),
+            ),
           ),
           const SizedBox(height: 8),
           TextField(
@@ -1093,10 +1189,16 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     const Text(
                       'Stream Configuration',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: _jsStreamInitialized
                             ? const Color(0xFF10B981).withValues(alpha: 0.15)
@@ -1119,7 +1221,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const Divider(height: 24, color: Color(0x1AFFFFFF)),
                 const Text(
                   'STREAM NAME',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -1130,7 +1236,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 12),
                 const Text(
                   'SUBJECT FILTER',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -1167,7 +1277,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const Divider(height: 24, color: Color(0x1AFFFFFF)),
                 const Text(
                   'SUBJECT',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -1178,7 +1292,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 12),
                 const Text(
                   'MSG-ID (FOR DEDUPLICATION)',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -1189,7 +1307,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 12),
                 const Text(
                   'PAYLOAD',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -1221,10 +1343,16 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     const Text(
                       'Pull Consumer & Message Replay',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: _jsConsumerInitialized
                             ? const Color(0xFF10B981).withValues(alpha: 0.15)
@@ -1232,7 +1360,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        _jsConsumerInitialized ? 'CONSUMER ACTIVE' : 'NO CONSUMER',
+                        _jsConsumerInitialized
+                            ? 'CONSUMER ACTIVE'
+                            : 'NO CONSUMER',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
@@ -1247,7 +1377,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const Divider(height: 24, color: Color(0x1AFFFFFF)),
                 const Text(
                   'CONSUMER DURABLE NAME',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -1265,22 +1399,42 @@ class _DashboardPageState extends State<DashboardPage> {
                         children: [
                           const Text(
                             'DELIVER POLICY',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF94A3B8),
+                            ),
                           ),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
                             initialValue: _jsDeliverPolicy,
                             dropdownColor: const Color(0xFF1E293B),
                             decoration: InputDecoration(
-                              fillColor: const Color(0xFF0F172A).withValues(alpha: 0.6),
+                              fillColor: const Color(
+                                0xFF0F172A,
+                              ).withValues(alpha: 0.6),
                               filled: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'all', child: Text('All Messages')),
-                              DropdownMenuItem(value: 'last', child: Text('Last Message')),
-                              DropdownMenuItem(value: 'new', child: Text('New Messages')),
+                              DropdownMenuItem(
+                                value: 'all',
+                                child: Text('All Messages'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'last',
+                                child: Text('Last Message'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'new',
+                                child: Text('New Messages'),
+                              ),
                             ],
                             onChanged: isJsActive
                                 ? (val) {
@@ -1301,7 +1455,11 @@ class _DashboardPageState extends State<DashboardPage> {
                         children: [
                           const Text(
                             'BATCH SIZE',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF94A3B8),
+                            ),
                           ),
                           const SizedBox(height: 8),
                           TextField(
@@ -1327,7 +1485,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: isJsActive && _jsConsumerInitialized ? _pullJsMessages : null,
+                        onPressed: isJsActive && _jsConsumerInitialized
+                            ? _pullJsMessages
+                            : null,
                         style: _buildActionButtonStyle(const Color(0xFF10B981)),
                         child: const Text('Pull & Replay'),
                       ),
@@ -1337,13 +1497,21 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 20),
                 const Text(
                   'REPLAYED MESSAGES',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 if (_jsReplayedMessages.isEmpty)
                   const Text(
                     'No messages replayed yet. Pull a batch to display.',
-                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF64748B),
+                    ),
                   )
                 else
                   ListView.builder(
@@ -1368,18 +1536,29 @@ class _DashboardPageState extends State<DashboardPage> {
                               children: [
                                 Text(
                                   'Subject: ${msg.subject}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF818CF8)),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: Color(0xFF818CF8),
+                                  ),
                                 ),
                                 Text(
                                   'Seq: ${msg.streamSequence}',
-                                  style: const TextStyle(color: Color(0xFFFBBF24), fontSize: 11, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                    color: Color(0xFFFBBF24),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
                             Text(
                               msg.string,
-                              style: const TextStyle(fontSize: 12.5, color: Colors.white),
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                color: Colors.white,
+                              ),
                             ),
                           ],
                         ),
@@ -1411,12 +1590,20 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     const Text(
                       'KV Bucket Configuration',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: isKvActive ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFEF4444).withValues(alpha: 0.15),
+                        color: isKvActive
+                            ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                            : const Color(0xFFEF4444).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1424,7 +1611,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: isKvActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          color: isKvActive
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFEF4444),
                         ),
                       ),
                     ),
@@ -1433,7 +1622,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const Divider(height: 24, color: Color(0x1AFFFFFF)),
                 const Text(
                   'KV BUCKET NAME',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -1470,7 +1663,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const Divider(height: 24, color: Color(0x1AFFFFFF)),
                 const Text(
                   'KEY',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -1481,7 +1678,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 12),
                 const Text(
                   'VALUE',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -1546,12 +1747,20 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     const Text(
                       'Object Store Configuration',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: isOsActive ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFEF4444).withValues(alpha: 0.15),
+                        color: isOsActive
+                            ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                            : const Color(0xFFEF4444).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1559,7 +1768,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: isOsActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          color: isOsActive
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFEF4444),
                         ),
                       ),
                     ),
@@ -1568,7 +1779,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const Divider(height: 24, color: Color(0x1AFFFFFF)),
                 const Text(
                   'OBJECT BUCKET NAME',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -1605,7 +1820,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const Divider(height: 24, color: Color(0x1AFFFFFF)),
                 const Text(
                   'FILENAME',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -1616,7 +1835,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 12),
                 const Text(
                   'FILE CONTENT',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -1660,7 +1883,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     const Text(
                       'Bucket Files',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.refresh, size: 18),
@@ -1673,12 +1899,20 @@ class _DashboardPageState extends State<DashboardPage> {
                 if (!isOsActive)
                   const Text(
                     'Bind Object Store bucket to list files.',
-                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF64748B),
+                    ),
                   )
                 else if (_osFiles.isEmpty)
                   const Text(
                     'No files in bucket.',
-                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF64748B),
+                    ),
                   )
                 else
                   ListView.builder(
@@ -1703,12 +1937,18 @@ class _DashboardPageState extends State<DashboardPage> {
                               children: [
                                 Text(
                                   file.name,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   'Size: ${file.size}B | Chunks: ${file.chunks}',
-                                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                                  style: const TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ],
                             ),
@@ -1763,9 +2003,7 @@ class _DashboardPageState extends State<DashboardPage> {
         color: isConnected ? const Color(0x1Fffffff) : Colors.transparent,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 
@@ -1776,9 +2014,7 @@ class _DashboardPageState extends State<DashboardPage> {
       disabledBackgroundColor: const Color(0xFF475569),
       disabledForegroundColor: const Color(0xFF94A3B8),
       padding: const EdgeInsets.symmetric(vertical: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 
@@ -1787,9 +2023,7 @@ class _DashboardPageState extends State<DashboardPage> {
       backgroundColor: color.withValues(alpha: 0.15),
       foregroundColor: color,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       side: BorderSide(color: color.withValues(alpha: 0.3)),
     );
   }
@@ -1831,12 +2065,18 @@ class _DashboardPageState extends State<DashboardPage> {
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFF94A3B8),
                   backgroundColor: const Color(0x0Fffffff),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text('Clear Console', style: TextStyle(fontSize: 12)),
+                child: const Text(
+                  'Clear Console',
+                  style: TextStyle(fontSize: 12),
+                ),
               ),
             ],
           ),

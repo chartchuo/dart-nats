@@ -1,3 +1,25 @@
+## 1.1.0
+
+* Add JetStream, Key-Value, and Object Store API enhancements and handle-based classes:
+  * Introduce `JsStream` class wrapping JetStream stream operations (`info`, `purge`, `consumer`, `createConsumer`).
+  * Introduce generic `Consumer<T>` class with `fetch` (for pull batching) and `messages()` (stream for push deliver or continuous pull polling in the background).
+  * Introduce `AccountInfo` API mapping JetStream tier resource usage and account details.
+  * Add support for `numReplicas` and `maxAge` properties in `StreamConfig`.
+  * Support flexible payload publishing using `publishPayload<T>` on the `JetStream` class.
+* Key-Value Store API updates:
+  * Add `create` and `update` methods supporting optimistic concurrency control (via `PubOpts`).
+  * Add `getRevision` to retrieve historical values.
+  * Support tracking and emitting key-value entry operations (`KeyValueOp` like `put`, `delete`, and `purge`).
+  * Filter out deleted and purged keys automatically in `KeyValue.get()`.
+* Object Store API updates:
+  * Introduce `ObjectStoreConfig` supporting `replicas`, `maxBytes`, and `ttl`.
+  * Add `addLink` and `addBucketLink` methods to align with standard NATS conventions (aliasing/replacing old `putLink` and `putBucketLink`).
+  * Update `list()` to correctly track tombstones and filter deleted object metadata.
+  * Add helper methods `putBytes` and `getBytes`.
+* Performance and refactoring improvements:
+  * Optimize NATS protocol parser by replacing dynamic List growth/sublisting with direct byte processing on a manual buffer manager.
+  * Clean up and document API definitions, including configuration options, exception models, and platform stubs.
+
 ## 1.0.0
 
 * Add NATS JetStream Support (Stream/Consumer management, Publish/Subscribe, Pull mode with Ack/Nak/Term)

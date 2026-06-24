@@ -90,6 +90,8 @@ class Client {
 
   /// User authentication callbacks
   String Function()? userJwtHandler;
+
+  /// Callback to sign a challenge nonce during NKEY authentication
   Uint8List Function(Uint8List nonce)? signatureHandler;
 
   /// Error handler for websocket errors
@@ -157,10 +159,46 @@ class Client {
   int _connectionId = 0;
   bool _connectOptionSent = false;
 
-  List<int> _buffer = [];
-  int _bufferOffset = 0;
+  Uint8List _buffer = Uint8List(0);
+  int _bufferLength = 0;
+  int _readOffset = 0;
   _ReceiveState _receiveState = _ReceiveState.idle;
   String _receiveLine1 = '';
+
+  void _appendBytes(List<int> d) {
+    if (_bufferLength + d.length > _buffer.length) {
+      var newCapacity = _buffer.length * 2;
+      if (newCapacity < _bufferLength + d.length) {
+        newCapacity = _bufferLength + d.length + 16384;
+      }
+      final newBuffer = Uint8List(newCapacity);
+      newBuffer.setRange(0, _bufferLength, _buffer);
+      _buffer = newBuffer;
+    }
+    _buffer.setRange(_bufferLength, _bufferLength + d.length, d);
+    _bufferLength += d.length;
+  }
+
+  int _indexOf(int byte, int start) {
+    for (var i = start; i < _bufferLength; i++) {
+      if (_buffer[i] == byte) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  int _findLineEnd(int start) {
+    var searchStart = start;
+    while (true) {
+      final idx = _indexOf(13, searchStart);
+      if (idx == -1) return -1;
+      if (idx + 1 < _bufferLength && _buffer[idx + 1] == 10) {
+        return idx;
+      }
+      searchStart = idx + 1;
+    }
+  }
 
   /// Create a new NATS Client
   Client() {
@@ -183,6 +221,25 @@ class Client {
     }
   }
 
+  List<String> _parseArgs(String line) {
+    final args = <String>[];
+    var start = 0;
+    final len = line.length;
+    while (start < len) {
+      while (start < len && line.codeUnitAt(start) == 32) {
+        start++;
+      }
+      if (start >= len) break;
+      var end = start;
+      while (end < len && line.codeUnitAt(end) != 32) {
+        end++;
+      }
+      args.add(line.substring(start, end));
+      start = end;
+    }
+    return args;
+  }
+
   void _streamHandle() {
     _channelStream.stream.listen((dynamic dataPacket) {
       if (dataPacket is! List || dataPacket.length != 2) return;
@@ -195,40 +252,142 @@ class Client {
         return;
       }
       if (d is List<int>) {
-        _buffer.addAll(d);
+        _appendBytes(d);
       } else if (d is String) {
-        _buffer.addAll(utf8.encode(d));
+        _appendBytes(utf8.encode(d));
       }
 
       while (_receiveState == _ReceiveState.idle) {
-        final n13 = _buffer.indexOf(13, _bufferOffset);
-        if (n13 == -1) break;
+        final lineEnd = _findLineEnd(_readOffset);
+        if (lineEnd == -1) break;
 
-        final msgFull =
-            String.fromCharCodes(_buffer.sublist(_bufferOffset, n13))
-                .toLowerCase()
-                .trim();
-        final msgList = msgFull.split(' ');
-        final msgType = msgList[0];
+        final lineLen = lineEnd - _readOffset;
+        var isMsg = false;
+        var isHmsg = false;
 
-        if (msgType == 'msg' || msgType == 'hmsg') {
-          final len = int.parse(msgList.last);
-          if (len > 0 &&
-              (_buffer.length - _bufferOffset) <
-                  (n13 - _bufferOffset + len + 4)) {
-            break;
-          }
+        if (lineLen >= 4 &&
+            (_buffer[_readOffset] == 109 || _buffer[_readOffset] == 77) &&
+            (_buffer[_readOffset + 1] == 115 ||
+                _buffer[_readOffset + 1] == 83) &&
+            (_buffer[_readOffset + 2] == 103 ||
+                _buffer[_readOffset + 2] == 71) &&
+            _buffer[_readOffset + 3] == 32) {
+          isMsg = true;
+        } else if (lineLen >= 5 &&
+            (_buffer[_readOffset] == 104 || _buffer[_readOffset] == 72) &&
+            (_buffer[_readOffset + 1] == 109 ||
+                _buffer[_readOffset + 1] == 77) &&
+            (_buffer[_readOffset + 2] == 115 ||
+                _buffer[_readOffset + 2] == 83) &&
+            (_buffer[_readOffset + 3] == 103 ||
+                _buffer[_readOffset + 3] == 71) &&
+            _buffer[_readOffset + 4] == 32) {
+          isHmsg = true;
         }
 
-        _processOp();
+        if (isMsg) {
+          final line = String.fromCharCodes(Uint8List.view(
+              _buffer.buffer, _buffer.offsetInBytes + _readOffset, lineLen));
+          final args = _parseArgs(line);
+          if (args.length < 4) {
+            _readOffset = lineEnd + 2;
+            continue;
+          }
+          final subject = args[1];
+          final sid = int.parse(args[2]);
+          String? replyTo;
+          int len;
+          if (args.length == 4) {
+            len = int.parse(args[3]);
+          } else {
+            replyTo = args[3];
+            len = int.parse(args[4]);
+          }
+
+          final requiredBytes = lineEnd + len + 4;
+          if (_bufferLength < requiredBytes) {
+            break;
+          }
+
+          _readOffset = lineEnd + 2;
+          final payload = _buffer.sublist(_readOffset, _readOffset + len);
+          _readOffset += len + 2;
+
+          if (_subs[sid] != null) {
+            _subs[sid]?.add(Message<dynamic>(
+              subject,
+              sid,
+              payload,
+              this,
+              replyTo: replyTo,
+            ));
+          }
+          continue;
+        }
+
+        if (isHmsg) {
+          final line = String.fromCharCodes(Uint8List.view(
+              _buffer.buffer, _buffer.offsetInBytes + _readOffset, lineLen));
+          final args = _parseArgs(line);
+          if (args.length < 5) {
+            _readOffset = lineEnd + 2;
+            continue;
+          }
+          final subject = args[1];
+          final sid = int.parse(args[2]);
+          String? replyTo;
+          int len;
+          int headerLength;
+          if (args.length == 5) {
+            headerLength = int.parse(args[3]);
+            len = int.parse(args[4]);
+          } else {
+            replyTo = args[3];
+            headerLength = int.parse(args[4]);
+            len = int.parse(args[5]);
+          }
+
+          final requiredBytes = lineEnd + len + 4;
+          if (_bufferLength < requiredBytes) {
+            break;
+          }
+
+          _readOffset = lineEnd + 2;
+          final header =
+              _buffer.sublist(_readOffset, _readOffset + headerLength);
+          final payload =
+              _buffer.sublist(_readOffset + headerLength, _readOffset + len);
+          _readOffset += len + 2;
+
+          if (_subs[sid] != null) {
+            final msg = Message<dynamic>(
+              subject,
+              sid,
+              payload,
+              this,
+              replyTo: replyTo,
+              header: Header.fromBytes(header),
+            );
+            _subs[sid]?.add(msg);
+          }
+          continue;
+        }
+
+        final line = String.fromCharCodes(Uint8List.view(
+            _buffer.buffer, _buffer.offsetInBytes + _readOffset, lineLen));
+        _processOp(line, lineEnd);
       }
 
-      if (_buffer.length == _bufferOffset) {
-        _buffer = [];
-        _bufferOffset = 0;
-      } else if (_bufferOffset > 65536) {
-        _buffer = _buffer.sublist(_bufferOffset);
-        _bufferOffset = 0;
+      if (_readOffset == _bufferLength) {
+        _readOffset = 0;
+        _bufferLength = 0;
+      } else if (_readOffset > 65536) {
+        final remaining = _bufferLength - _readOffset;
+        if (remaining > 0) {
+          _buffer.setRange(0, remaining, _buffer, _readOffset);
+        }
+        _bufferLength = remaining;
+        _readOffset = 0;
       }
     });
   }
@@ -342,8 +501,9 @@ class Client {
           break;
         }
 
-        _buffer = [];
-        _bufferOffset = 0;
+        _buffer = Uint8List(0);
+        _bufferLength = 0;
+        _readOffset = 0;
         return;
       } catch (err, st) {
         await _cleanUpSockets();
@@ -496,13 +656,8 @@ class Client {
     }
   }
 
-  void _processOp() async {
-    final nextLineIndex = _buffer.indexOf(13, _bufferOffset);
-    if (nextLineIndex == -1) return;
-
-    final line =
-        String.fromCharCodes(_buffer.sublist(_bufferOffset, nextLineIndex));
-    _bufferOffset = nextLineIndex + 2;
+  void _processOp(String line, int lineEnd) async {
+    _readOffset = lineEnd + 2;
 
     final splitIndex = line.indexOf(' ');
     String op, data;
@@ -658,7 +813,7 @@ class Client {
   }
 
   void _processMsg() {
-    final s = _receiveLine1.split(' ');
+    final s = _receiveLine1.split(' ').where((str) => str.isNotEmpty).toList();
     final subject = s[1];
     final sid = int.parse(s[2]);
     String? replyTo;
@@ -671,11 +826,10 @@ class Client {
       length = int.parse(s[4]);
     }
 
-    if ((_buffer.length - _bufferOffset) < length) return;
-    final payload = Uint8List.fromList(
-        _buffer.sublist(_bufferOffset, _bufferOffset + length));
+    if ((_bufferLength - _readOffset) < length) return;
+    final payload = _buffer.sublist(_readOffset, _readOffset + length);
 
-    _bufferOffset += length + 2; // Move past payload and trailing \r\n
+    _readOffset += length + 2; // Move past payload and trailing \r\n
 
     if (_subs[sid] != null) {
       _subs[sid]?.add(Message<dynamic>(
@@ -689,7 +843,7 @@ class Client {
   }
 
   void _processHMsg() {
-    final s = _receiveLine1.split(' ');
+    final s = _receiveLine1.split(' ').where((str) => str.isNotEmpty).toList();
     final subject = s[1];
     final sid = int.parse(s[2]);
     String? replyTo;
@@ -705,13 +859,12 @@ class Client {
       length = int.parse(s[5]);
     }
 
-    if ((_buffer.length - _bufferOffset) < length) return;
-    final header = Uint8List.fromList(
-        _buffer.sublist(_bufferOffset, _bufferOffset + headerLength));
-    final payload = Uint8List.fromList(
-        _buffer.sublist(_bufferOffset + headerLength, _bufferOffset + length));
+    if ((_bufferLength - _readOffset) < length) return;
+    final header = _buffer.sublist(_readOffset, _readOffset + headerLength);
+    final payload =
+        _buffer.sublist(_readOffset + headerLength, _readOffset + length);
 
-    _bufferOffset += length + 2; // Move past payload and trailing \r\n
+    _readOffset += length + 2; // Move past payload and trailing \r\n
 
     if (_subs[sid] != null) {
       final msg = Message<dynamic>(
@@ -1152,8 +1305,9 @@ class Client {
     await _inboxSub?.close();
     _inboxSub = null;
     _inboxSubPrefix = null;
-    _buffer = [];
-    _bufferOffset = 0;
+    _buffer = Uint8List(0);
+    _bufferLength = 0;
+    _readOffset = 0;
     _receiveState = _ReceiveState.idle;
     _clientStatus = _ClientStatus.closed;
   }

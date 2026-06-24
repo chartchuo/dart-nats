@@ -83,6 +83,12 @@ class StreamConfig {
   /// Max message size
   final int? maxMsgSize;
 
+  /// Maximum age of messages in the stream
+  final Duration? maxAge;
+
+  /// Number of replicas for the stream configuration
+  final int? numReplicas;
+
   /// Constructor for StreamConfig
   StreamConfig({
     required this.name,
@@ -98,6 +104,8 @@ class StreamConfig {
     this.allowDirect,
     this.maxMsgsPerSubject,
     this.maxMsgSize,
+    this.maxAge,
+    this.numReplicas,
   });
 
   /// Export configuration to JSON map
@@ -131,9 +139,16 @@ class StreamConfig {
     if (maxMsgSize != null) {
       map['max_msg_size'] = maxMsgSize;
     }
+    if (maxAge != null) {
+      map['max_age'] = maxAge!.inMicroseconds * 1000;
+    }
+    if (numReplicas != null) {
+      map['num_replicas'] = numReplicas;
+    }
     return map;
   }
 }
+
 /// JetStream Consumer Configuration
 class ConsumerConfig {
   /// Durable consumer name (required for Pull Mode durability)
@@ -184,19 +199,31 @@ class ConsumerConfig {
     if (optStartSeq != null) map['opt_start_seq'] = optStartSeq;
     if (flowControl != null) map['flow_control'] = flowControl;
     if (idleHeartbeat != null) {
-      map['idle_heartbeat'] = idleHeartbeat!.inMicroseconds * 1000; // in nanoseconds
+      map['idle_heartbeat'] =
+          idleHeartbeat!.inMicroseconds * 1000; // in nanoseconds
     }
     return map;
   }
 }
+
 /// Publish options for JetStream de-duplication and optimistic concurrency control
 class PubOpts {
+  /// Expected message ID
   final String? msgId;
+
+  /// Expected stream name
   final String? expectStream;
+
+  /// Expected last sequence number
   final int? expectLastSeq;
+
+  /// Expected last message ID
   final String? expectLastMsgId;
+
+  /// Expected last subject sequence number
   final int? expectLastSubjectSeq;
 
+  /// Constructor for PubOpts
   PubOpts({
     this.msgId,
     this.expectStream,
@@ -208,14 +235,28 @@ class PubOpts {
 
 /// JetStream Stream State
 class StreamState {
+  /// Number of messages in the stream
   final int messages;
+
+  /// Number of bytes in the stream
   final int bytes;
+
+  /// First sequence number in the stream
   final int firstSeq;
+
+  /// First timestamp in the stream
   final String firstTs;
+
+  /// Last sequence number in the stream
   final int lastSeq;
+
+  /// Last timestamp in the stream
   final String lastTs;
+
+  /// Number of consumers bound to the stream
   final int consumerCount;
 
+  /// Constructor for StreamState
   StreamState({
     required this.messages,
     required this.bytes,
@@ -226,6 +267,7 @@ class StreamState {
     required this.consumerCount,
   });
 
+  /// Factory from JSON map
   factory StreamState.fromJson(Map<String, dynamic> json) {
     return StreamState(
       messages: json['messages'] as int? ?? 0,
@@ -241,11 +283,19 @@ class StreamState {
 
 /// JetStream Stream Information
 class StreamInfo {
+  /// Type of response/event
   final String type;
+
+  /// Stream configuration
   final StreamConfig config;
+
+  /// Created timestamp
   final String created;
+
+  /// Stream state detail
   final StreamState state;
 
+  /// Constructor for StreamInfo
   StreamInfo({
     required this.type,
     required this.config,
@@ -253,6 +303,7 @@ class StreamInfo {
     required this.state,
   });
 
+  /// Factory from JSON map
   factory StreamInfo.fromJson(Map<String, dynamic> json) {
     final cfg = json['config'] as Map<String, dynamic>? ?? {};
     return StreamInfo(
@@ -273,16 +324,34 @@ class StreamInfo {
 
 /// JetStream Consumer Information
 class ConsumerInfo {
+  /// Type of response/event
   final String type;
+
+  /// Stream name bound to consumer
   final String streamName;
+
+  /// Consumer name
   final String name;
+
+  /// Created timestamp
   final String created;
+
+  /// Consumer configuration
   final ConsumerConfig config;
+
+  /// Number of pending messages
   final int numPending;
+
+  /// Number of waiting messages
   final int numWaiting;
+
+  /// Number of ack pending messages
   final int numAckPending;
+
+  /// Number of redelivered messages
   final int numRedelivered;
 
+  /// Constructor for ConsumerInfo
   ConsumerInfo({
     required this.type,
     required this.streamName,
@@ -295,6 +364,7 @@ class ConsumerInfo {
     required this.numRedelivered,
   });
 
+  /// Factory from JSON map
   factory ConsumerInfo.fromJson(Map<String, dynamic> json) {
     final cfg = json['config'] as Map<String, dynamic>? ?? {};
     return ConsumerInfo(
@@ -381,8 +451,51 @@ class JetStream {
     );
   }
 
+  /// Publish a generic payload to a JetStream subject and wait for acknowledgement.
+  ///
+  /// The payload is serialized using [serializer] if provided. If not provided:
+  /// - If `payload` is `Uint8List`, it's sent directly.
+  /// - If `payload` is `List<int>`, it's converted to `Uint8List`.
+  /// - If `payload` is `String`, it's encoded to UTF-8.
+  /// - Otherwise, it falls back to JSON encoding using `jsonEncode(payload)`.
+  Future<PubAck> publishPayload<T>(
+    String subject,
+    T payload, {
+    Duration timeout = const Duration(seconds: 2),
+    PubOpts? opts,
+    Header? header,
+    List<int> Function(T)? serializer,
+  }) {
+    Uint8List bytes;
+    if (serializer != null) {
+      bytes = Uint8List.fromList(serializer(payload));
+    } else if (payload is Uint8List) {
+      bytes = payload;
+    } else if (payload is List<int>) {
+      bytes = Uint8List.fromList(payload);
+    } else if (payload is String) {
+      bytes = Uint8List.fromList(utf8.encode(payload));
+    } else {
+      bytes = Uint8List.fromList(utf8.encode(jsonEncode(payload)));
+    }
+    return publish(subject, bytes,
+        timeout: timeout, opts: opts, header: header);
+  }
+
+  /// Get a handle to a stream
+  JsStream stream(String name) {
+    return JsStream(this, name);
+  }
+
+  /// Get a handle to a consumer
+  Consumer<T> consumer<T>(String streamName, String consumerName,
+      {T Function(String)? jsonDecoder}) {
+    return Consumer<T>(this, streamName, consumerName,
+        jsonDecoder: jsonDecoder);
+  }
+
   /// Get information about a stream
-  Future<StreamInfo> getStream(String streamName,
+  Future<StreamInfo> streamInfo(String streamName,
       {Duration timeout = const Duration(seconds: 2)}) async {
     final subject = '\$JS.API.STREAM.INFO.$streamName';
     final response =
@@ -394,8 +507,15 @@ class JetStream {
     return StreamInfo.fromJson(map as Map<String, dynamic>);
   }
 
+  /// Get information about a stream (Deprecated: Use streamInfo instead)
+  @Deprecated('Use streamInfo instead')
+  Future<StreamInfo> getStream(String streamName,
+      {Duration timeout = const Duration(seconds: 2)}) {
+    return streamInfo(streamName, timeout: timeout);
+  }
+
   /// Update an existing stream
-  Future<bool> updateStream(StreamConfig config,
+  Future<JsStream> updateStream(StreamConfig config,
       {Duration timeout = const Duration(seconds: 2)}) async {
     final subject = '\$JS.API.STREAM.UPDATE.${config.name}';
     final payload = utf8.encode(jsonEncode(config.toJson()));
@@ -405,11 +525,64 @@ class JetStream {
     if (map['error'] != null) {
       throw NatsException(map['error']['description'] as String);
     }
+    return JsStream(this, config.name);
+  }
+
+  /// Create a stream
+  Future<JsStream> createStream(StreamConfig config,
+      {Duration timeout = const Duration(seconds: 2)}) async {
+    final subject = '\$JS.API.STREAM.CREATE.${config.name}';
+    final payload = utf8.encode(jsonEncode(config.toJson()));
+    final response = await client.request(subject, Uint8List.fromList(payload),
+        timeout: timeout);
+    final map = jsonDecode(response.string);
+    if (map['error'] != null) {
+      throw NatsException(map['error']['description'] as String);
+    }
+    return JsStream(this, config.name);
+  }
+
+  /// Create or update a stream
+  Future<JsStream> createOrUpdateStream(StreamConfig config,
+      {Duration timeout = const Duration(seconds: 2)}) async {
+    try {
+      await streamInfo(config.name, timeout: timeout);
+      return await updateStream(config, timeout: timeout);
+    } on NatsException catch (_) {
+      return await createStream(config, timeout: timeout);
+    }
+  }
+
+  /// Create or update a stream (Deprecated: Use createStream instead)
+  @Deprecated('Use createStream instead')
+  Future<bool> addStream(StreamConfig config,
+      {Duration timeout = const Duration(seconds: 2)}) async {
+    await createStream(config, timeout: timeout);
     return true;
   }
 
-  /// Purge a stream (delete all messages but keep config/stream)
+  /// Delete a stream
+  Future<bool> deleteStream(String streamName,
+      {Duration timeout = const Duration(seconds: 2)}) async {
+    final subject = '\$JS.API.STREAM.DELETE.$streamName';
+    final response =
+        await client.request(subject, Uint8List.fromList([]), timeout: timeout);
+    final map = jsonDecode(response.string);
+    if (map['error'] != null) {
+      throw NatsException(map['error']['description'] as String);
+    }
+    return true;
+  }
+
+  /// Purge a stream (Deprecated: Use stream(streamName).purge() instead)
+  @Deprecated('Use stream(streamName).purge() instead')
   Future<bool> purgeStream(String streamName,
+      {Duration timeout = const Duration(seconds: 2)}) {
+    return _purgeStream(streamName, timeout: timeout);
+  }
+
+  /// Internal purge helper
+  Future<bool> _purgeStream(String streamName,
       {Duration timeout = const Duration(seconds: 2)}) async {
     final subject = '\$JS.API.STREAM.PURGE.$streamName';
     final response =
@@ -437,8 +610,26 @@ class JetStream {
         .toList();
   }
 
+  /// Find a stream name by a subject it covers
+  Future<String> streamNameBySubject(String subject,
+      {Duration timeout = const Duration(seconds: 2)}) async {
+    const apiSubject = '\$JS.API.STREAM.NAMES';
+    final payload = utf8.encode(jsonEncode({'subject': subject}));
+    final response = await client
+        .request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
+    final map = jsonDecode(response.string);
+    if (map['error'] != null) {
+      throw NatsException(map['error']['description'] as String);
+    }
+    final streams = map['streams'] as List?;
+    if (streams == null || streams.isEmpty) {
+      throw NatsException('no stream matches subject');
+    }
+    return streams.first as String;
+  }
+
   /// Get information about a consumer
-  Future<ConsumerInfo> getConsumer(String streamName, String consumerName,
+  Future<ConsumerInfo> consumerInfo(String streamName, String consumerName,
       {Duration timeout = const Duration(seconds: 2)}) async {
     final subject = '\$JS.API.CONSUMER.INFO.$streamName.$consumerName';
     final response =
@@ -448,6 +639,13 @@ class JetStream {
       throw NatsException(map['error']['description'] as String);
     }
     return ConsumerInfo.fromJson(map as Map<String, dynamic>);
+  }
+
+  /// Get information about a consumer (Deprecated: Use consumerInfo instead)
+  @Deprecated('Use consumerInfo instead')
+  Future<ConsumerInfo> getConsumer(String streamName, String consumerName,
+      {Duration timeout = const Duration(seconds: 2)}) {
+    return consumerInfo(streamName, consumerName, timeout: timeout);
   }
 
   /// List consumers on a stream
@@ -466,36 +664,11 @@ class JetStream {
         .toList();
   }
 
-  /// Create or update a stream
-  Future<bool> addStream(StreamConfig config,
-      {Duration timeout = const Duration(seconds: 2)}) async {
-    final subject = '\$JS.API.STREAM.CREATE.${config.name}';
-    final payload = utf8.encode(jsonEncode(config.toJson()));
-    final response = await client.request(subject, Uint8List.fromList(payload),
-        timeout: timeout);
-    final map = jsonDecode(response.string);
-    if (map['error'] != null) {
-      throw NatsException(map['error']['description'] as String);
-    }
-    return true;
-  }
-
-  /// Delete a stream
-  Future<bool> deleteStream(String streamName,
-      {Duration timeout = const Duration(seconds: 2)}) async {
-    final subject = '\$JS.API.STREAM.DELETE.$streamName';
-    final response =
-        await client.request(subject, Uint8List.fromList([]), timeout: timeout);
-    final map = jsonDecode(response.string);
-    if (map['error'] != null) {
-      throw NatsException(map['error']['description'] as String);
-    }
-    return true;
-  }
-
   /// Create a consumer (durable or ephemeral) on a stream
-  Future<bool> addConsumer(String streamName, ConsumerConfig config,
-      {Duration timeout = const Duration(seconds: 2)}) async {
+  Future<Consumer<T>> createConsumer<T>(
+      String streamName, ConsumerConfig config,
+      {Duration timeout = const Duration(seconds: 2),
+      T Function(String)? jsonDecoder}) async {
     String subject;
     if (config.durable != null) {
       subject =
@@ -513,6 +686,25 @@ class JetStream {
     if (map['error'] != null) {
       throw NatsException(map['error']['description'] as String);
     }
+    final consumerName = config.durable ?? map['name'] as String? ?? '';
+    return Consumer<T>(this, streamName, consumerName,
+        jsonDecoder: jsonDecoder);
+  }
+
+  /// Create or update a consumer
+  Future<Consumer<T>> createOrUpdateConsumer<T>(
+      String streamName, ConsumerConfig config,
+      {Duration timeout = const Duration(seconds: 2),
+      T Function(String)? jsonDecoder}) {
+    return createConsumer<T>(streamName, config,
+        timeout: timeout, jsonDecoder: jsonDecoder);
+  }
+
+  /// Create a consumer (durable or ephemeral) on a stream (Deprecated: Use createConsumer instead)
+  @Deprecated('Use createConsumer instead')
+  Future<bool> addConsumer(String streamName, ConsumerConfig config,
+      {Duration timeout = const Duration(seconds: 2)}) async {
+    await createConsumer(streamName, config, timeout: timeout);
     return true;
   }
 
@@ -529,12 +721,20 @@ class JetStream {
     return true;
   }
 
-  /// Pull a batch of messages from a pull consumer.
-  /// Returns a Future with a List of Messages.
+  /// Pull a batch of messages from a pull consumer (Deprecated: Use consumer(stream, consumer).fetch() instead)
+  @Deprecated('Use consumer(stream, consumer).fetch() instead')
   Future<List<Message>> pull(String stream, String consumer,
-      {int batch = 1, Duration timeout = const Duration(seconds: 2)}) async {
+      {int batch = 1, Duration timeout = const Duration(seconds: 2)}) {
+    return _pull<dynamic>(stream, consumer, batch: batch, timeout: timeout);
+  }
+
+  /// Internal pull implementation
+  Future<List<Message<T>>> _pull<T>(String stream, String consumer,
+      {int batch = 1,
+      Duration timeout = const Duration(seconds: 2),
+      T Function(String)? jsonDecoder}) async {
     final inbox = client.inboxPrefix + '.' + Nuid().next();
-    final sub = client.sub(inbox);
+    final sub = client.sub<T>(inbox, jsonDecoder: jsonDecoder);
 
     final subject = '\$JS.API.CONSUMER.MSG.NEXT.$stream.$consumer';
     final payload = utf8.encode(jsonEncode({
@@ -545,10 +745,10 @@ class JetStream {
     // Publish the pull request pointing responses to our inbox
     client.pub(subject, Uint8List.fromList(payload), replyTo: inbox);
 
-    final messages = <Message>[];
-    final completer = Completer<List<Message>>();
+    final messages = <Message<T>>[];
+    final completer = Completer<List<Message<T>>>();
 
-    StreamSubscription? streamSub;
+    StreamSubscription<Message<T>>? streamSub;
     Timer? timer;
 
     void cleanup() {
@@ -597,40 +797,66 @@ class JetStream {
     return completer.future;
   }
 
-  /// Create or bind to a Key-Value bucket
+  /// Create a new Key-Value bucket
+  Future<KeyValue> createKeyValue(KeyValueConfig config) async {
+    await createStream(config.toStreamConfig());
+    return KeyValue(client, config.bucket);
+  }
+
+  /// Bind to an existing Key-Value bucket
   Future<KeyValue> keyValue(String bucket,
-      {bool create = false, String? storage = 'file'}) async {
+      {bool create = false, String? storage = 'file', int history = 1}) async {
     if (create) {
-      final config = KeyValueConfig(bucket: bucket, storage: storage ?? 'file');
-      await addStream(config.toStreamConfig());
+      final config = KeyValueConfig(
+        bucket: bucket,
+        storage: storage ?? 'file',
+        history: history,
+      );
+      await createKeyValue(config);
     }
     return KeyValue(client, bucket);
   }
 
-  /// Create or bind to an Object Store bucket
+  /// Delete a Key-Value bucket
+  Future<bool> deleteKeyValue(String bucket,
+      {Duration timeout = const Duration(seconds: 2)}) {
+    return deleteStream('KV_$bucket', timeout: timeout);
+  }
+
+  /// Create a new Object Store bucket
+  Future<ObjectStore> createObjectStore(ObjectStoreConfig config) async {
+    await createStream(config.toStreamConfig());
+    return ObjectStore(client, config.bucket);
+  }
+
+  /// Bind to an existing Object Store bucket
   Future<ObjectStore> objectStore(String bucket,
       {bool create = false, String? storage = 'file'}) async {
-    final streamName = 'OBJ_$bucket';
     if (create) {
-      final config = StreamConfig(
-        name: streamName,
-        subjects: ['\$O.$bucket.>'],
+      final config = ObjectStoreConfig(
+        bucket: bucket,
         storage: storage ?? 'file',
-        allowRollup: true,
-        discard: 'new',
       );
-      await addStream(config);
+      await createObjectStore(config);
     }
     return ObjectStore(client, bucket);
   }
 
+  /// Delete an Object Store bucket
+  Future<bool> deleteObjectStore(String bucket,
+      {Duration timeout = const Duration(seconds: 2)}) {
+    return deleteStream('OBJ_$bucket', timeout: timeout);
+  }
+
   /// Get a specific message from a stream by its sequence number
-  Future<Message> getMsg(String stream, int seq, {Duration timeout = const Duration(seconds: 2)}) async {
+  Future<Message> getMsg(String stream, int seq,
+      {Duration timeout = const Duration(seconds: 2)}) async {
     final apiSubject = '\$JS.API.STREAM.MSG.GET.$stream';
     final payload = utf8.encode(jsonEncode({
       'seq': seq,
     }));
-    final response = await client.request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
+    final response = await client
+        .request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
     final map = jsonDecode(response.string);
     if (map['error'] != null) {
       throw NatsException(map['error']['description'] as String);
@@ -639,12 +865,14 @@ class JetStream {
   }
 
   /// Get the last message in a stream for a specific subject
-  Future<Message> getLastMsg(String stream, String subject, {Duration timeout = const Duration(seconds: 2)}) async {
+  Future<Message> getLastMsg(String stream, String subject,
+      {Duration timeout = const Duration(seconds: 2)}) async {
     final apiSubject = '\$JS.API.STREAM.MSG.GET.$stream';
     final payload = utf8.encode(jsonEncode({
       'last_by_subj': subject,
     }));
-    final response = await client.request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
+    final response = await client
+        .request(apiSubject, Uint8List.fromList(payload), timeout: timeout);
     final map = jsonDecode(response.string);
     if (map['error'] != null) {
       throw NatsException(map['error']['description'] as String);
@@ -672,9 +900,8 @@ class JetStream {
         replyTo: dummyReply, header: header);
   }
 
-  /// Subscribe to a JetStream subject using a push consumer.
-  /// If [durable] is provided, a durable consumer is used.
-  /// Automatically configures the push consumer and returns a [Subscription] of messages.
+  /// Subscribe to a JetStream subject using a push consumer. (Deprecated: Use createConsumer and pull instead)
+  @Deprecated('Use createConsumer and pull instead')
   Future<Subscription> subscribe(
     String subject, {
     String? stream,
@@ -707,7 +934,7 @@ class JetStream {
       deliverPolicy: deliverPolicy,
     );
 
-    await addConsumer(targetStream, consumerConfig);
+    await createConsumer(targetStream, consumerConfig);
 
     return client.sub(deliverSubject, queueGroup: queueGroup);
   }
@@ -715,6 +942,19 @@ class JetStream {
   /// Create an Ordered Consumer on a stream.
   OrderedConsumer orderedConsumer(String stream, OrderedConsumerConfig config) {
     return OrderedConsumer(this, stream, config);
+  }
+
+  /// Get JetStream account usage information and statistics
+  Future<AccountInfo> accountInfo(
+      {Duration timeout = const Duration(seconds: 2)}) async {
+    const subject = '\$JS.API.INFO';
+    final response =
+        await client.request(subject, Uint8List.fromList([]), timeout: timeout);
+    final map = jsonDecode(response.string);
+    if (map['error'] != null) {
+      throw NatsException(map['error']['description'] as String);
+    }
+    return AccountInfo.fromJson(map as Map<String, dynamic>);
   }
 }
 
@@ -760,7 +1000,8 @@ class OrderedConsumer {
 
   /// Constructor for OrderedConsumer
   OrderedConsumer(this.js, this.stream, this.config) {
-    if (config.deliverPolicy == 'by_start_sequence' && config.optStartSeq != null) {
+    if (config.deliverPolicy == 'by_start_sequence' &&
+        config.optStartSeq != null) {
       _lastSeq = config.optStartSeq! - 1;
     }
   }
@@ -811,13 +1052,14 @@ class OrderedConsumer {
           deliverSubject: deliverSubject,
           filterSubject: config.filterSubject,
           ackPolicy: 'none',
-          deliverPolicy: _lastSeq == 0 ? config.deliverPolicy : 'by_start_sequence',
+          deliverPolicy:
+              _lastSeq == 0 ? config.deliverPolicy : 'by_start_sequence',
           optStartSeq: _lastSeq == 0 ? config.optStartSeq : _lastSeq + 1,
           flowControl: true,
           idleHeartbeat: const Duration(seconds: 5),
         );
 
-        await js.addConsumer(stream, consumerConfig);
+        await js.createConsumer(stream, consumerConfig);
 
         expectedConsumerSeq = 1;
         final completer = Completer<void>();
@@ -875,5 +1117,275 @@ class OrderedConsumer {
         await Future.delayed(const Duration(seconds: 1));
       }
     }
+  }
+}
+
+/// NATS JetStream Stream handle wrapping operations for a specific stream.
+class JsStream {
+  /// Reference to the JetStream context
+  final JetStream js;
+
+  /// Name of the stream
+  final String name;
+
+  /// Constructor for JsStream
+  JsStream(this.js, this.name);
+
+  /// Get details/status of this stream
+  Future<StreamInfo> info({Duration timeout = const Duration(seconds: 2)}) {
+    return js.streamInfo(name, timeout: timeout);
+  }
+
+  /// Purge all messages from this stream
+  Future<bool> purge({Duration timeout = const Duration(seconds: 2)}) {
+    return js._purgeStream(name, timeout: timeout);
+  }
+
+  /// Bind to a consumer on this stream
+  Consumer<T> consumer<T>(String consumerName,
+      {T Function(String)? jsonDecoder}) {
+    return js.consumer<T>(name, consumerName, jsonDecoder: jsonDecoder);
+  }
+
+  /// Create a consumer on this stream
+  Future<Consumer<T>> createConsumer<T>(ConsumerConfig config,
+      {Duration timeout = const Duration(seconds: 2),
+      T Function(String)? jsonDecoder}) {
+    return js.createConsumer<T>(name, config,
+        timeout: timeout, jsonDecoder: jsonDecoder);
+  }
+}
+
+/// NATS JetStream Consumer handle wrapping operations for a specific consumer.
+class Consumer<T> {
+  /// Reference to the JetStream context
+  final JetStream js;
+
+  /// Name of the stream bound to this consumer
+  final String streamName;
+
+  /// Name of the consumer
+  final String name;
+
+  /// Optional JSON decoder for generic type T
+  final T Function(String)? jsonDecoder;
+
+  /// Constructor for Consumer
+  Consumer(this.js, this.streamName, this.name, {this.jsonDecoder});
+
+  /// Get status of this consumer
+  Future<ConsumerInfo> info({Duration timeout = const Duration(seconds: 2)}) {
+    return js.consumerInfo(streamName, name, timeout: timeout);
+  }
+
+  /// Pull a batch of messages from this pull consumer
+  Future<List<Message<T>>> fetch(
+      {int batch = 1, Duration timeout = const Duration(seconds: 2)}) {
+    return js._pull<T>(streamName, name,
+        batch: batch, timeout: timeout, jsonDecoder: jsonDecoder);
+  }
+
+  /// Consume messages continuously from this consumer.
+  ///
+  /// Under the hood, if the consumer is configured as a push consumer (has a deliver subject),
+  /// it subscribes to that deliver subject.
+  /// If it is configured as a pull consumer, it continuously polls/fetches messages in the background.
+  ///
+  /// [batch] specifies the number of messages to pull per fetch request (only applicable for pull consumers).
+  /// [timeout] specifies the expiration timeout for each pull request (only applicable for pull consumers).
+  Stream<Message<T>> messages(
+      {int batch = 1, Duration timeout = const Duration(seconds: 5)}) {
+    late StreamController<Message<T>> controller;
+    StreamSubscription<Message<T>>? pushSub;
+    bool active = true;
+    bool isPaused = false;
+
+    void stop() {
+      active = false;
+      pushSub?.cancel();
+      if (!controller.isClosed) {
+        controller.close();
+      }
+    }
+
+    Future<void> startPullLoop() async {
+      while (active && !controller.isClosed) {
+        if (isPaused) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          continue;
+        }
+        try {
+          final msgs = await fetch(batch: batch, timeout: timeout);
+          for (final msg in msgs) {
+            if (!active || controller.isClosed) break;
+            controller.add(msg);
+          }
+        } catch (e) {
+          // Avoid tight loop if fetch throws
+          await Future.delayed(const Duration(seconds: 1));
+        }
+      }
+    }
+
+    controller = StreamController<Message<T>>(
+      onListen: () async {
+        try {
+          final consumerInfo = await info(timeout: timeout);
+          if (!active || controller.isClosed) return;
+
+          final deliverSubject = consumerInfo.config.deliverSubject;
+          if (deliverSubject != null && deliverSubject.isNotEmpty) {
+            // Push Consumer: Subscribe to the deliver subject
+            final sub =
+                js.client.sub<T>(deliverSubject, jsonDecoder: jsonDecoder);
+            pushSub = sub.stream.listen(
+              (msg) {
+                if (!controller.isClosed) {
+                  controller.add(msg);
+                }
+              },
+              onError: (err) {
+                if (!controller.isClosed) controller.addError(err);
+              },
+              onDone: stop,
+            );
+          } else {
+            // Pull Consumer: Start pull loop in background
+            startPullLoop();
+          }
+        } catch (e) {
+          if (!controller.isClosed) {
+            controller.addError(e);
+            stop();
+          }
+        }
+      },
+      onCancel: stop,
+      onPause: () {
+        isPaused = true;
+        pushSub?.pause();
+      },
+      onResume: () {
+        isPaused = false;
+        pushSub?.resume();
+      },
+    );
+
+    return controller.stream;
+  }
+}
+
+/// JetStream Tier resource usage
+class Tier {
+  /// Memory resource usage
+  final int memory;
+
+  /// Storage resource usage
+  final int storage;
+
+  /// Reserved memory limit
+  final int reservedMemory;
+
+  /// Reserved storage limit
+  final int reservedStorage;
+
+  /// Number of streams
+  final int streams;
+
+  /// Number of consumers
+  final int consumers;
+
+  /// Constructor for Tier
+  Tier({
+    required this.memory,
+    required this.storage,
+    required this.reservedMemory,
+    required this.reservedStorage,
+    required this.streams,
+    required this.consumers,
+  });
+
+  /// Factory from JSON map
+  factory Tier.fromJson(Map<String, dynamic> json) {
+    return Tier(
+      memory: json['memory'] as int? ?? 0,
+      storage: json['storage'] as int? ?? 0,
+      reservedMemory: json['reserved_memory'] as int? ?? 0,
+      reservedStorage: json['reserved_storage'] as int? ?? 0,
+      streams: json['streams'] as int? ?? 0,
+      consumers: json['consumers'] as int? ?? 0,
+    );
+  }
+}
+
+/// JetStream API usage statistics for an account
+class APIStats {
+  /// API limits level
+  final int level;
+
+  /// Total requests count
+  final int total;
+
+  /// Total errors count
+  final int errors;
+
+  /// Current inflight requests
+  final int inflight;
+
+  /// Constructor for APIStats
+  APIStats({
+    required this.level,
+    required this.total,
+    required this.errors,
+    required this.inflight,
+  });
+
+  /// Factory from JSON map
+  factory APIStats.fromJson(Map<String, dynamic> json) {
+    return APIStats(
+      level: json['level'] as int? ?? 0,
+      total: json['total'] as int? ?? 0,
+      errors: json['errors'] as int? ?? 0,
+      inflight: json['inflight'] as int? ?? 0,
+    );
+  }
+}
+
+/// JetStream account information
+class AccountInfo {
+  /// JetStream domain
+  final String domain;
+
+  /// API statistics
+  final APIStats api;
+
+  /// Tier resource usage
+  final Tier tier;
+
+  /// Multi-tier configurations mapped by tier name
+  final Map<String, Tier> tiers;
+
+  /// Constructor for AccountInfo
+  AccountInfo({
+    required this.domain,
+    required this.api,
+    required this.tier,
+    required this.tiers,
+  });
+
+  /// Factory from JSON map
+  factory AccountInfo.fromJson(Map<String, dynamic> json) {
+    final tiersMap = <String, Tier>{};
+    if (json['tiers'] != null) {
+      (json['tiers'] as Map<String, dynamic>).forEach((key, value) {
+        tiersMap[key] = Tier.fromJson(value as Map<String, dynamic>);
+      });
+    }
+    return AccountInfo(
+      domain: json['domain'] as String? ?? '',
+      api: APIStats.fromJson(json['api'] as Map<String, dynamic>? ?? {}),
+      tier: Tier.fromJson(json['tier'] as Map<String, dynamic>? ?? {}),
+      tiers: tiersMap,
+    );
   }
 }

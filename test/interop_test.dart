@@ -249,5 +249,203 @@ void main() {
           reason:
               'CLI responder failed to exit cleanly (exit code: $exitCode)');
     });
+
+    test('JetStream Stream Interop: Created from CLI -> Read/Write in Dart',
+        () async {
+      final streamName = 'cli_stream_${DateTime.now().millisecondsSinceEpoch}';
+      final subject =
+          'cli.stream.test.${DateTime.now().millisecondsSinceEpoch}';
+
+      // 1. Create stream from CLI
+      final resCreate = await Process.run(natsExec, [
+        'stream',
+        'add',
+        streamName,
+        '--subjects',
+        subject,
+        '--storage',
+        'memory',
+        '--defaults',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+      expect(resCreate.exitCode, equals(0),
+          reason: 'CLI stream creation failed: ${resCreate.stderr}');
+
+      // 2. Publish from CLI
+      final resPub = await Process.run(natsExec, [
+        'pub',
+        subject,
+        'msg-from-cli',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+      expect(resPub.exitCode, equals(0),
+          reason: 'CLI pub to stream failed: ${resPub.stderr}');
+
+      // 3. Verify and read in Dart
+      final info = await js.streamInfo(streamName);
+      expect(info.config.name, equals(streamName));
+      expect(info.state.messages, equals(1));
+
+      // 4. Clean up stream from Dart
+      await js.deleteStream(streamName);
+    });
+
+    test('JetStream Stream Interop: Created from Dart -> Read/Write from CLI',
+        () async {
+      final streamName = 'dart_stream_${DateTime.now().millisecondsSinceEpoch}';
+      final subject =
+          'dart.stream.test.${DateTime.now().millisecondsSinceEpoch}';
+
+      // 1. Create stream in Dart
+      await js.createStream(StreamConfig(
+        name: streamName,
+        subjects: [subject],
+        storage: 'memory',
+      ));
+
+      // 2. Publish from Dart
+      await js.publishString(subject, 'msg-from-dart');
+
+      // 3. Verify and read from CLI
+      final resInfo = await Process.run(natsExec, [
+        'stream',
+        'info',
+        streamName,
+        '-j',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+      expect(resInfo.exitCode, equals(0),
+          reason: 'CLI stream info failed: ${resInfo.stderr}');
+      final Map<String, dynamic> infoMap =
+          jsonDecode(resInfo.stdout.toString());
+      expect(infoMap['config']['name'], equals(streamName));
+      expect(infoMap['state']['messages'], equals(1));
+
+      // 4. Clean up stream
+      await js.deleteStream(streamName);
+    });
+
+    test('KeyValue Store Interop: Created from CLI -> Read/Write in Dart',
+        () async {
+      final bucket = 'cli_kv_${DateTime.now().millisecondsSinceEpoch}';
+
+      // 1. Create KV bucket from CLI
+      final resCreate = await Process.run(natsExec, [
+        'kv',
+        'add',
+        bucket,
+        '--storage',
+        'memory',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+      expect(resCreate.exitCode, equals(0),
+          reason: 'CLI KV creation failed: ${resCreate.stderr}');
+
+      // 2. Put from CLI
+      final resPut = await Process.run(natsExec, [
+        'kv',
+        'put',
+        bucket,
+        'mykey',
+        'val-from-cli',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+      expect(resPut.exitCode, equals(0),
+          reason: 'CLI KV put failed: ${resPut.stderr}');
+
+      // 3. Bind and Get in Dart
+      final kv = await js.keyValue(bucket);
+      final entry = await kv.get('mykey');
+      expect(entry, isNotNull);
+      expect(entry!.string, equals('val-from-cli'));
+
+      // 4. Put in Dart and Get from CLI
+      await kv.putString('mykey', 'val-from-dart');
+
+      final resGet = await Process.run(natsExec, [
+        'kv',
+        'get',
+        bucket,
+        'mykey',
+        '--raw',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+      expect(resGet.exitCode, equals(0),
+          reason: 'CLI KV get failed: ${resGet.stderr}');
+      expect(resGet.stdout.toString().trim(), equals('val-from-dart'));
+
+      // Clean up bucket
+      await js.deleteKeyValue(bucket);
+    });
+
+    test('Object Store Interop: Created from CLI -> Read/Write in Dart',
+        () async {
+      final bucket = 'cli_obj_${DateTime.now().millisecondsSinceEpoch}';
+
+      // 1. Create Object Store bucket from CLI
+      final resCreate = await Process.run(natsExec, [
+        'object',
+        'add',
+        bucket,
+        '--storage',
+        'memory',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+      expect(resCreate.exitCode, equals(0),
+          reason: 'CLI Object Store creation failed: ${resCreate.stderr}');
+
+      // 2. Put from CLI
+      final tempDir = Directory.systemTemp.createTempSync('nats_cli_obj');
+      final tempFile = File('${tempDir.path}/test_cli.txt');
+      tempFile.writeAsStringSync('cli-object-content');
+
+      final resPut = await Process.run(natsExec, [
+        'object',
+        'put',
+        bucket,
+        tempFile.path,
+        '--name',
+        'cli-file-key',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+      expect(resPut.exitCode, equals(0),
+          reason: 'CLI Object Store put failed: ${resPut.stderr}');
+
+      // 3. Bind and Get in Dart
+      final os = await js.objectStore(bucket);
+      final retrievedData = await os.getString('cli-file-key');
+      expect(retrievedData, equals('cli-object-content'));
+
+      // 4. Put in Dart and Get from CLI
+      await os.putString('dart-file-key', 'dart-object-content');
+
+      final destFile = File('${tempDir.path}/retrieved.txt');
+      final resGet = await Process.run(natsExec, [
+        'object',
+        'get',
+        bucket,
+        'dart-file-key',
+        '-O',
+        destFile.path,
+        '-f',
+        '-s',
+        'nats://localhost:4222',
+      ]);
+      expect(resGet.exitCode, equals(0),
+          reason: 'CLI Object Store get failed: ${resGet.stderr}');
+      expect(destFile.readAsStringSync(), equals('dart-object-content'));
+
+      // Clean up files and bucket
+      tempDir.deleteSync(recursive: true);
+      await js.deleteStream('OBJ_$bucket');
+    });
   });
 }

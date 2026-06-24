@@ -25,10 +25,8 @@ void main() async {
 
     print(
         'Creating stream "$streamName" for subjects matching "$subjectFilter"...');
-    final streamAdded = await js.addStream(streamConfig);
-    if (streamAdded) {
-      print('Stream created successfully.');
-    }
+    final stream = await js.createStream(streamConfig);
+    print('Stream created successfully.');
 
     // 4. Publish messages to the stream
     print('Publishing messages...');
@@ -65,16 +63,12 @@ void main() async {
     );
 
     print('Creating pull consumer "$consumerName"...');
-    final consumerAdded = await js.addConsumer(streamName, consumerConfig);
-    if (consumerAdded) {
-      print('Consumer created successfully.');
-    }
+    final consumer = await stream.createConsumer(consumerConfig);
+    print('Consumer created successfully.');
 
     // 6. Pull messages from the consumer in batches
     print('Pulling a batch of up to 5 messages (timeout 2s)...');
-    final messages = await js.pull(
-      streamName,
-      consumerName,
+    final messages = await consumer.fetch(
       batch: 5,
       timeout: const Duration(seconds: 2),
     );
@@ -102,9 +96,7 @@ void main() async {
     await Future.delayed(const Duration(milliseconds: 200));
 
     // Pulling again should be empty
-    final remaining = await js.pull(
-      streamName,
-      consumerName,
+    final remaining = await consumer.fetch(
       batch: 1,
       timeout: const Duration(milliseconds: 500),
     );

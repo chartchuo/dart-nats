@@ -8,6 +8,7 @@ import 'client.dart';
 import 'common.dart';
 import 'jetstream.dart';
 import 'inbox.dart';
+
 /// Represents a link to another object or bucket in the Object Store.
 class ObjectLink {
   /// The bucket name the link points to
@@ -41,27 +42,37 @@ class ObjectLink {
 
 /// Object Store Metadata Information
 class ObjectInfo {
-  /// The object's name.
-final String name;
-  /// Human‑readable description of the object.
-final String description;
-  /// Bucket containing the object.
-final String bucket;
-  /// Unique identifier for the object.
-final String nuid;
-  /// Size of the object in bytes.
-final int size;
-  /// Modification timestamp of the object.
-final DateTime mtime;
-  /// Number of data chunks the object is split into.
-final int chunks;
-  /// SHA‑256 digest of the object's data.
-final String digest;
-  /// Indicates if the object is marked as deleted.
-final bool deleted;
-  /// Optional link to another object or bucket.
-final ObjectLink? link;
+  /// Name of the object
+  final String name;
 
+  /// Optional description
+  final String description;
+
+  /// Name of the bucket
+  final String bucket;
+
+  /// Unique NUID identifier of the object
+  final String nuid;
+
+  /// Size of the object in bytes
+  final int size;
+
+  /// Modification timestamp
+  final DateTime mtime;
+
+  /// Number of chunks the object is split into
+  final int chunks;
+
+  /// SHA-256 digest of the full object payload
+  final String digest;
+
+  /// Whether the object is marked as deleted (tombstoned)
+  final bool deleted;
+
+  /// Link mapping if this object is a link to another object/bucket
+  final ObjectLink? link;
+
+  /// Constructor for ObjectInfo
   ObjectInfo({
     required this.name,
     this.description = '',
@@ -75,6 +86,7 @@ final ObjectLink? link;
     this.link,
   });
 
+  /// Factory from JSON map
   factory ObjectInfo.fromJson(Map<String, dynamic> json) {
     final opts = json['options'] as Map<String, dynamic>?;
     ObjectLink? link;
@@ -97,6 +109,7 @@ final ObjectLink? link;
     );
   }
 
+  /// Export metadata to JSON map
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{
       'name': name,
@@ -115,6 +128,51 @@ final ObjectLink? link;
       };
     }
     return map;
+  }
+}
+
+/// Object Store Configuration
+class ObjectStoreConfig {
+  /// Name of the object store bucket
+  final String bucket;
+
+  /// Description of the object store bucket
+  final String description;
+
+  /// Storage type: 'file' or 'memory'
+  final String storage;
+
+  /// Number of replicas for the backing stream
+  final int replicas;
+
+  /// Maximum size of the bucket in bytes
+  final int maxBytes;
+
+  /// Time to live for objects in the bucket
+  final Duration ttl;
+
+  /// Constructor for ObjectStoreConfig
+  ObjectStoreConfig({
+    required this.bucket,
+    this.description = '',
+    this.storage = 'file',
+    this.replicas = 1,
+    this.maxBytes = -1,
+    this.ttl = Duration.zero,
+  });
+
+  /// Convert to StreamConfig
+  StreamConfig toStreamConfig() {
+    return StreamConfig(
+      name: 'OBJ_$bucket',
+      subjects: ['\$O.$bucket.>'],
+      storage: storage,
+      maxBytes: maxBytes,
+      maxAge: ttl,
+      numReplicas: replicas,
+      allowRollup: true,
+      discard: 'new',
+    );
   }
 }
 
@@ -190,6 +248,12 @@ class ObjectStore {
     return info;
   }
 
+  /// Store a byte payload as an object
+  Future<ObjectInfo> putBytes(String name, Uint8List data,
+      {String description = ''}) {
+    return put(name, data, description: description);
+  }
+
   /// Store a string payload as an object
   Future<ObjectInfo> putString(String name, String value,
       {String description = ''}) {
@@ -198,7 +262,7 @@ class ObjectStore {
   }
 
   /// Create a link to another object in the same or different bucket.
-  Future<ObjectInfo> putLink(String name, ObjectInfo target,
+  Future<ObjectInfo> addLink(String name, ObjectInfo target,
       {String description = ''}) async {
     final nuid = Nuid().next();
 
@@ -230,7 +294,7 @@ class ObjectStore {
   }
 
   /// Create a link to an entire bucket.
-  Future<ObjectInfo> putBucketLink(String name, String targetBucket,
+  Future<ObjectInfo> addBucketLink(String name, String targetBucket,
       {String description = ''}) async {
     final nuid = Nuid().next();
 
@@ -369,7 +433,7 @@ class ObjectStore {
     });
 
     try {
-      await client.jetStream().addConsumer('OBJ_$bucket', consumerConfig);
+      await client.jetStream().createConsumer('OBJ_$bucket', consumerConfig);
     } catch (e) {
       cleanup();
       if (!completer.isCompleted) {
@@ -378,6 +442,11 @@ class ObjectStore {
     }
 
     return completer.future;
+  }
+
+  /// Retrieve full byte data of the object and verify integrity
+  Future<Uint8List?> getBytes(String name) {
+    return get(name);
   }
 
   /// Retrieve object data as string
@@ -435,7 +504,7 @@ class ObjectStore {
       ackPolicy: 'none',
     );
 
-    final list = <ObjectInfo>[];
+    final activeObjects = <String, ObjectInfo>{};
     final completer = Completer<List<ObjectInfo>>();
     StreamSubscription? streamSub;
     Timer? timeoutTimer;
@@ -449,7 +518,7 @@ class ObjectStore {
     timeoutTimer = Timer(const Duration(seconds: 5), () {
       cleanup();
       if (!completer.isCompleted) {
-        completer.complete(list);
+        completer.complete(activeObjects.values.toList());
       }
     });
 
@@ -457,8 +526,10 @@ class ObjectStore {
       try {
         final map = jsonDecode(msg.string);
         final info = ObjectInfo.fromJson(map as Map<String, dynamic>);
-        if (!info.deleted) {
-          list.add(info);
+        if (info.deleted) {
+          activeObjects.remove(info.name);
+        } else {
+          activeObjects[info.name] = info;
         }
       } catch (_) {}
 
@@ -474,7 +545,7 @@ class ObjectStore {
         if (pending == 0) {
           cleanup();
           if (!completer.isCompleted) {
-            completer.complete(list);
+            completer.complete(activeObjects.values.toList());
           }
         }
       }
@@ -486,12 +557,12 @@ class ObjectStore {
     }, onDone: () {
       cleanup();
       if (!completer.isCompleted) {
-        completer.complete(list);
+        completer.complete(activeObjects.values.toList());
       }
     });
 
     try {
-      await client.jetStream().addConsumer('OBJ_$bucket', consumerConfig);
+      await client.jetStream().createConsumer('OBJ_$bucket', consumerConfig);
     } catch (e) {
       cleanup();
       if (!completer.isCompleted) {

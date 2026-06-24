@@ -394,14 +394,14 @@ final streamConfig = StreamConfig(
 );
 
 // 2. Create the stream
-await js.addStream(streamConfig);
+final Stream stream = await js.createStream(streamConfig);
 
 // 3. Get stream info (e.g. sequence numbers, message counts)
-final StreamInfo info = await js.getStream('events-stream');
+final StreamInfo info = await stream.info();
 print('Stored messages: ${info.state.messages}');
 
 // 4. Purge stream messages
-await js.purgeStream('events-stream');
+await stream.purge();
 
 // 5. Delete stream
 await js.deleteStream('events-stream');
@@ -432,12 +432,10 @@ final consumerConfig = ConsumerConfig(
 );
 
 // 2. Add the consumer to the stream
-await js.addConsumer('events-stream', consumerConfig);
+final Consumer consumer = await stream.createConsumer(consumerConfig);
 
 // 3. Pull a batch of messages on-demand
-final List<Message> batch = await js.pull(
-  'events-stream',
-  'worker-consumer',
+final List<Message> batch = await consumer.fetch(
   batch: 10,
   timeout: const Duration(seconds: 3),
 );
@@ -464,26 +462,43 @@ await js.deleteConsumer('events-stream', 'worker-consumer');
 
 The KV Store provides a lightweight, schemaless key-value database built on top of NATS JetStream.
 
-### 1. Create or Bind to a KV Bucket
+### 1. Create, Bind, or Delete a KV Bucket
 ```dart
-// Provision or bind to the bucket. Setting create: true creates the backing JetStream stream.
-final KeyValue kv = await js.keyValue('app_settings', create: true, storage: 'memory');
+// Create a new bucket with custom configuration
+final KeyValue kv = await js.createKeyValue(KeyValueConfig(
+  bucket: 'app_settings',
+  storage: 'memory',
+  history: 5,
+));
+
+// Bind to an existing bucket by name
+final KeyValue boundKv = await js.keyValue('app_settings');
+
+// Delete a KV bucket (removes the backing stream)
+await js.deleteKeyValue('app_settings');
 ```
 
-### 2. Put & Get Values
+### 2. Put, Create, Update, & Get Values
 ```dart
-// Save keys (strings or raw binary bytes)
+// Save keys (strings or raw binary bytes) - puts overwrite existing values
 await kv.putString('theme', 'dark');
 await kv.put('port', Uint8List.fromList([80, 80]));
 
-// Fetch key entry
+// Atomic conditional creation - succeeds only if key doesn't exist
+final rev = await kv.createString('lock_key', 'session_active');
+
+// Atomic conditional update - succeeds only if current revision matches
+await kv.updateString('lock_key', 'session_renewed', rev);
+
+// Fetch latest key entry
 final KeyValueEntry? entry = await kv.get('theme');
 if (entry != null) {
-  print('Key: ${entry.key}');
-  print('Value: ${entry.string}');
-  print('Revision (Sequence): ${entry.revision}');
-  print('Timestamp: ${entry.created}');
+  print('Key: ${entry.key}, Value: ${entry.string}');
+  print('Revision: ${entry.revision}, Operation: ${entry.op}');
 }
+
+// Fetch a specific revision of a key
+final KeyValueEntry? oldEntry = await kv.getRevision('lock_key', rev);
 ```
 
 ### 3. Deleting vs Purging
@@ -502,10 +517,12 @@ Listen for live updates to keys. You can watch specific keys, or use wildcards (
 final Stream<KeyValueEntry?> watcher = kv.watch(key: 'user.>', includeHistory: false);
 
 final streamSub = watcher.listen((KeyValueEntry? entry) {
-  if (entry == null) {
-    print('Watched key was deleted/purged.');
-  } else {
-    print('Live Update - Key: ${entry.key}, Value: ${entry.string}');
+  if (entry != null) {
+    if (entry.op == KeyValueOp.put) {
+      print('Live Update - Key: ${entry.key}, Value: ${entry.string}');
+    } else {
+      print('Key ${entry.key} was deleted/purged (Op: ${entry.op})');
+    }
   }
 });
 
@@ -519,21 +536,31 @@ await streamSub.cancel();
 
 The Object Store is built on top of JetStream. It is designed to store files and large payloads. Under the hood, the client splits large objects into 128 KiB chunks and performs end-to-end SHA-256 digest validation to ensure file transfer integrity.
 
-### 1. Bind or Create a Bucket
+### 1. Create, Bind, or Delete a Bucket
 ```dart
-final ObjectStore os = await js.objectStore('attachments', create: true, storage: 'memory');
+// Create a new Object Store bucket
+final ObjectStore os = await js.createObjectStore(ObjectStoreConfig(
+  bucket: 'attachments',
+  storage: 'memory',
+));
+
+// Bind to an existing Object Store
+final ObjectStore boundOs = await js.objectStore('attachments');
+
+// Delete an Object Store bucket
+await js.deleteObjectStore('attachments');
 ```
 
 ### 2. Put & Get Large Payloads
 ```dart
 final largeData = Uint8List(500 * 1024); // 500 KiB data payload
 
-// Upload the object (will split into 4 chunks of 128 KiB under the hood)
-final ObjectInfo info = await os.put('report.pdf', largeData, description: 'Q3 financial report');
+// Upload the object (will split into chunks of 128 KiB under the hood)
+final ObjectInfo info = await os.putBytes('report.pdf', largeData, description: 'Q3 financial report');
 print('Uploaded chunks count: ${info.chunks}');
 
 // Download object (downloads chunks and verifies SHA-256 integrity automatically)
-final Uint8List? fileData = await os.get('report.pdf');
+final Uint8List? fileData = await os.getBytes('report.pdf');
 print('Downloaded file size: ${fileData?.length} bytes');
 ```
 

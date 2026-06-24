@@ -10,19 +10,25 @@ import 'inbox.dart';
 
 /// KeyValue Configuration
 class KeyValueConfig {
-  /// The bucket name.
-final String bucket;
-  /// Human‑readable description of the bucket.
-final String description;
-  /// Storage type, either 'file' or 'memory'.
-final String storage; // 'file' or 'memory'
-  /// Maximum number of messages per key (history depth).
-final int history; // max_msgs_per_subject
-  /// Maximum total bytes for the bucket (‑1 for unlimited).
-final int maxBytes;
-  /// Time‑to‑live for entries; 0 for no expiry.
-final Duration ttl; // max_age
+  /// Name of the key-value bucket
+  final String bucket;
 
+  /// Description of the key-value bucket
+  final String description;
+
+  /// Storage type: 'file' or 'memory'
+  final String storage;
+
+  /// History depth (maximum historical values kept per key)
+  final int history;
+
+  /// Maximum size of the bucket in bytes
+  final int maxBytes;
+
+  /// Time to live for values in the bucket
+  final Duration ttl;
+
+  /// Constructor for KeyValueConfig
   KeyValueConfig({
     required this.bucket,
     this.description = '',
@@ -49,22 +55,50 @@ final Duration ttl; // max_age
   }
 }
 
+/// KeyValue operations
+enum KeyValueOp {
+  /// Put operation (set/update value)
+  put,
+
+  /// Delete operation (add tombstone)
+  delete,
+
+  /// Purge operation (delete all key history)
+  purge,
+}
+
 /// KeyValue Entry holding value and metadata revision details
 class KeyValueEntry {
-  /// The entry's key.
-final String key;
-  /// The entry's value bytes.
-final Uint8List value;
-  /// Revision number for this entry.
-final int revision;
-  /// Creation timestamp of the entry.
-final DateTime created;
+  /// Name of the bucket containing entry
+  final String bucket;
 
+  /// The entry key
+  final String key;
+
+  /// Byte payload value
+  final Uint8List value;
+
+  /// Revision number in the backing stream
+  final int revision;
+
+  /// Created timestamp
+  final DateTime created;
+
+  /// Sequence delta number
+  final int delta;
+
+  /// Operation type performed
+  final KeyValueOp op;
+
+  /// Constructor for KeyValueEntry
   KeyValueEntry({
     required this.key,
     required this.value,
     required this.revision,
     required this.created,
+    this.bucket = '',
+    this.delta = 0,
+    this.op = KeyValueOp.put,
   });
 
   /// Get value payload as string
@@ -75,13 +109,16 @@ final DateTime created;
 ///
 /// NATS Key-Value Store implementation
 class KeyValue {
-  /// Underlying NATS client used for all operations.
-final Client client;
-  /// Name of the bucket this instance operates on.
-final String bucket;
-  /// Backing JetStream stream name (derived from the bucket).
-final String streamName;
+  /// Reference to the core NATS Client
+  final Client client;
 
+  /// Name of the bucket
+  final String bucket;
+
+  /// Backing stream name
+  final String streamName;
+
+  /// Constructor for KeyValue store
   KeyValue(this.client, this.bucket) : streamName = 'KV_$bucket';
 
   /// Associate a value with a key
@@ -99,8 +136,103 @@ Future<int> putString(String key, String value) {
   }
 
   /// Retrieve the latest entry associated with a key
-  /// Retrieve the latest entry for [key]; returns `null` if the key does not exist.
-Future<KeyValueEntry?> get(String key) async {
+  Future<KeyValueEntry?> get(String key) async {
+    final entry = await _getRaw(key);
+    if (entry == null ||
+        entry.op == KeyValueOp.delete ||
+        entry.op == KeyValueOp.purge) {
+      return null;
+    }
+    return entry;
+  }
+
+  /// Create a key with the given value only if it does not exist
+  Future<int> create(String key, Uint8List value) async {
+    try {
+      final subject = '\$KV.$bucket.$key';
+      final ack = await client.jetStream().publish(
+            subject,
+            value,
+            opts: PubOpts(expectLastSubjectSeq: 0),
+          );
+      return ack.sequence;
+    } catch (e) {
+      final entry = await _getRaw(key);
+      if (entry != null &&
+          (entry.op == KeyValueOp.delete || entry.op == KeyValueOp.purge)) {
+        try {
+          final subject = '\$KV.$bucket.$key';
+          final ack = await client.jetStream().publish(
+                subject,
+                value,
+                opts: PubOpts(expectLastSubjectSeq: entry.revision),
+              );
+          return ack.sequence;
+        } catch (_) {}
+      }
+      throw NatsException('key already exists');
+    }
+  }
+
+  /// Create a key with the given string value only if it does not exist
+  Future<int> createString(String key, String value) {
+    return create(key, Uint8List.fromList(utf8.encode(value)));
+  }
+
+  /// Update the value for the key only if the current revision matches
+  Future<int> update(String key, Uint8List value, int revision) async {
+    final subject = '\$KV.$bucket.$key';
+    final ack = await client.jetStream().publish(
+          subject,
+          value,
+          opts: PubOpts(expectLastSubjectSeq: revision),
+        );
+    return ack.sequence;
+  }
+
+  /// Update the string value for the key only if the current revision matches
+  Future<int> updateString(String key, String value, int revision) {
+    return update(key, Uint8List.fromList(utf8.encode(value)), revision);
+  }
+
+  /// Retrieve a specific revision associated with a key
+  Future<KeyValueEntry?> getRevision(String key, int revision) async {
+    final apiSubject = '\$JS.API.STREAM.MSG.GET.$streamName';
+    final payload = utf8.encode(jsonEncode({
+      'seq': revision,
+    }));
+
+    try {
+      final response =
+          await client.request(apiSubject, Uint8List.fromList(payload));
+      final map = jsonDecode(response.string);
+      if (map['error'] != null) {
+        if (map['error']['code'] == 404) {
+          return null; // Revision not found
+        }
+        throw NatsException(map['error']['description'] as String);
+      }
+      final msgMap = map['message'] as Map<String, dynamic>;
+      final msgSubject = msgMap['subject'] as String?;
+      if (msgSubject != '\$KV.$bucket.$key') {
+        return null; // Subject mismatch (revision corresponds to another key)
+      }
+      final entry = _parseEntryRaw(key, msgMap);
+      if (entry == null ||
+          entry.op == KeyValueOp.delete ||
+          entry.op == KeyValueOp.purge) {
+        return null;
+      }
+      return entry;
+    } catch (e) {
+      if (e is TimeoutException) {
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  Future<KeyValueEntry?> _getRaw(String key) async {
     final apiSubject = '\$JS.API.STREAM.MSG.GET.$streamName';
     final payload = utf8.encode(jsonEncode({
       'last_by_subj': '\$KV.$bucket.$key',
@@ -116,7 +248,7 @@ Future<KeyValueEntry?> get(String key) async {
         }
         throw NatsException(map['error']['description'] as String);
       }
-      return _parseEntry(key, map['message'] as Map<String, dynamic>);
+      return _parseEntryRaw(key, map['message'] as Map<String, dynamic>);
     } catch (e) {
       if (e is TimeoutException) {
         return null;
@@ -161,16 +293,21 @@ Future<bool> purge(String key) async {
 
         Header? header = msg.header;
         final op = header?.get('KV-Operation');
-        if (op == 'DEL' || op == 'PURGE') {
-          controller.add(null);
-        } else {
-          controller.add(KeyValueEntry(
-            key: keyName,
-            value: msg.byte,
-            revision: msg.streamSequence ?? 0,
-            created: DateTime.now(),
-          ));
+        KeyValueOp kvOp = KeyValueOp.put;
+        if (op == 'DEL') {
+          kvOp = KeyValueOp.delete;
+        } else if (op == 'PURGE') {
+          kvOp = KeyValueOp.purge;
         }
+
+        controller.add(KeyValueEntry(
+          bucket: bucket,
+          key: keyName,
+          value: kvOp == KeyValueOp.put ? msg.byte : Uint8List(0),
+          revision: msg.streamSequence ?? 0,
+          created: DateTime.now(),
+          op: kvOp,
+        ));
       } catch (e) {
         controller.addError(e);
       }
@@ -189,7 +326,7 @@ Future<bool> purge(String key) async {
 
     client
         .jetStream()
-        .addConsumer(streamName, consumerConfig)
+        .createConsumer(streamName, consumerConfig)
         .catchError((dynamic err) {
       controller.addError(err);
       controller.close();
@@ -204,7 +341,7 @@ Future<bool> purge(String key) async {
     return controller.stream;
   }
 
-  KeyValueEntry? _parseEntry(String key, Map<String, dynamic> jsonMsg) {
+  KeyValueEntry? _parseEntryRaw(String key, Map<String, dynamic> jsonMsg) {
     final seq = jsonMsg['seq'] as int;
     final timeStr = jsonMsg['time'] as String;
     final created = DateTime.tryParse(timeStr) ?? DateTime.now();
@@ -216,10 +353,13 @@ Future<bool> purge(String key) async {
       header = Header.fromBytes(decodedHdrs);
     }
 
+    KeyValueOp op = KeyValueOp.put;
     if (header != null) {
-      final op = header.get('KV-Operation');
-      if (op == 'DEL' || op == 'PURGE') {
-        return null; // Key is deleted or purged
+      final kvOp = header.get('KV-Operation');
+      if (kvOp == 'DEL') {
+        op = KeyValueOp.delete;
+      } else if (kvOp == 'PURGE') {
+        op = KeyValueOp.purge;
       }
     }
 
@@ -227,16 +367,18 @@ Future<bool> purge(String key) async {
     final value = base64.decode(data);
 
     return KeyValueEntry(
+      bucket: bucket,
       key: key,
       value: value,
       revision: seq,
       created: created,
+      op: op,
     );
   }
 
   /// List all active keys in this bucket (excluding deleted/purged ones).
-  /// List all active keys in the bucket, excluding those that are deleted or purged.
-Future<List<String>> keys({Duration timeout = const Duration(seconds: 5)}) async {
+  Future<List<String>> keys(
+      {Duration timeout = const Duration(seconds: 5)}) async {
     final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
     final sub = client.sub(deliverSubject);
 
@@ -261,7 +403,10 @@ Future<List<String>> keys({Duration timeout = const Duration(seconds: 5)}) async
     timeoutTimer = Timer(timeout, () {
       cleanup();
       if (!completer.isCompleted) {
-        completer.complete(activeKeys.entries.where((e) => e.value).map((e) => e.key).toList());
+        completer.complete(activeKeys.entries
+            .where((e) => e.value)
+            .map((e) => e.key)
+            .toList());
       }
     });
 
@@ -291,7 +436,10 @@ Future<List<String>> keys({Duration timeout = const Duration(seconds: 5)}) async
         if (pending == 0) {
           cleanup();
           if (!completer.isCompleted) {
-            completer.complete(activeKeys.entries.where((e) => e.value).map((e) => e.key).toList());
+            completer.complete(activeKeys.entries
+                .where((e) => e.value)
+                .map((e) => e.key)
+                .toList());
           }
         }
       }
@@ -303,12 +451,15 @@ Future<List<String>> keys({Duration timeout = const Duration(seconds: 5)}) async
     }, onDone: () {
       cleanup();
       if (!completer.isCompleted) {
-        completer.complete(activeKeys.entries.where((e) => e.value).map((e) => e.key).toList());
+        completer.complete(activeKeys.entries
+            .where((e) => e.value)
+            .map((e) => e.key)
+            .toList());
       }
     });
 
     try {
-      await client.jetStream().addConsumer(streamName, consumerConfig);
+      await client.jetStream().createConsumer(streamName, consumerConfig);
     } catch (e) {
       cleanup();
       if (!completer.isCompleted) {
@@ -321,8 +472,8 @@ Future<List<String>> keys({Duration timeout = const Duration(seconds: 5)}) async
 
   /// Get a stream of all revisions (history) for a specific key.
   /// The stream will yield historical entries and automatically close when the existing history is fully read.
-  /// Stream the historical revisions for [key] in order of creation.
-Stream<KeyValueEntry> history(String key, {Duration timeout = const Duration(seconds: 5)}) {
+  Stream<KeyValueEntry> history(String key,
+      {Duration timeout = const Duration(seconds: 5)}) {
     final controller = StreamController<KeyValueEntry>();
     final deliverSubject = client.inboxPrefix + '.' + Nuid().next();
     final sub = client.sub(deliverSubject);
@@ -349,12 +500,23 @@ Stream<KeyValueEntry> history(String key, {Duration timeout = const Duration(sec
         if (parts.length >= 3) {
           final keyName = parts.sublist(2).join('.');
           final seq = msg.streamSequence ?? 0;
-          
+
+          Header? header = msg.header;
+          final op = header?.get('KV-Operation');
+          KeyValueOp kvOp = KeyValueOp.put;
+          if (op == 'DEL') {
+            kvOp = KeyValueOp.delete;
+          } else if (op == 'PURGE') {
+            kvOp = KeyValueOp.purge;
+          }
+
           controller.add(KeyValueEntry(
+            bucket: bucket,
             key: keyName,
-            value: msg.byte,
+            value: kvOp == KeyValueOp.put ? msg.byte : Uint8List(0),
             revision: seq,
             created: DateTime.now(),
+            op: kvOp,
           ));
         }
       } catch (e) {
@@ -381,24 +543,28 @@ Stream<KeyValueEntry> history(String key, {Duration timeout = const Duration(sec
       cleanup();
     });
 
-    client.jetStream().addConsumer(streamName, ConsumerConfig(
-      deliverSubject: deliverSubject,
-      filterSubject: '\$KV.$bucket.$key',
-      deliverPolicy: 'all',
-      ackPolicy: 'none',
-    )).catchError((dynamic err) {
+    client
+        .jetStream()
+        .createConsumer(
+            streamName,
+            ConsumerConfig(
+              deliverSubject: deliverSubject,
+              filterSubject: '\$KV.$bucket.$key',
+              deliverPolicy: 'all',
+              ackPolicy: 'none',
+            ))
+        .catchError((dynamic err) {
       controller.addError(err);
       cleanup();
-      return false;
+      throw err;
     });
 
     return controller.stream;
   }
 
   /// Get status details for this Key-Value bucket.
-  /// Retrieve status and statistics for this bucket.
-Future<KeyValueStatus> status() async {
-    final info = await client.jetStream().getStream(streamName);
+  Future<KeyValueStatus> status() async {
+    final info = await client.jetStream().streamInfo(streamName);
     return KeyValueStatus(bucket, info);
   }
 }

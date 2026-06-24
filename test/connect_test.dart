@@ -211,7 +211,8 @@ void main() {
       expect(clientWs.isClosedAndCleaned, isTrue);
     });
 
-    test('reconnect to valid server after connection failure to invalid server', () async {
+    test('reconnect to valid server after connection failure to invalid server',
+        () async {
       var client = Client();
 
       // 1. Attempt connection to a non-existent WebSocket NATS server
@@ -240,11 +241,105 @@ void main() {
 
       // 4. Verify that publish/subscribe works after reconnecting
       var sub = client.sub('reconnect_test_subject');
-      await client.pub('reconnect_test_subject', Uint8List.fromList('test_data'.codeUnits));
+      await client.pub(
+          'reconnect_test_subject', Uint8List.fromList('test_data'.codeUnits));
       var msg = await sub.stream.first;
       expect(String.fromCharCodes(msg.byte), equals('test_data'));
 
       await client.close();
+    });
+
+    test('connection close logic and state transition', () async {
+      var client = Client();
+      await client.connect(Uri.parse('nats://localhost:4222'), retry: false);
+      expect(client.status, equals(Status.connected));
+      expect(client.connected, isTrue);
+
+      // Verify pending ping is completed with error upon close
+      var pingFuture = client.ping();
+
+      // Expect that pingFuture will throw NatsException when closed.
+      // This is registered before close() is called to avoid unhandled async errors in the test Zone.
+      expect(pingFuture, throwsA(isA<NatsException>()));
+
+      await client.close();
+      expect(client.status, equals(Status.closed));
+      expect(client.connected, isFalse);
+      expect(client.isClosedAndCleaned, isTrue);
+
+      // Subsequent operations like request should throw NatsException
+      expect(
+        client.request('subj', Uint8List(0)),
+        throwsA(isA<NatsException>()),
+      );
+
+      // Subsequent unbuffered pub should return false
+      var pubResult = await client.pub('subj', Uint8List(0), buffer: false);
+      expect(pubResult, isFalse);
+    });
+
+    test('connection forceClose cancels retries and closes', () async {
+      var client = Client();
+      // Connect to a valid server with retry enabled (will block/loop in statusStream await)
+      var connectFuture = client.connect(
+        Uri.parse('nats://localhost:4222'),
+        retry: true,
+        retryCount: -1,
+        retryInterval: 1,
+      );
+
+      await client.waitUntilConnected();
+      expect(client.status, equals(Status.connected));
+
+      await client.forceClose();
+      expect(client.status, equals(Status.closed));
+      expect(client.isClosedAndCleaned, isTrue);
+
+      // The connectFuture should complete successfully (emits null) when closed
+      await expectLater(connectFuture, completes);
+
+      // Wait a bit to ensure it doesn't trigger reconnect and remains closed
+      await Future<void>.delayed(Duration(seconds: 2));
+      expect(client.status, equals(Status.closed));
+    });
+
+    test('connection drain gracefully receives pending messages and closes',
+        () async {
+      var client = Client();
+      await client.connect(Uri.parse('nats://localhost:4222'), retry: false);
+
+      var sub = client.sub('drain_test');
+
+      // Publish messages
+      await client.pubString('drain_test', 'msg1');
+      await client.pubString('drain_test', 'msg2');
+      await client.pubString('drain_test', 'msg3');
+
+      // Collect received messages and track stream completion
+      var received = <String>[];
+      var streamClosed = Completer<void>();
+
+      sub.stream.listen(
+        (msg) {
+          received.add(msg.string);
+        },
+        onDone: () {
+          streamClosed.complete();
+        },
+      );
+
+      // Call drain
+      await client.drain();
+
+      // The client should be closed
+      expect(client.status, equals(Status.closed));
+      expect(client.isClosedAndCleaned, isTrue);
+
+      // The subscription stream should complete (onDone is called)
+      await streamClosed.future.timeout(Duration(seconds: 5));
+
+      // Verify all published messages were received before stream closure
+      expect(received, equals(['msg1', 'msg2', 'msg3']));
     });
   });
 }

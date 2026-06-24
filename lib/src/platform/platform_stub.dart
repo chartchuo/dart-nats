@@ -1,52 +1,59 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-/// Abstract security context placeholder for platform‑specific implementations.
+/// Abstract security context stub for platform abstraction
 abstract class SecurityContext {}
 
-/// Abstract socket class placeholder for platform‑specific implementations.
+/// Abstract Socket class stub for platform abstraction
 abstract class Socket extends Stream<Uint8List> {
-    /// Connect to a TCP socket (unsupported on this platform).
+  /// Connects to a socket
   static Future<Socket> connect(dynamic host, int port, {Duration? timeout}) {
     throw UnsupportedError('Sockets are not supported on this platform.');
   }
 
-    /// Add data to the socket (unsupported on this platform).
+  /// Adds data to the socket stream
   void add(List<int> data);
-    /// Close the socket connection (unsupported on this platform).
+
+  /// Closes the socket connection
   Future<void> close();
 }
 
-/// Abstract secure socket class placeholder for platform‑specific implementations.
+/// Abstract SecureSocket class stub for platform abstraction
 abstract class SecureSocket extends Stream<Uint8List> {
-    /// Upgrade an existing socket to a secure TLS socket (unsupported on this platform).
+  /// Secures an existing socket connection
   static Future<SecureSocket> secure(dynamic socket,
       {dynamic context, bool Function(dynamic)? onBadCertificate}) {
     throw UnsupportedError(
         'Secure sockets are not supported on this platform.');
   }
 
-    /// Add data to the secure socket (unsupported on this platform).
+  /// Adds data to the secure socket stream
   void add(List<int> data);
-    /// Close the secure socket (unsupported on this platform).
+
+  /// Closes the secure socket connection
   Future<void> close();
 }
 
-/// Abstract TLS exception placeholder for platform‑specific implementations.
+/// Abstract TlsException class stub for platform abstraction
 abstract class TlsException {
+  /// Exception message
   final String message;
+
+  /// Constructor for TlsException
   TlsException([this.message = '']);
 }
 
-/// Abstract file class placeholder for platform‑specific implementations.
+/// Abstract File class stub for platform abstraction
 abstract class File {
-    /// Factory constructor to create a file instance (unsupported on this platform).
+  /// Factory constructor for File
   factory File(String path) {
     throw UnsupportedError(
         'File operations are not supported on this platform.');
   }
-    /// Check if the file exists (unsupported on this platform).
+
+  /// Checks if file exists
   Future<bool> exists();
-    /// Read the entire file as a string (unsupported on this platform).
+
+  /// Reads file contents as string
   Future<String> readAsString();
 }
