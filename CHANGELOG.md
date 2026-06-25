@@ -1,3 +1,8 @@
+## 1.1.1
+
+* Fix defect #42: Ensure `newInbox` always appends a dot suffix (`.`) to `inboxPrefix` to conform to hierarchical NATS subject structures (`_INBOX.>` gateway callout authorization policy).
+* Retain backward compatibility: Do not append double dots (`..`) if the prefix argument already ends with a dot.
+
 ## 1.1.0
 
 * Add JetStream, Key-Value, and Object Store API enhancements and handle-based classes:

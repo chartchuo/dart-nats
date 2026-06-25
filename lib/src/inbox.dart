@@ -8,7 +8,8 @@ String newInbox({String inboxPrefix = '_INBOX', bool secure = true}) {
   if (secure) {
     _nuid = Nuid();
   }
-  return inboxPrefix + _nuid.next();
+  final prefix = inboxPrefix.endsWith('.') ? inboxPrefix : '$inboxPrefix.';
+  return prefix + _nuid.next();
 }
 
 ///nuid port from go nats
